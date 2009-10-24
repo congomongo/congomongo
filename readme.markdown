@@ -87,22 +87,22 @@ You need to have the mongodb-java-driver and clojure on your classpath
 in order to use congomongo.
 
 A working jar of the mongodb-java-api is included in deps, but you can
-also get the latest one [here](http://www.github.com/mongodb/mongo-java-driver).
+also get the latest one [here](http://www.github.com/mongodb/mongo-java-driver).   
 Just in case you don't have clojure try looking [here](http://www.github.com/richhickey/clojure).
 
 Building congomongo
 -------
 
-You will need a very recent version of the mongo-java-driver due to a
-bug interfering with serialization of nested maps in earlier
-version. A working jar is included in deps, but feel free to swap it
+You will need a very recent version of the mongo-java-driver due to a  
+bug interfering with serialization of nested maps in earlier   
+version. A working jar is included in deps, but feel free to swap it   
 out with a newer one.
 
 In the congomongo root directory type:
 
     ant -Dclojure.jar=<path/to/my/clojure.jar>
 
-and voila, you should find a shiny new congomongo jar that's ready 
+and voila, you should find a shiny new congomongo jar that's ready   
 and raring to get on the classpath.
 
 TODO
