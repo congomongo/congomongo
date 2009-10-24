@@ -16,13 +16,13 @@ Basics
 
 ### Setup
 
-`(ns my-mongo-app`
-
-  `(:use somnium.congomongo))`
-
-  `(mongo!`
-
-    `:db "mydb")`
+>(ns my-mongo-app
+>
+>  (:use somnium.congomongo))
+>
+>(mongo!
+> 
+>  :db "mydb")
 
 ### Create
 
@@ -35,7 +35,7 @@ Basics
 ### Read
 
 >`(fetch`
-
+>
 >  `:my-collection`
 
 >  `:where {:x {'> 7` 
