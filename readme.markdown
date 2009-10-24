@@ -3,7 +3,7 @@ congomongo
 
 What?
 ------
-A Clojure toolkit wrapped around the MongoDB java api.
+A toolkit for using mongodb with clojure.
 
 Summary
 ---------
