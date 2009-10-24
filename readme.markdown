@@ -84,11 +84,11 @@ Dependencies
 ------------
 
 You need to have the mongodb-java-driver and clojure on your classpath
-in order to use congomongo. You also needs a running mongodb instance
-to talk to in order to do anything useful.
+in order to use congomongo.
 
-  You can get the mongodb-java-api jar [here](http://www.github.com/mongodb/mongo-java-driver).
-Just in case you can't find clojure try looking [here](http://www.github.com/richhickey/clojure).
+A working jar of the mongodb-java-api is included in deps, but you can
+also get the latest one [here](http://www.github.com/mongodb/mongo-java-driver).
+Just in case you don't have clojure try looking [here](http://www.github.com/richhickey/clojure).
 
 Building congomongo
 -------
