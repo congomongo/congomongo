@@ -58,9 +58,9 @@ Basics
 Coercions
 ---------
 
-  The MongoDB java api will serialize any collections that
+  The mongodb-java-driver will serialize any collections that
 implement java.util.Map or java.util.List. That covers most
-of Clojure already, for convenience Congo coerces all keywords
+of clojure already, for convenience congomongo coerces all keywords
 to strings on insert, and coerces map keys back to keywords
 on fetch (unless you're fetching json).
 
