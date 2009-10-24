@@ -25,7 +25,7 @@
              :only [object-to-map map-to-object coerce-many
                     coerce-fields cache-coercions!]]
             [somnium.congomongo.util
-             :only [named]])  
+             :only [named case]])  
   (:import  [com.mongodb Mongo DB DBCollection BasicDBObject]
             [com.mongodb.util JSON]))
 
@@ -45,17 +45,34 @@
                        (or (argmap :port) 27017))
         db     (.getDB mongo (named (argmap :db)))]
     (do
-      (swap! *mongo-config*
-                (fn [& _]
-                  {:mongo       mongo
-                   :db          db
-                   :coerce-to   (or (argmap :coerce-to)
-                                    [:keywords :query-operators :object-ids])
-                   :coerce-from (or (argmap :coerce-from)
-                                    [:keywords])}))
-      (cache-coercions!))))
+      (reset! *mongo-config*
+               {:mongo       mongo
+                :db          db
+                :coerce-to   (or (argmap :coerce-to)
+                                 [:keywords :query-operators :object-ids])
+                :coerce-from (or (argmap :coerce-from)
+                                 [:keywords])})
+      (cache-coercions!)
+      true)))
 
-;; todo database manipulations
+;; perhaps split *mongo-config* out into vars for thread-local
+;; changes. 
+
+(defn drop-database!
+ "drops a database from the mongo server"
+ [title]
+ (.dropDatabase (:mongo @*mongo-config*)))
+
+(defn set-database!
+  "atomically alters the current database"
+  [title]
+  (if-let [db (.getDB #^Mongo (:mongo @*mongo-config*))]
+    (swap! *mongo-config* merge {:db db})
+    (throw (RuntimeException. (str "database with title " title " does not exist.")))))
+
+(defn databases
+  "List databases on the mongo server" []
+  (.getDatabaseNames (:mongo @*mongo-config*)))
 
 (defn collections
   "Returns the set of collections stored in the current database"
@@ -77,13 +94,14 @@
 ;; could be cleaner as multimethod dispatching on :many :one :count or
 ;; simiilar, need to add :skip and :limit options
 
-(defn fetch [col & options]
+(defn fetch 
   "Fetches objects from a collection. Optional arguments include
    :where -> takes a query map
    :only  -> takes an array of keys to retrieve
    :as    -> defaults to :clojure, specify :json to get records as json
    :one   -> defaults to false, use fetch-one as a shortcut
    :count -> defaults to false, use fetch-count as a shortcut"
+  [col & options]
   (let [argmap (apply hash-map options)
         where  #^BasicDBObject (map-to-object (or (:where argmap) {}))
         only   #^BasicDBObject (coerce-fields (or (:only argmap) []))
@@ -103,15 +121,33 @@
 (defn fetch-count [col & options]
   (apply fetch col (concat options [:count true])))
 
-(defn insert! [col map]
-  "Inserts a map into collection. Will not overwrite existing maps."
-  (.insert #^DBCollection  (get-coll col)
-           #^BasicDBObject (map-to-object map)))
+(defn insert! 
+  "Inserts a map into collection. Will not overwrite existing maps.
+   Takes an optional :return argument that specifies what to return.
+   Default is nil, can specify :clojure, :json and :db."
+  [col map & options]
+  (let [argmap (apply hash-map options)
+        res    (.insert #^DBCollection  (get-coll col)
+                        #^BasicDBObject (map-to-object map))]
+    (case (argmap :return)
+      :db      res
+      :json    (JSON/serialize res) 
+      :clojure (object-to-map res)
+      :else    nil)))
 
-(defn mass-insert! [col mapseq]
-  "Inserts a lot of maps into a collection. Does not overwrite existing objects."
-  (.insert #^DBCollection (get-coll col)
-           #^java.util.List (coerce-many mapseq :clojure :db)))
+(defn mass-insert! 
+  "Inserts a lot of maps into a collection. Does not overwrite existing objects.
+   Returns a lazy sequence of clojure maps. Options:
+   :return -> defaults to :clojure, can also be :json, :db, or nil"
+  [col mapseq & options]
+  (let [argmap (apply hash-map options)
+        res    (.insert #^DBCollection (get-coll col)
+                 #^java.util.List (coerce-many mapseq :clojure :db))]
+    (case (argmap :return)
+            :db      res
+            :json    (JSON/serialize res)
+            :clojure (coerce-many res :db :clojure)
+            :else    nil)))
 
 ;; should this raise an exception if _ns and _id aren't present?
 (defn update!
@@ -130,7 +166,7 @@
 
 (defn destroy!
   "Removes map from collection. Takes a collection name and
-   a query map argument constraints."
+   a query map argument."
   ([coll map] (.remove (get-coll coll) #^BasicDBObject (map-to-object map))))
 
 (defn get-indexes

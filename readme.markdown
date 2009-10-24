@@ -3,13 +3,15 @@ congomongo
 
 What?
 ------
-A toolkit for using mongodb with clojure.
+A toolkit for using MongoDB with Clojure.
 
 Summary
 ---------
-Provides a convenience wrapper around most of the standard methods on 
-collections from the java api and introduces some coercion utilities 
-for convenient serialization of Clojure data-structures.
+Provides a convenience wrapper around a subset of methods in the
+mongodb-java-driver. It also introduces some coercion utilities 
+for convenient serialization of Clojure data-structures. It is 
+still pre-alpha so the api is subject to change. Bug reports and
+patches are welcome!
 
 Basics
 --------
@@ -19,44 +21,104 @@ Basics
     (ns my-mongo-app  
       (:use somnium.congomongo))  
     (mongo!  
-      :db "mydb")  
+      :db "mydb") 
 
-### Create
+### Simple Tasks
+------------------
+
+#### create
+
+    (insert! :robots    
+             {:name "robby"}
+
+#### read
+
+    (def my-robot (fetch-one :robots)) => #'user/my-robot
+
+    my-robot => { :name "robby", 
+                  :_id  #<ObjectId 0c23396f7e53e34a4c8cf400>, 
+                  :_ns  "robots"}
+
+#### update
+
+    (update! (merge my-robot { :name "asimo" }))
+
+    =>  #<BasicDBObject { "name" : "asimo" , 
+                          "_id" : "0c23396f7e53e34a4c8cf400" , 
+                          "_ns" : "robots"}>
+
+#### destroy
+
+    (destroy! my-robot) => nil
+    (fetch :robots) => ()
+
+### More Sophisticated Tasks
+----------------------------
+
+#### mass inserts
 
     (mass-insert!  
-      :my-collection
-      (for [x (range 100) y (range 100)] {:x x :y y}))
+      :points
+      (for [x (range 100) y (range 100)] 
+        {:x x :y y :z (* x y)}) 
 
-### Read
+     =>  nil
 
-    (fetch
-      :my-collection
-      :where {:x {'> 7  
-                  '< 42}
-              :y {3}})
+    (fetch-count :points)
+    => 10000
+
+#### ad-hoc queries
 
     (fetch-one
-      :my-collection
-      :as :json)
-    (fetch-count
-      :my-collection)
+      :points
+      :where {:x {'> 10  
+                  '< 20}
+              :y 42
+              :z '>500})
 
-### Update
+    => {:x 12, :y 42, :z 504,  :_ns "points", :_id ... }
 
-    (update!
-      :my-collection
-      {:x {'> 5 '< 10}}
-      {:x "you've been updated!"})
+#### nested queries with regular expressions
 
-### Destroy
+     ;; let's make some documents with strings in an embedded document
 
-    (destroy! :my-collection
-      {:x 2})
+    (let [first-names ["bob" "joe" "mary" "sue" "jack" "jill"]
+          last-names  ["smith" "holmes" "churchhill" "miyazaki"]]
+          (mass-insert! :people
+                        (for [a first-names
+                              b last-names ]
+                          {:name {:first a 
+                                  :last b }}))])  =>  nil
+ 
+    (fetch-one :people 
+               :where {:name.first #".*ob$"
+                       :name.last  #".*yaz.*"})
 
-    (drop! :my-collection)
+    => {:name {:first "bob", 
+               :last "miyazaki", 
+               :_ns "people", 
+               :_id #<ObjectId 0c23396f7b83e34a63b3f400> }}
 
-Coercions
----------
+#### Some Handy Coercions
+------------------------------------------------------------------------
+
+    (fetch-one :points 
+               :as :json)
+
+    => "{ \"_id\" : \"0c23396ffe79e34a508cf400\" , 
+          \"x\" : 0 , \"y\" : 0 , \"z\" : 0 , \"_ns\" : \"points\"}"
+
+    (fetch-one :points 
+               :where {:x 5}
+               :as :mongo)
+    #<BasicDBObject { "x" : 0 , "y" : 0 , "z" : 0 , 
+                      "_id" : "0c23396ffe79e34a508cf400" , 
+                      "_ns" : "points"}>
+
+    ;; MongoDB and Clojure make a nice pair, don't you think?
+
+More About Coercions
+--------------------
 
   The mongodb-java-driver will serialize any collections that
 implement java.util.Map or java.util.List. That covers most
@@ -65,16 +127,30 @@ to strings on insert, and coerces map keys back to keywords
 on fetch (unless you're fetching json).
 
   It also coerces query shortcuts (like `'>`) to their Mongo form
-("$gt"). A full list is located in congo.coerce.
+("$gt"). The current list includes:
+
+      '<      "$lt"
+      '<=     "$lte"
+      '>      "$gt"
+      '>=     "$gte"
+      '!=     "$ne"
+      'in     "$in"
+      '!in    "$nin"
+      'mod    "$mod"
+      'all    "$all"
+      'size   "$size"
+      'exists "$exists"
+      'where  "$where
+
   Strings mapped to keys that begin with an underscore and end with id
 are coerced to com.mongodb.ObjectId instances. This comes in handy for
-querying by object-id if you happen to want some relational database action while you're getting your key-value storage on.
+querying by object-id in case you're in relational mood.
 
-  If all this coercion disturbs you, it's easy to turn it off:
+  If all this coercion happens to bother you, it's easy to turn it off:
 
     (mongo!
       :db "my-db"
-      :coerce-to []
+      :coerce-to   []
       :coerce-from [])
 
   You can also write your own coercions using the defcoercion macro in
@@ -106,13 +182,12 @@ and raring to get on the classpath.
 TODO
 ----
 
-* tests
+* Full test coverage for core functionality
 * MapReduce
+* inline coercions
 * concurrency
-* validations
-* collection specific attributes
-* refactor coercion interface
-* definline everything
+* validations?
+* collection specific attributes?
 
 ### Feedback
 
