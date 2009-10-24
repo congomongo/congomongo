@@ -79,6 +79,7 @@ anything useful.
 Just in case you can't find clojure try looking [here](http://www.github.com/richhickey/clojure).
 
 Install:
+  The jar in build may work for some people.
   Flexible build.xml coming soon.
 
 TODO:
