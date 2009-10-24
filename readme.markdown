@@ -1,4 +1,4 @@
-CongoMongo
+congomongo
 ===========
 
 What?
@@ -83,18 +83,17 @@ congomongo.coerce. See the source for details.
 Dependencies
 ------------
 
-CongoMongo depends on the mongodb-java-driver and clojure.
-It also needs a running mongodb instance to talk to in order to do
-anything useful.
+You need to have the mongodb-java-driver and clojure on your classpath
+in order to use congomongo. You also needs a running mongodb instance
+to talk to in order to do anything useful.
 
   You can get the mongodb-java-api jar [here](http://www.github.com/mongodb/mongo-java-driver).
-Just in case you can't find Clojure try looking [here](http://www.github.com/richhickey/clojure).
+Just in case you can't find clojure try looking [here](http://www.github.com/richhickey/clojure).
 
 Install
 -------
 
-The jar in build may work for some people.
-Build.xml coming soon.
+The jar in build may work for some people, (usable) build.xml coming soon.
 
 TODO
 ----
