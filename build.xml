@@ -9,6 +9,7 @@
   <property name='deps.dir' value='deps'></property>
   <property name='src.dir' value='src'></property>
   <property name='test.dir' value='test'></property>
+  <property name='build.dir' value='build'></property>
 
   <available property="hasclojure" file="${clojure.jar}"/>
 
@@ -22,9 +23,11 @@
 
   <target name='clean'>
     <delete dir='${classes.dir}'></delete>
+    <delete dir='${build.dir}'></delete>
   </target>
 
   <target name='init'>
+    <mkdir dir='${build.dir}'></mkdir>
     <mkdir dir='${classes.dir}'></mkdir>
   </target>
 
