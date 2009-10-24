@@ -1,21 +1,33 @@
-<project basedir='.' default='compile' name='mongo'>
+<project basedir='.' default='jar' name='congomongo'>
+
+  <description>
+    Compile and pack congomongo into a standalone jar.
+  </description>
+
   <property name='classes.dir' value='build/classes'></property>
-  <property name='jar.dir' value='build'></property>
-  <property name='lib.dir' value='lib'></property>
+  <property name='jar.dir' value='.'></property>
+  <property name='deps.dir' value='deps'></property>
   <property name='src.dir' value='src'></property>
   <property name='test.dir' value='test'></property>
+
+  <available property="hasclojure" file="${clojure.jar}"/>
+
   <path id='project.classpath'>
+    <pathelement path='${clojure.jar}'></pathelement>
     <pathelement path='${classes.dir}'></pathelement>
-    <fileset dir='${lib.dir}'>
-      <include name='**/*.jar'></include>
+    <fileset dir='${deps.dir}'>
+      <include name='**/*.jar'></include> 
     </fileset>
   </path>
+
   <target name='clean'>
     <delete dir='${classes.dir}'></delete>
   </target>
+
   <target name='init'>
     <mkdir dir='${classes.dir}'></mkdir>
   </target>
+
   <target depends='clean, init' name='compile'>
     <java classname='clojure.lang.Compile' classpathref='project.classpath' failonerror='true'>
       <classpath path='${src.dir}'></classpath>
@@ -26,6 +38,7 @@
       <arg value='somnium.congomongo'></arg>
     </java>
   </target>
+
   <target depends='compile' description='compile and test' name='test'>
     <java classname='clojure.main' classpathref='project.classpath' dir='${test.dir}' failonerror='true' fork='true'>
       <classpath path='${test.dir}'></classpath>
@@ -33,10 +46,11 @@
       <arg value="(use 'clojure.test) (require 'congomongo-test) (run-tests 'congomongo-test)"></arg>
     </java>
   </target>
+
   <target depends='compile' description='put congomongo in a jar' name='jar'>
     <jar destfile="${jar.dir}/congomongo.jar">
       <fileset dir="${classes.dir}" />
-      <fileset dir="${src.dir}" />
     </jar>
   </target>
+
 </project>

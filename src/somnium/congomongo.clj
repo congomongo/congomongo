@@ -85,11 +85,11 @@
                         (-> (.find col where only)
                             (coerce-many :db as))))))
 
-(defn fetch-one [col & kwargs]
-  (apply fetch col (concat kwargs [:one true])))
+(defn fetch-one [col & options]
+  (apply fetch col (concat options [:one true])))
 
-(defn fetch-count [col & kwargs]
-  (apply fetch col (concat kwargs [:count true])))
+(defn fetch-count [col & options]
+  (apply fetch col (concat options [:count true])))
 
 (defn insert! [col map]
   "Inserts a map into collection. Will not overwrite existing maps."
@@ -121,5 +121,29 @@
    a query map argument constraints."
   ([coll map] (.remove (get-coll coll) #^BasicDBObject (map-to-object map))))
 
+(defn get-indexes
+  "Get index information on collection"
+  [coll]
+  (.getIndexInfo (get-coll coll)))
 
+(defn add-index
+  "Adds an index on the collection for the specified fields if it does not exist.
+   Options include:
+   :unique -> defaults to false
+   :force  -> defaults to true"
+  [coll fields & options]
+  (let [argmap (apply hash-map options)]
+        (-> (get-coll coll)
+            (.ensureIndex (coerce-fields fields)
+                          (or (options :force) true)
+                          (or (options :unique) false)))))
 
+(defn drop-index
+  "Drops an index on the collection for the specified fields"
+  [coll fields]
+  (.dropIndex (get-coll coll) (coerce-fields fields)))
+
+(defn drop-all-indexes
+  "Drops all indexes from a collection"
+  [coll]
+  (.dropIndexes (get-coll coll)))
