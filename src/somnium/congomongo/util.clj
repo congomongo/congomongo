@@ -1,8 +1,8 @@
 (ns somnium.congomongo.util)
 
 (defn named [s]
-  "convenience for interchangeably handling keywords and strings"
-  (if (keyword? s) (name s) s))
+  "convenience for interchangeably handling keywords, symbols, and strings"
+  (if (or (keyword? s) (symbol? s)) (name s) s))
 
 (defn partition-map
   "creates a hash-map of first and rest pairs from a partitioned collection"

@@ -30,7 +30,7 @@
     <java classname='clojure.main' classpathref='project.classpath' dir='${test.dir}' failonerror='true' fork='true'>
       <classpath path='${test.dir}'></classpath>
       <arg value='-e'></arg>
-      <arg value="(use 'clojure.test) (require 'congomongo.test) (run-tests 'congomongo.test)"></arg>
+      <arg value="(use 'clojure.test) (require 'congomongo-test) (run-tests 'congomongo-test)"></arg>
     </java>
   </target>
   <target depends='compile' description='put congomongo in a jar' name='jar'>

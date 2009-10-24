@@ -112,7 +112,8 @@
   (case [from to]
           [:clojure :db] (map map-to-object coll)
           [:db :clojure] (map object-to-map coll)
-          [:db :json]    (map #(JSON/serialize #^BasicDBObject %) coll)))
+          [:db :json]    (map #(JSON/serialize #^BasicDBObject %) coll)
+          [:json :db]    (map #(JSON/parse #^String %) coll)))
 
 (defn coerce-fields [fields]
   (map-to-object (zipmap fields (repeat 1))))
