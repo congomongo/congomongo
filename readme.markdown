@@ -16,58 +16,44 @@ Basics
 
 ### Setup
 
-(ns my-mongo-app  
-  (:use somnium.congomongo))  
-(mongo!  
-  :db "mydb")  
+    (ns my-mongo-app  
+      (:use somnium.congomongo))  
+    (mongo!  
+      :db "mydb")  
 
 ### Create
 
->`(mass-insert!`
-
->  `:my-collection`
-
->  `(for [x (range 100) y (range 100)] {:x x :y y}))`
+    (mass-insert!  
+      :my-collection
+      (for [x (range 100) y (range 100)] {:x x :y y}))
 
 ### Read
 
->`(fetch`
->
->  `:my-collection`
+    (fetch
+      :my-collection
+      :where {:x {'> 7  
+                  '< 42}
+              :y {3}})
 
->  `:where {:x {'> 7` 
-
->              `'< 42}`
-
->          `:y {3}})`
-
->`(fetch-one`
-
->  `:my-collection`
-
->  `:as :json)`
-
->`(fetch-count`
-
->  `:my-collection)`
+    (fetch-one
+      :my-collection
+      :as :json)
+    (fetch-count
+      :my-collection)
 
 ### Update
 
->`(update!`
-
->  `:my-collection`
-
->  `{:x {'> 5 '< 10}}`
-
->  `{:x "you've been updated!"})`
+    (update!
+      :my-collection
+      {:x {'> 5 '< 10}}
+      {:x "you've been updated!"})
 
 ### Destroy
 
->`(destroy! :my-collection`
+    (destroy! :my-collection
+      {:x 2})
 
->  `{:x 2})`
-
->`(drop! :my-collection)`
+    (drop! :my-collection)
 
 Coercions
 ---------
@@ -79,20 +65,17 @@ to strings on insert, and coerces map keys back to keywords
 on fetch (unless you're fetching json).
 
   It also coerces query shortcuts (like `'>`) to their Mongo form
-`("$gt")`. A full list is located in congo.coerce.
+("$gt"). A full list is located in congo.coerce.
   Strings mapped to keys that begin with an underscore and end with id
 are coerced to com.mongodb.ObjectId instances. This comes in handy for
 querying by object-id if you happen to want some relational database action while you're getting your key-value storage on.
 
   If all this coercion disturbs you, it's easy to turn it off:
 
->`(mongo!`
-
->  `:db "my-db"`
-
->  `:coerce-to   []`
-
->  `:coerce-from [])`
+    (mongo!
+      :db "my-db"
+      :coerce-to []
+      :coerce-from [])
 
   You can also write your own coercions using the defcoercion macro in
 congomongo.coerce. See the source for details.
