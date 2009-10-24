@@ -1,49 +1,56 @@
-CongoMongo:
+CongoMongo
 ===========
 
 What?
 ------
 A Clojure toolkit wrapped around the MongoDB java api.
 
-Summary:
+Summary
 ---------
 Provides a convenience wrapper around most of the standard methods on 
 collections from the java api and introduces some coercion utilities 
 for convenient serialization of Clojure data-structures.
 
-Basics:
+Basics
 --------
-(ns my-mongo-app
-  (:use somnium.congomongo))
 
-(mongo!
-  :db "mydb")
+### Setup
+>`(ns my-mongo-app
+>  (:use somnium.congomongo))
+>(mongo!
+>  :db "mydb")`
 
-(mass-insert!
-  :my-collection
-  (for [x (range 100) y (range 100)] {:x x :y y}))
+### Crud
 
-(fetch
-  :my-collection
-  :where {:x {'> 7 
-              '< 42}
-          :y {3}})
+>`(mass-insert!
+>  :my-collection
+>  (for [x (range 100) y (range 100)] {:x x :y y}))`
 
-(fetch-one
-  :my-collection 
-  :as :json)
+### cRud
+>`(fetch
+>  :my-collection
+>  :where {:x {'> 7 
+>              '< 42}
+>          :y {3}})`
 
-(fetch-count
-  :my-collection)
+>(fetch-one
+>  :my-collection 
+>  :as :json)
 
-(update!
-  :my-collection 
-  {:x {'> 5 '< 10}}
-  {:x "you've been updated!"})
+>(fetch-count
+>  :my-collection)
 
-(drop! :my-collection)
+### crUd
+>(update!
+>  :my-collection 
+>  {:x {'> 5 '< 10}}
+>  {:x "you've been updated!"})
 
-Coercions:
+### cruD
+>(drop! :my-collection)
+
+Coercions
+---------
 
   The MongoDB java api will serialize any collections that
 implement java.util.Map or java.util.List. That covers most
