@@ -15,38 +15,38 @@ Basics
 --------
 
 ### Setup
->`(ns my-mongo-app
->  (:use somnium.congomongo))
->(mongo!
+>`(ns my-mongo-app`
+>` (:use somnium.congomongo))`
+>`(mongo!
 >  :db "mydb")`
 
-### Crud
+### Create
 
 >`(mass-insert!
 >  :my-collection
 >  (for [x (range 100) y (range 100)] {:x x :y y}))`
 
-### cRud
->`(fetch
->  :my-collection
->  :where {:x {'> 7 
->              '< 42}
->          :y {3}})`
+### Read
+>`(fetch`
+>  `:my-collection`
+>  `:where {:x {'> 7` 
+>              `'< 42}`
+>          `:y {3}})`
 
->(fetch-one
+>`(fetch-one
 >  :my-collection 
->  :as :json)
+>  :as :json)`
 
->(fetch-count
->  :my-collection)
+>`(fetch-count
+>  :my-collection)`
 
-### crUd
+### Update
 >(update!
 >  :my-collection 
 >  {:x {'> 5 '< 10}}
 >  {:x "you've been updated!"})
 
-### cruD
+### Destroy
 >(drop! :my-collection)
 
 Coercions
@@ -68,16 +68,16 @@ key-value storage on.
 
   You can turn all the coercions off if they bother you, just do:
 
-(mongo!
-  :db "my-db"
-  :coerce-to   []
-  :coerce-from [])
+>`(mongo!`
+>  `:db "my-db"`
+>  `:coerce-to   []`
+>  `:coerce-from [])`
 
   You can also write your own coercions using the defcoercion macro in
 congomongo.coerce. See the source for details.
    
-Dependencies:
-
+Dependencies
+------------
   Congomongo depends on the MongoDB java api and clojure.
 It also needs a running MongoDB instance to talk to in order to do
 anything useful.
@@ -85,22 +85,26 @@ anything useful.
   You can get the mongodb-java-api jar [here](http://www.github.com/mongodb/mongo-java-driver).
 Just in case you can't find clojure try looking [here](http://www.github.com/richhickey/clojure).
 
-Install:
+Install
+-------
   The jar in build may work for some people.
   Flexible build.xml coming soon.
 
-TODO:
-*build.xml
-*indexes
-*mapReduce
-*concurrency
-*validations
-*collection specific attributes
-*refactor coercion interface
+TODO
+----
+* build.xml
+* indexes
+* mapReduce
+* concurrency
+* validations
+* collection specific attributes
+* refactor coercion interface
+
   one big function composition
+
   inline everything
 
-Feedback:
-  Congomongo is very much a work in progress, so if you've used, improved, 
+### Feedback
+Congomongo is very much a work in progress, so if you've used, improved, 
 or abused it I'd like to hear about it.
 Drop me a line at spam_central.boekhoffa@spam_me_please.gmail.i_like_spam.com.
