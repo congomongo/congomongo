@@ -30,7 +30,7 @@
             [com.mongodb.util JSON]))
 
 (defn mongo!
-  "Connects to Mongo, opens a database, and compiles coercions.
+  "Creates a Mongo object, opens a database, and compiles coercions.
    Keyword arguments include:
    :host        -> defaults to localhost
    :port        -> defaults to 27017
@@ -49,9 +49,12 @@
                {:mongo       mongo
                 :db          db
                 :coerce-to   (or (argmap :coerce-to)
-                                 [:keywords :query-operators :object-ids])
+                                 [:keywords
+                                  :query-operators
+                                  :object-ids])
                 :coerce-from (or (argmap :coerce-from)
-                                 [:keywords])})
+                                 [:object-ids
+                                  :nested-db-objects])})
       (cache-coercions!)
       true)))
 
@@ -61,12 +64,12 @@
 (defn drop-database!
  "drops a database from the mongo server"
  [title]
- (.dropDatabase (:mongo @*mongo-config*)))
+ (.dropDatabase (:mongo @*mongo-config*) (named title)))
 
 (defn set-database!
   "atomically alters the current database"
   [title]
-  (if-let [db (.getDB #^Mongo (:mongo @*mongo-config*))]
+  (if-let [db (.getDB (:mongo @*mongo-config*) (named title))]
     (swap! *mongo-config* merge {:db db})
     (throw (RuntimeException. (str "database with title " title " does not exist.")))))
 
@@ -129,11 +132,12 @@
   (let [argmap (apply hash-map options)
         res    (.insert #^DBCollection  (get-coll col)
                         #^BasicDBObject (map-to-object map))]
-    (case (argmap :return)
-      :db      res
-      :json    (JSON/serialize res) 
-      :clojure (object-to-map res)
-      :else    nil)))
+    (let [c (fn [x] (= x (argmap :return)))]
+      (cond 
+        (c :json)     (JSON/serialize res) 
+        (c :clojure)  (object-to-map res)
+        (c :db)       res
+        (c :else)     nil))))
 
 (defn mass-insert! 
   "Inserts a lot of maps into a collection. Does not overwrite existing objects.
@@ -154,44 +158,55 @@
   "Alters/inserts a map in a collection. Overwrites existing objects.
   The shortcut forms need a map with valid :_id and :_ns fields or
   a collection and a map with a valid :_id field."
-  ([map]
-     (update! (:_ns map) {:_id (:_id map)} map))
-  ([col map]
-     (update! col {:_id (:_id map)} map))
+  ([obj]
+     (update! (obj "_ns")
+              {"_id" (obj "_id")}
+              obj))
+  ([col obj]
+     (update! col
+              {"_id" (obj "_id")}
+              obj))
   ([col old new]
-     (.update #^DBCollection  (get-coll col)
-              #^BasicDBObject (map-to-object old)
-              #^BasicDBObject (map-to-object new)
-              true true)))
+     (object-to-map (.update #^DBCollection  (get-coll col)
+                             #^BasicDBObject (map-to-object old)
+                             #^BasicDBObject (map-to-object new)
+                             true true))))
 
 (defn destroy!
   "Removes map from collection. Takes a collection name and
    a query map argument."
-  ([coll map] (.remove (get-coll coll) #^BasicDBObject (map-to-object map))))
+  ([map]
+     (.remove
+      (get-coll (map "_ns"))
+        #^BasicDBObject (map-to-object {"_id" (map "_id")})))
+  ([coll map]
+     (.remove (get-coll coll)
+              #^BasicDBObject (map-to-object map))))
 
 (defn get-indexes
   "Get index information on collection"
   [coll]
-  (.getIndexInfo (get-coll coll)))
+  (coerce-many (.getIndexInfo (get-coll coll))
+               :db :clojure))
 
-(defn add-index
+(defn add-index!
   "Adds an index on the collection for the specified fields if it does not exist.
    Options include:
    :unique -> defaults to false
    :force  -> defaults to true"
   [coll fields & options]
-  (let [argmap (apply hash-map options)]
+  (let [options (apply hash-map options)]
         (-> (get-coll coll)
             (.ensureIndex (coerce-fields fields)
                           (or (options :force) true)
                           (or (options :unique) false)))))
 
-(defn drop-index
+(defn drop-index!
   "Drops an index on the collection for the specified fields"
   [coll fields]
   (.dropIndex (get-coll coll) (coerce-fields fields)))
 
-(defn drop-all-indexes
+(defn drop-all-indexes!
   "Drops all indexes from a collection"
   [coll]
   (.dropIndexes (get-coll coll)))

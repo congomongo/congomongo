@@ -1,4 +1,4 @@
-congomongo
+CongoMongo
 ===========
 
 What?
@@ -7,11 +7,31 @@ A toolkit for using MongoDB with Clojure.
 
 Summary
 ---------
-Provides a convenience wrapper around a subset of methods in the
-mongodb-java-driver. It also introduces some coercion utilities 
-for convenient serialization of Clojure data-structures. It is 
-still pre-alpha so the api is subject to change. Bug reports and
-patches are welcome!
+Currently a convenience wrapper around a subset of methods in the
+mongodb-java-driver. Aims to be a full-featured clojure
+powered driver for mongodb. Test coverage now exists for the api 
+described on this page.
+
+Recent Changes
+--------------
+Keywords are coerced to strings on insert only.  
+They will be strings when they reemerge from Mongo.
+
+Coming Changes
+--------------
+### Low hanging fruit
+* Rewrite coercions using inline functions with granular control over what coercions are used and when.
+* Factor out repetitive code from core.
+* Add simple schema-description/validation macros to core. 
+
+### Higher branches
+* Implement DBObject on Clojure collections (not ideal)
+* or
+* Implement ByteEncoder and ByteDecoder in Clojure (better, but involved)
+
+### Patches
+The current implementation is not stable, but I will try to fix any
+bugs submitted by people trying out the current version. 
 
 Basics
 --------
@@ -29,15 +49,15 @@ Basics
 #### create
 
     (insert! :robots    
-             {:name "robby"}
+             {"name" "robby"}
 
 #### read
 
     (def my-robot (fetch-one :robots)) => #'user/my-robot
 
-    my-robot => { :name "robby", 
-                  :_id  #<ObjectId 0c23396f7e53e34a4c8cf400>, 
-                  :_ns  "robots"}
+    my-robot => { "name" "robby", 
+                  "_id"  "0c23396f7e53e34a4c8cf400", 
+                  "_ns"  "robots"}
 
 #### update
 
@@ -76,7 +96,7 @@ Basics
               :y 42
               :z '>500})
 
-    => {:x 12, :y 42, :z 504,  :_ns "points", :_id ... }
+    => {"x" 12, "y" 42, "z" 504,  :_ns "points", :_id ... }
 
 #### nested queries with regular expressions
 
@@ -94,10 +114,10 @@ Basics
                :where {:name.first #".*ob$"
                        :name.last  #".*yaz.*"})
 
-    => {:name {:first "bob", 
-               :last "miyazaki", 
-               :_ns "people", 
-               :_id #<ObjectId 0c23396f7b83e34a63b3f400> }}
+    => {"name" {"first" "bob", 
+               :"last"  "miyazaki", 
+               :"_ns"   "people", 
+               :"_id"   "0c23396f7b83e34a63b3f400" }}
 
 #### Some Handy Coercions
 ------------------------------------------------------------------------
@@ -109,8 +129,7 @@ Basics
           \"x\" : 0 , \"y\" : 0 , \"z\" : 0 , \"_ns\" : \"points\"}"
 
     (fetch-one :points 
-               :where {:x 5}
-               :as :mongo)
+               :as :db)
     #<BasicDBObject { "x" : 0 , "y" : 0 , "z" : 0 , 
                       "_id" : "0c23396ffe79e34a508cf400" , 
                       "_ns" : "points"}>
@@ -123,8 +142,7 @@ More About Coercions
   The mongodb-java-driver will serialize any collections that
 implement java.util.Map or java.util.List. That covers most
 of clojure already, for convenience congomongo coerces all keywords
-to strings on insert, and coerces map keys back to keywords
-on fetch (unless you're fetching json).
+to strings on insert.
 
   It also coerces query shortcuts (like `'>`) to their Mongo form
 ("$gt"). The current list includes:
@@ -152,9 +170,6 @@ querying by object-id in case you're in relational mood.
       :db "my-db"
       :coerce-to   []
       :coerce-from [])
-
-  You can also write your own coercions using the defcoercion macro in
-congomongo.coerce. See the source for details.
    
 Dependencies
 ------------
@@ -179,15 +194,18 @@ In the congomongo root directory type:
 and voila, you should find a shiny new congomongo jar that's ready   
 and raring to get on the classpath.
 
+To run the test suite you will need a running MongoDB instance.
+In the root directory type:
+
+    ant -Dclojure.jar=<path/to/my/clojure.jar> test
+
 TODO
 ----
 
-* Full test coverage for core functionality
-* MapReduce
 * inline coercions
-* concurrency
-* validations?
-* collection specific attributes?
+* collection schemas/validations
+* refactor core and coerce
+* lower level coercion implementation
 
 ### Feedback
 

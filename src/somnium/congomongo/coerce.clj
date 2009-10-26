@@ -4,7 +4,7 @@
             [somnium.congomongo.util
              :only [named case partition-map map-keys]])
   (:require [clojure.walk :as walk])
-  (:import  [com.mongodb BasicDBObject ObjectId]
+  (:import  [com.mongodb DBObject BasicDBObject ObjectId]
             [com.mongodb.util JSON]))
 
 ;; consider keyword arguments for from and to, there
@@ -19,15 +19,14 @@
     :from (string? arg) (.toLowerCase arg)"
   {:arglists '[keyword arg :to test then :from test then]}
   [key arg & kwargs]
-  (let [argsym  (if (coll? arg) (first arg) arg)
-        clauses (partition-map kwargs 3)]
+  (let [clauses (partition-map kwargs 3)]
     `(do
        ~(if-let [to (clauses :to)]
-          `(defmethod coerce-object-to-db ~key [_# ~argsym]
-             (if ~@to ~argsym)))
+          `(defmethod coerce-object-to-db ~key [_# ~arg]
+             (if ~@to ~arg)))
        ~(if-let [from (clauses :from)]
-          `(defmethod coerce-object-from-db ~key [_# ~argsym]
-             (if ~@from ~argsym))))))
+          `(defmethod coerce-object-from-db ~key [_# ~arg]
+             (if ~@from ~arg))))))
 
 ;; not exactly sure where these should go, putting them here
 ;; as they get used here, but should really appear in api
@@ -52,26 +51,33 @@
 ;; coerces any keyword to string on insert
 ;; coerces string keys on maps to keywords on fetch
 
-(defcoercion :keywords [x]
-  :to   (keyword? x) (name x)
-  :from (map? x)     (map-keys #(if (string? %) (keyword %) %) x))
+(defcoercion :keywords x
+  :to (keyword? x) (name x))
 
 ;; coerces query shortcuts to their mongo string versions
 
-(defcoercion :query-operators [x]
+(defcoercion :query-operators x
   :to (symbol? x) (query-operators x))
 
 ;; when it finds a key that begins with _ and ends with id it coerces
 ;; it to an instance of ObjectId.
 
-(defcoercion :object-ids [x]
-  :to (map? x) (let [ks  (keys x)
-                     ids (filter #(and (re-matches #"^_.*id$" (named %))
-                                       (string? (x %))) ks)]
+(defcoercion :object-ids x
+  :to
+  (map? x) (let [ks  (keys x)
+                 ids (filter #(and (re-matches #"^_.*id$"
+                                               (named %))) ks)]
                  (if (empty? ids) x
                      (apply merge x
                             (for [k ids]
-                              {k (ObjectId. #^String (x k))})))))
+                              {k (ObjectId. #^String (x k))}))))
+  :from
+  (instance? ObjectId x) (.toString x))
+
+(defcoercion :nested-db-objects x
+  :from
+  (instance? DBObject x) ((@*mongo-config* :coerce-from-function)
+                          (into {} #^java.util.Map x)))
 
 ;; coerces strings in keys with _id or _..._id to ObjectId objects on insert
 ;; coerces ObjectIds to strings on fetch
@@ -102,8 +108,7 @@
              ((:coerce-to-function @*mongo-config*) map))))
 
 (defn object-to-map [obj]
-  ((:coerce-from-function @*mongo-config*)
-   (into {} #^java.util.Map obj)))
+  ((:coerce-from-function @*mongo-config*) obj))
 
 (defn object-to-json [obj]
   (JSON/serialize #^BasicDBObject obj))
