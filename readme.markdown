@@ -8,9 +8,8 @@ A toolkit for using MongoDB with Clojure.
 Summary
 ---------
 Currently a convenience wrapper around a subset of methods in the
-mongodb-java-driver. Aims to be a full-featured clojure
-powered driver for mongodb. Test coverage now exists for the api 
-described on this page.
+mongodb-java-driver.    
+Aspires to be a full-featured clojure powered driver for mongodb.
 
 Recent Changes
 --------------
@@ -30,7 +29,7 @@ Coming Changes
 * Implement ByteEncoder and ByteDecoder in Clojure (better, but involved)
 
 ### Patches
-The current implementation is not stable, but I will try to fix any
+The current api should not be considered stable, but I will try to fix any
 bugs submitted by people trying out the current version. 
 
 Basics
