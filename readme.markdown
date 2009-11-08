@@ -75,11 +75,11 @@ Basics
 
 #### destroy
 
-    (destroy! my-robot) => nil
+    (destroy! :robots {:name "asimo"}) => nil
     (fetch :robots) => ()
 
-### More Sophisticated Tasks
-----------------------------
+### (slightly) More Sophisticated Tasks
+---------------------------------------
 
 #### mass inserts
 
