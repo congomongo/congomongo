@@ -1,28 +1,25 @@
 <project basedir='.' default='jar' name='congomongo'>
 
   <description>
-    Compile and pack congomongo into a standalone jar.
+    Pack congomongo into a standalone jar.
   </description>
 
   <property name='classes.dir' value='build/classes'></property>
   <property name='jar.dir' value='.'></property>
-  <property name='deps.dir' value='deps'></property>
-  <property name='src.dir' value='src'></property>
+  <property name='lib.dir' value='lib'></property>
+  <property name='java.dir' value='src/main/java'></property>
+  <property name='clj.dir' value='src/main/clj'></property>
   <property name='test.dir' value='test'></property>
-  <property name='build.dir' value='build'></property>
-
-  <available property="hasclojure" file="${clojure.jar}"/>
-
+ 
   <path id='project.classpath'>
     <pathelement path='${clojure.jar}'></pathelement>
     <pathelement path='${classes.dir}'></pathelement>
-    <fileset dir='${deps.dir}'>
+    <fileset dir='${lib.dir}'>
       <include name='**/*.jar'></include> 
     </fileset>
   </path>
 
-  <target name='clean'>
-    <delete dir='${classes.dir}'></delete>
+  <target name='clean'>    
     <delete dir='${build.dir}'></delete>
   </target>
 
@@ -31,28 +28,20 @@
     <mkdir dir='${classes.dir}'></mkdir>
   </target>
 
-  <target depends='clean, init' name='compile'>
-    <java classname='clojure.lang.Compile' classpathref='project.classpath' failonerror='true'>
-      <classpath path='${src.dir}'></classpath>
-      <sysproperty key='clojure.compile.path' value='${classes.dir}'></sysproperty>
-      <arg value='somnium.congomongo.config'></arg>
-      <arg value='somnium.congomongo.util'></arg>
-      <arg value='somnium.congomongo.coerce'></arg>
-      <arg value='somnium.congomongo'></arg>
-    </java>
-  </target>
-
-  <target depends='compile' description='compile and test' name='test'>
+  <target description='test' name='test'>
     <java classname='clojure.main' classpathref='project.classpath' dir='${test.dir}' failonerror='true' fork='true'>
       <classpath path='${test.dir}'></classpath>
+      <classpath path='${clj.dir}'></classpath>
+      <classpath path='${classes.dir}'></classpath>
       <arg value='-e'></arg>
       <arg value="(use 'clojure.test) (require 'congomongo-test) (run-tests 'congomongo-test)"></arg>
     </java>
   </target>
 
-  <target depends='compile' description='put congomongo in a jar' name='jar'>
+  <target description='put congomongo in a jar' name='jar'>
     <jar destfile="${jar.dir}/congomongo.jar">
-      <fileset dir="${classes.dir}" />
+      <fileset dir="${classes.dir}"/>
+      <fileset dir="${clj.dir}"/>
     </jar>
   </target>
 
