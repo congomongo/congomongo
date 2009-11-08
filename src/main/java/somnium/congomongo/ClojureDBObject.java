@@ -84,10 +84,14 @@ public class ClojureDBObject extends BasicDBObject {
     // call .toString on ObjectIds?
 
     public IPersistentMap toClojure() {
-      return toClojureMap(this);
+      return toClojure(true);
     }
 
-    private static IPersistentMap toClojureMap(Map m){
+    public IPersistentMap toClojure(boolean keywordize) {
+      return toClojureMap(this, keywordize);
+    }
+
+    private static IPersistentMap toClojureMap(Map m, boolean keywordize){
 
       Set keys = m.keySet();
       Iterator<String> iter = keys.iterator();
@@ -95,19 +99,25 @@ public class ClojureDBObject extends BasicDBObject {
       while (iter.hasNext()) {
         String s = iter.next();
         Object v = m.get(s);
-        Symbol sym = Symbol.intern(s);
-        Keyword k = Keyword.intern(sym);
-        alist.add(k);
-        alist.add(toClojureVal(v));
+
+        if (keywordize) {
+          Symbol sym = Symbol.intern(s);
+          Keyword k = Keyword.intern(sym);
+          alist.add(k);
+        } else {
+          alist.add(s);
+        }
+
+        alist.add(toClojureVal(v, keywordize));
       }
 
       return PersistentHashMap.create(alist);
     }
 
-    private static Object toClojureVal(Object o) {
+    private static Object toClojureVal(Object o, boolean keywordize) {
 
       if (o instanceof Map) {
-        return toClojureMap((Map)o);
+        return toClojureMap((Map)o, keywordize);
       }
 
       else if (o instanceof List) {
@@ -115,7 +125,7 @@ public class ClojureDBObject extends BasicDBObject {
         Iterator<Object> i = ((java.util.List)o).iterator();
         while (i.hasNext()) {
           Object obj = i.next();
-          alist.add(toClojureVal(obj));
+          alist.add(toClojureVal(obj, keywordize));
         }
         return PersistentVector.create(alist);
       }
