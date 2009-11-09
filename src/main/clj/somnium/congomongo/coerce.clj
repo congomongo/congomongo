@@ -21,12 +21,12 @@
       obj
       (let [fun
             (condp = from-to
-              [:clojure :mongo  ] #(ClojureDBObject. %)
+              [:clojure :mongo  ] #(ClojureDBObject. #^IPersistentMap %)
               [:clojure :json   ] #(json-str %)
               [:mongo   :clojure] #(.toClojure #^ClojureDBObject %
                                                #^Boolean/TYPE *keywordize*)
               [:mongo   :json   ] #(.toString #^ClojureDBObject %)
-              [:json    :clojure] #(binding [*json-keyword-keys* true] (read-json %))
+              [:json    :clojure] #(binding [*json-keyword-keys* *keywordize*] (read-json %))
               [:json    :mongo  ] #(JSON/parse %)
               :else               (throw (RuntimeException.
                                           "unsupported keyword pair")))]

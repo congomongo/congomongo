@@ -12,8 +12,10 @@ CongoMongo is essentially two parts.
 One is the ClojureDBObject class written java.
 It extends the BasicDBObject class with two methods (putClojure,
 toClojure) and a convenience constructor.
-It's fast -> coerces 100,000 maps (clojure -> ClojureDBObject -> clojure) in under 2 seconds,    
-and convenient, automatically handling keywords and arbitrarily nested
+It's fast: 
+coerces 10,000 maps (clojure -> ClojureDBObject -> clojure) in under 2
+seconds,   
+and convenient, automatically handling keyword-keys and arbitrarily nested
 structures.
 
 The other is a clojure wrapper of the mongo-java-driver.   
@@ -22,9 +24,16 @@ More to come.
 
 Recent Changes
 --------------
-Keyword coercions are now handled automatically (and can be disabled)
-but query operators have been temporarily removed pending a better
-implementation.
+Keyword coercions for map keys are now handled automatically (and can
+be disabled).   
+
+Keywords in value fields are currently converted to strings for
+safety, but not preserved as keywords in mongo. There is a facility
+for serializing custom types, and it can be added if there is a
+demand. 
+
+(Clojure code serializes to strings easily enough that I haven't
+needed this yet.)
 
 Switched to keyword arguments for central functions in order to
 streamline the api and make it easier to cover less common use cases.
@@ -93,7 +102,7 @@ Basics
      =>  nil
 
     (fetch-count :points)
-    => 100000
+    => 10000
 
 #### ad-hoc queries
 
