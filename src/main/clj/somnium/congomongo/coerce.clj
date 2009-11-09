@@ -3,6 +3,7 @@
         [clojure.contrib.json read write]
         [clojure.contrib.def :only [defvar]])
   (:import [somnium.congomongo ClojureDBObject]
+           [clojure.lang IPersistentMap]
            [com.mongodb.util JSON]))
 
 (defvar *keywordize* true
