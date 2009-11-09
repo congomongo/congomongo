@@ -13,7 +13,7 @@ One is the ClojureDBObject class written java.
 It extends the BasicDBObject class with two methods (putClojure,
 toClojure) and a convenience constructor.
 It's fast: 
-coerces 10,000 maps (clojure -> ClojureDBObject -> clojure) in under 2
+coerces 100,000 maps (clojure -> ClojureDBObject -> clojure) in under 2
 seconds,   
 and convenient, automatically handling keyword-keys and arbitrarily nested
 structures.
