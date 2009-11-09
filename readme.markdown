@@ -9,12 +9,16 @@ Summary
 ---------
 CongoMongo is essentially two parts.
 
-One is the ClojureDBObject class written java.
+One is the ClojureDBObject class written in java.
 It extends the BasicDBObject class with two methods (putClojure,
 toClojure) and a convenience constructor.
-It's fast -> coerces 100,000 maps (clojure -> ClojureDBObject -> clojure) in under 2 seconds,    
-and convenient, automatically handling keywords and arbitrarily nested
-structures.
+
+It's fast:   
+coerces 10,000 maps (clojure -> ClojureDBObject -> clojure)    
+in under 2 seconds (on an almost archaic single core,
+and depending on the complexity of the maps).
+Mostly its convenient, automatically handling keywords and arbitrarily nested
+structures for easy clojure-in/clojure-out.
 
 The other is a clojure wrapper of the mongo-java-driver.   
 Currently there is support for CRUD, indexing, and error checking.   

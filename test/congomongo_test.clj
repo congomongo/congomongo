@@ -50,7 +50,7 @@
       (drop-database! test-db2))))
 
 (defn make-points! []
-  (println "slow insert of 100000 points:")
+  (println "slow insert of 10000 points:")
   (time
    (doseq [x (range 100)
            y (range 100)]
@@ -89,7 +89,7 @@
 
  (deftest mass-insert
    (with-mongo
-     (println "mass insert of 100000 points")
+     (println "mass insert of 10000 points")
      (time
       (mass-insert! :points
                     (for [x (range 100) y (range 100)]
