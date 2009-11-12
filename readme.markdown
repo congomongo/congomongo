@@ -129,8 +129,7 @@ Dependencies
 ------------
 
 CongoMongo depends on the mongodb-java-driver, clojure, and clojure-contrib.       
-Currently CongoMongo does not work with Clojure 1.0, only the 1.1
-branch. 
+Currently CongoMongo only works with the clojure 1.1 branch.     
 
 A mongodb-java-driver jar is included in lib, and you can also get
 the bleeding edge version [here](http://www.github.com/mongodb/mongo-java-driver).   
