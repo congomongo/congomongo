@@ -8,10 +8,10 @@ A toolkit for using MongoDB with Clojure.
 Recent Changes
 --------------
 
+Now available from clojars via leiningen.           
 Added skip and limit to fetch.
 Patched ClojureDBObject to call clojure.lang.RT so it    
 will create ArrayMaps/HashMaps as appropriate.    
-Should get all deps onto clojars soon.    
 
 Summary
 ---------
@@ -146,18 +146,13 @@ Just in case you don't have clojure try looking [here](http://www.github.com/ric
 Building congomongo
 -------
 
-No build required. 
-
-Just put congomongo.jar and the mongo-java-driver
-on your classpath along with your preferred clojure jars and you're
-good to go. If you feel compelled to compile your own ClojureDBObject
-the source is in ./src/main/java
-
-To run the test suite will need a running MongoDB instance, ant, and
-symlinks to clojure and clojure-contrib in ./lib.
-Once that's been taken care of just type:
-
-  ant test
+Leiningen is the recommended way to use congomongo.
+Just add 
+    [org.clojars.somnium/congomongo "0.1.0-SNAPSHOT"]
+to your project.clj and do
+    $lein deps
+to get congomongo and all of its dependencies.    
+ 
 
 TODO
 ----

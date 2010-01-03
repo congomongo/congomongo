@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>congomongo</groupId>
+  <groupId>org.clojars.somnium</groupId>
   <artifactId>congomongo</artifactId>
   <version>0.1.0-SNAPSHOT</version>
   <name>congomongo</name>
-  <description>clojure wrapper for the mongo-java-driver</description>
+  <description>clojure-friendly api for MongoDB</description>
   <scm>
-    <tag>3dff6bcab65667c6588127e68d27956467ee8139</tag>
+    <tag>88507478392224f205a96a28183e2bcde7acfbef</tag>
   </scm>
   <repositories>
     <repository>
@@ -33,6 +33,11 @@
       <groupId>org.clojure</groupId>
       <artifactId>clojure-contrib</artifactId>
       <version>1.1.0-master-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>org.clojars.somnium</groupId>
+      <artifactId>mongo-java-driver</artifactId>
+      <version>1.1.0-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>org.clojars.somnium</groupId>
