@@ -9,9 +9,9 @@ Recent Changes
 --------------
 
 Added skip and limit to fetch.
-Patched ClojureDBObject to call clojure.lang.RT so it
-will create ArrayMaps/HashMaps as appropriate.
-Should get all deps onto clojars soon.
+Patched ClojureDBObject to call clojure.lang.RT so it    
+will create ArrayMaps/HashMaps as appropriate.    
+Should get all deps onto clojars soon.    
 
 Summary
 ---------
