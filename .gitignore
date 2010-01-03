@@ -1,4 +1,6 @@
-lib/clojure.jar
-lib/clojure-contrib.jar
-lib/congomongo.jar
+lib/*
+build/*
+classes/*
+*~
+.#*
 \#*#
