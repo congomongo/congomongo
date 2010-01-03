@@ -56,11 +56,16 @@
      (.setObjectClass ClojureDBObject)))
 
 (defunk fetch 
-  "Fetches objects from a collection. Optional arguments include
+  "Fetches objects from a collection.
+   Note that MongoDB always adds the _id and _ns
+   fields to objects returned from the database.
+   Optional arguments include
    :where  -> takes a query map
    :only   -> takes an array of keys to retrieve
    :as     -> what to return, defaults to :clojure, can also be :json or :mongo
    :from   -> argument type, same options as above
+   :skip   -> number of records to skip
+   :limit  -> number of records to return
    :one?   -> defaults to false, use fetch-one as a shortcut
    :count? -> defaults to false, use fetch-count as a shortcut"
   {:arglists

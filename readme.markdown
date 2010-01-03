@@ -133,17 +133,7 @@ Basics
           \"x\" : 0 , \"y\" : 0 , \"z\" : 0 , \"_ns\" : \"points\"}"
 
    
-Dependencies
-------------
-
-CongoMongo depends on the mongodb-java-driver, clojure, and clojure-contrib.       
-Currently CongoMongo only works with the clojure 1.1 branch.     
-
-A mongodb-java-driver jar is included in lib, and you can also get
-the bleeding edge version [here](http://www.github.com/mongodb/mongo-java-driver).   
-Just in case you don't have clojure try looking [here](http://www.github.com/richhickey/clojure).
-
-Building congomongo
+Install
 -------
 
 Leiningen is the recommended way to use congomongo.
