@@ -3,11 +3,14 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.clojars.somnium</groupId>
   <artifactId>congomongo</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.1-SNAPSHOT</version>
   <name>congomongo</name>
   <description>clojure-friendly api for MongoDB</description>
   <scm>
-    <tag>88507478392224f205a96a28183e2bcde7acfbef</tag>
+    <connection>scm:git:git://github.com/somnium/congomongo.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/somnium/congomongo.git</developerConnection>
+    <tag>b54b1f19f26e71eb0c13f672d4c61ba783745ef3</tag>
+    <url>http://github.com/somnium/congomongo</url>
   </scm>
   <repositories>
     <repository>
@@ -42,7 +45,7 @@
     <dependency>
       <groupId>org.clojars.somnium</groupId>
       <artifactId>clojure-db-object</artifactId>
-      <version>0.1.0-SNAPSHOT</version>
+      <version>0.1.1-SNAPSHOT</version>
     </dependency>
   </dependencies>
 </project>

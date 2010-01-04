@@ -138,7 +138,7 @@ Install
 
 Leiningen is the recommended way to use congomongo.
 Just add 
-    [org.clojars.somnium/congomongo "0.1.0-SNAPSHOT"]
+    [org.clojars.somnium/congomongo "0.1.1-SNAPSHOT"]
 to your project.clj and do
     $lein deps
 to get congomongo and all of its dependencies.    

@@ -9,6 +9,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.Map;
+import java.util.Arrays;
 import clojure.lang.Keyword;
 import clojure.lang.MapEntry;
 import clojure.lang.IPersistentMap;
@@ -62,16 +63,16 @@ public class ClojureDBObject extends BasicDBObject {
         return clj;
       }
 
- //     else if (o instanceof List) {
- //       int msize = ((List)o).size();
- //       Object[] ary = new Object[msize];
- //       Iterator<Object> iter = ((List)o).iterator();
- //       for (int idx = 0; idx < msize; idx++) {
- //         Object obj = iter.next();
- //         ary[idx] = readClojureObject(obj);
- //       }
- //       return Arrays.asList(ary);
- //     }
+      else if (o instanceof List) {
+        int msize = ((List)o).size();
+        Object[] ary = new Object[msize];
+        Iterator<Object> iter = ((List)o).iterator();
+        for (int idx = 0; idx < msize; idx++) {
+          Object obj = iter.next();
+          ary[idx] = readClojureObject(obj);
+        }
+        return Arrays.asList(ary);
+      }
 
       else return o;
 
