@@ -17,44 +17,15 @@ Summary
 ---------
 CongoMongo is essentially two parts.
 
-One is the ClojureDBObject class written java.
+One is the ClojureDBObject class written in java.
 It extends the BasicDBObject class with two methods (putClojure,
 toClojure) and a convenience constructor.
-It's fast: 
-coerces 100,000 maps (clojure -> ClojureDBObject -> clojure) in under 2
-seconds,   
-and convenient, automatically handling keyword-keys and arbitrarily nested
-structures.
 
-The other is a clojure wrapper of the mongo-java-driver.   
-Currently there is support for CRUD, indexing, and error checking.   
-More to come.
+It is basically a close-to-the-metal wrapper around the mongo-java-driver's
+BasicDBObject class to handle coercions (keyword->string and nested structures)        
+while offering similar performance to the BasicDBObject class itself.
 
-Recent Changes
---------------
-Keyword coercions for map keys are now handled automatically (and can
-be disabled).   
-
-Keywords in value fields are currently converted to strings for
-safety, but not preserved as keywords in mongo. There is a facility
-for serializing custom types, and it can be added if there is a
-demand. 
-
-(Clojure code serializes to strings easily enough that I haven't
-needed this yet.)
-
-Switched to keyword arguments for central functions in order to
-streamline the api and make it easier to cover less common use cases.
-
-Coming Changes
---------------
-Current goal is to wrap more of the core mongo api.
-This includes convenience functions for grouping, sorting,   
-map-reduce, server-side javascript commands and more.
-
-### Patches
-The current api should not be considered stable, but I will try to fix any
-bugs submitted by people trying out the current version. 
+The rest is a Clojure api for the mongo-java-driver.
 
 Basics
 --------
@@ -142,7 +113,6 @@ Just add
 to your project.clj and do
     $lein deps
 to get congomongo and all of its dependencies.    
- 
 
 TODO
 ----
@@ -153,4 +123,4 @@ TODO
 ### Feedback
 
 CongoMongo is a work in progress. If you've used, improved, 
-or abused it I'd love to hear about it. Contact me at somnium@gmx.us
+or abused it I'd love to hear about it. Contact me at boekhoffa@gmail.com
