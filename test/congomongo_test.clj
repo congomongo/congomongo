@@ -106,3 +106,36 @@
      (add-index! :points [:x])
      (is (some #(= (into {} (% "key")) {"x" 1})
                (get-indexes :points)))))
+
+(deftest gridfs-insert-and-fetch
+  (with-mongo
+    (is (empty? (fetch-files :testfs)))
+    (let [f (insert-file! :testfs (.getBytes "toasted")
+                          :filename "muffin" :contentType "food/breakfast")]
+      (is (= "muffin" (:filename f)))
+      (is (= "food/breakfast" (:contentType f)))
+      (is (= 7 (:length f)))
+      (is (= nil (fetch-one-file :testfs :where {:filename "monkey"})))
+      (is (= f (fetch-one-file :testfs :where {:filename "muffin"})))
+      (is (= f (fetch-one-file :testfs :where {:contentType "food/breakfast"})))
+      (is (= (list f) (fetch-files :testfs))))))
+ 
+(deftest gridfs-destroy
+  (with-mongo
+    (insert-file! :testfs (.getBytes "banana") :filename "lunch")
+    (destroy-file! :testfs {:filename "lunch"})
+    (is (empty? (fetch-files :testfs)))))
+ 
+(deftest gridfs-insert-with-metadata
+  (with-mongo
+    (let [f (insert-file! :testfs (.getBytes "nuts")
+                          :metadata { :calories 50, :opinion "tasty"})]
+      (is (= "tasty" (-> f :metadata :opinion)))
+      (is (= f (fetch-one-file :testfs :where { :metadata.opinion "tasty" }))))))
+ 
+(deftest gridfs-write-file-to
+  (with-mongo
+    (let [f (insert-file! :testfs (.getBytes "banana"))]
+      (let [o (java.io.ByteArrayOutputStream.)]
+        (write-file-to :testfs f o)
+        (is (= "banana" (str o)))))))

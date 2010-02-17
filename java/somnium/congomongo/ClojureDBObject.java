@@ -91,7 +91,7 @@ public class ClojureDBObject extends BasicDBObject {
       return toClojureMap(this, keywordize);
     }
 
-    private static IPersistentMap toClojureMap(Map m, boolean keywordize){
+    public static IPersistentMap toClojureMap(Map m, boolean keywordize){
       int msize = m.size() * 2;
       Object[] ary = new Object[msize];
       Set keys = m.keySet();
