@@ -6,5 +6,4 @@
                  [org.clojars.somnium/mongo-java-driver "1.1.0-SNAPSHOT"]
                  [org.clojars.somnium/clojure-db-object "0.1.1-SNAPSHOT"]]
   :dev-dependencies [[swank-clojure "1.1.0-SNAPSHOT"]
-                     [org.clojars.somnium/user "0.1.0-SNAPSHOT"]]
-  :source-path "src/clj")
+                     [org.clojars.somnium/user "0.1.0-SNAPSHOT"]])
