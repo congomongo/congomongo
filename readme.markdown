@@ -8,9 +8,9 @@ A toolkit for using MongoDB with Clojure.
 Recent Changes
 --------------
 
-GridFs support courtesy of Steve Purcell. Thannks, Steve!
-Bumped version to 0.1.2.
-Clojars group is now congomongo.           
+GridFs support courtesy of Steve Purcell. Thannks, Steve!             
+Bumped version to 0.1.2.        
+Clojars group is now congomongo.                 
 
 Summary
 ---------

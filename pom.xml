@@ -1,21 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.clojars.somnium</groupId>
+  <groupId>congomongo</groupId>
   <artifactId>congomongo</artifactId>
-  <version>0.1.1-SNAPSHOT</version>
+  <version>0.1.2-SNAPSHOT</version>
   <name>congomongo</name>
   <description>clojure-friendly api for MongoDB</description>
   <scm>
     <connection>scm:git:git://github.com/somnium/congomongo.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/somnium/congomongo.git</developerConnection>
-    <tag>b54b1f19f26e71eb0c13f672d4c61ba783745ef3</tag>
+    <tag>a5cdd0d56ff622c02df6fcacd679fc1b938e0602</tag>
     <url>http://github.com/somnium/congomongo</url>
   </scm>
   <repositories>
     <repository>
       <id>central</id>
       <url>http://repo1.maven.org/maven2</url>
+    </repository>
+    <repository>
+      <id>clojure</id>
+      <url>http://build.clojure.org/releases</url>
     </repository>
     <repository>
       <id>clojure-snapshots</id>
