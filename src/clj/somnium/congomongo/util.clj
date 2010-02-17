@@ -32,3 +32,29 @@
   "applies f to each key in h"
   [f h]
   (zipmap (map f (keys h)) (vals h)))
+
+
+(defmacro opt-fn
+  "experimental helper for creating
+   overloaded fns that accept option maps
+   with a helper macro that acts like a
+   function that accepts keyword args"
+  [m-name default-map pos-args & body]
+  (let [f-name (symbol (str "*" m-name))
+        skeys (map symbol (map name (keys default-map)))
+        dmap  (zipmap skeys (vals default-map))
+        dest  {:keys (vec skeys) :or dmap}
+        avec  (vec (cons dest pos-args))]
+    `(do
+       ;; main-fn
+       (defn ~f-name
+         ~avec
+         ~@body)
+       (defmacro ~m-name
+         [& args#]
+         (let [[*args# opts#] (split-with (complement keyword?) args#)
+               *opts#         (apply hash-map opts#)]
+           (apply list (quote ~f-name) *opts# *args#)))
+       (alter-meta! (resolve (quote ~m-name))
+                    merge
+                    {:arglists (quote [~'& ~'args ~default-map])}))))
