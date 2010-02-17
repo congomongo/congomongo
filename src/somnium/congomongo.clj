@@ -27,6 +27,7 @@
             [somnium.congomongo.coerce :only [coerce coerce-fields]]
             [clojure.contrib.json read write])
   (:import  [com.mongodb Mongo DB DBCollection DBObject]
+            [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [somnium.congomongo ClojureDBObject]))
 
@@ -172,13 +173,15 @@
     (swap! *mongo-config* merge {:db db})
     (throw (RuntimeException. (str "database with title " title " does not exist.")))))
 
+;;;; go ahead and have these retucn seqs
+
 (defn databases
   "List databases on the mongo server" []
-  (.getDatabaseNames (:mongo @*mongo-config*)))
+  (seq (.getDatabaseNames (:mongo @*mongo-config*))))
 
 (defn collections
   "Returns the set of collections stored in the current database" []
-  (.getCollectionNames #^DB (:db @*mongo-config*)))
+  (seq (.getCollectionNames #^DB (:db @*mongo-config*))))
 
 (defn drop-coll!
   [collection]
