@@ -1,4 +1,4 @@
-(defproject org.clojars.somnium/congomongo
+(defproject congomongo
   "0.1.2-SNAPSHOT"
   :description "clojure-friendly api for MongoDB"
   :dependencies [[org.clojure/clojure "1.1.0-master-SNAPSHOT"]
