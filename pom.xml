@@ -9,7 +9,7 @@
   <scm>
     <connection>scm:git:git://github.com/somnium/congomongo.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/somnium/congomongo.git</developerConnection>
-    <tag>1a657369c833a2f9b3296328a73e613dc9bffcf2</tag>
+    <tag>3f800e4338bcbe649c444c38e50e5c82bfccd878</tag>
     <url>http://github.com/somnium/congomongo</url>
   </scm>
   <repositories>
