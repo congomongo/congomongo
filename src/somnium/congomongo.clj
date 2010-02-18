@@ -26,7 +26,7 @@
             [somnium.congomongo.util   :only [named defunk]]
             [somnium.congomongo.coerce :only [coerce coerce-fields]]
             [clojure.contrib.json read write])
-  (:import  [com.mongodb Mongo DB DBCollection DBObject]
+  (:import  [com.mongodb Mongo DB DBCollection DBObject ObjectId]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [somnium.congomongo ClojureDBObject]))
@@ -48,6 +48,19 @@
 
 ;; perhaps split *mongo-config* out into vars for thread-local
 ;; changes. 
+
+;; add some convenience fns for manipulating object-ids
+(definline object-id [s]
+  `(ObjectId. #^String ~s))
+
+;; add convenience get-timestamp method
+(defn get-timestamp
+  "pulls the timestamp from an ObjectId or a map with a valid
+   ObjectId in :_id."
+  [obj]
+  (let [id (if (instance? ObjectId obj) obj (:_id obj))]
+    (when id (.getTime id))))
+
 
 (definline get-coll
   "Returns a DBCollection object"
@@ -96,6 +109,11 @@
 
 (defn fetch-count [col & options]
   (apply fetch col (concat options '[:count? true])))
+
+;; add fetch-by-id fn
+(defn fetch-by-id [col id & options]
+  (let [id (if (instance? ObjectId id) id (object-id id))]
+      (apply fetch col (concat options [:one? true :where {:_id id}]))))
 
 (defunk insert! 
   "Inserts a map into collection. Will not overwrite existing maps.

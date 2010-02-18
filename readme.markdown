@@ -7,9 +7,21 @@ A toolkit for using MongoDB with Clojure.
 
 Recent Changes
 --------------
+Added a few convenience fns related to object-ids:     
 
-GridFs support courtesy of Steve Purcell. Thannks, Steve!             
-Bumped version to 0.1.2.        
+'object-id:   creates a com.mongodb.ObjectId from a string so      
+you don't have to import it anymore.      
+
+'fetch-by-id: takes a collection and a string/object-id and      
+fetches the result      
+
+'get-timestamp: takes a map with a valid :_id or an ObjectId and
+returns the embedded timestamp       
+       
+GridFs support courtesy of Steve Purcell.     
+
+Bumped version to 0.1.2.          
+
 Clojars group is now congomongo.                 
 
 Summary
