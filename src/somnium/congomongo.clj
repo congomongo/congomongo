@@ -272,3 +272,13 @@
   [fs file out]
   (if-let [f (.findOne (get-gridfs fs) (coerce file [:clojure :mongo]))]
     (.writeTo f out)))
+
+(defn server-eval
+  "Sends javascript to the server to be evaluated. js should define a function that takes no arguments. The server will call the function."
+  [js & args]
+  (let [db #^com.mongodb.DB (:db @somnium.congomongo.config/*mongo-config*)
+        m (.doEval db js (into-array Object args))]
+    (let [result (coerce m [:mongo :clojure])]
+      (if (= 1 (:ok result))
+        (:retval result)
+        (throw (Exception. (format "failure executing javascript: %s" (str result))))))))

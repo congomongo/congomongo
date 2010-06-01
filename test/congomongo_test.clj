@@ -147,3 +147,17 @@
       (let [o (java.io.ByteArrayOutputStream.)]
         (write-file-to :testfs f o)
         (is (= "banana" (str o)))))))
+
+(deftest test-server-eval
+  (with-mongo
+    (is (= (server-eval
+            "
+function ()
+{
+ function square (n)
+ {
+  return n*n;                           ;
+  }
+ return square (25);
+ }
+") 625))))
