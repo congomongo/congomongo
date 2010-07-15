@@ -5,7 +5,6 @@
         somnium.congomongo.util
         somnium.congomongo.coerce
         clojure.contrib.pprint)
-  (:import somnium.congomongo.ClojureDBObject)
   (:use [clojure.contrib.json :only (read-json json-str)]))
 
 (deftest coercions

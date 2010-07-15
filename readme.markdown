@@ -26,19 +26,8 @@ Clojars group is now congomongo.
 
 Summary
 ---------
-note: The .java bits are likely to disappear once Clojure 1.2 is stable.
-
-CongoMongo is essentially two parts.
-
-One is the ClojureDBObject class written in java.
-It extends the BasicDBObject class with two methods (putClojure,
-toClojure) and a convenience constructor.
-
-It is basically a close-to-the-metal wrapper around the mongo-java-driver's
-BasicDBObject class to handle coercions (keyword->string and nested structures)        
-while offering similar performance to the BasicDBObject class itself.
-
-The rest is a Clojure api for the mongo-java-driver.
+CongoMongo is essentially a Clojure api for the mongo-java-driver, transparently handling
+coercions between Clojure and Java data types.
 
 Basics
 --------
