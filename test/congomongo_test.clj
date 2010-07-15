@@ -4,10 +4,9 @@
         somnium.congomongo.config
         somnium.congomongo.util
         somnium.congomongo.coerce
-        clojure.contrib.json.read
-        clojure.contrib.json.write
         clojure.contrib.pprint)
-  (:import somnium.congomongo.ClojureDBObject))
+  (:import somnium.congomongo.ClojureDBObject)
+  (:use [clojure.contrib.json :only (read-json json-str)]))
 
 (deftest coercions
   (let [forms   [:clojure :mongo :json]
