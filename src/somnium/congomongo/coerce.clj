@@ -93,7 +93,6 @@
               [:clojure :json   ] json-str
               [:mongo   :clojure] #(mongo->clojure #^DBObject % #^Boolean/TYPE *keywordize*)
               [:mongo   :json   ] #(.toString #^DBObject %)
-              [:gridfs  :clojure] #(mongo->clojure #^GridFSFile % *keywordize*)
               [:json    :clojure] #(read-json % *keywordize*)
               [:json    :mongo  ] #(JSON/parse %)
               :else               (throw (RuntimeException.

@@ -230,7 +230,7 @@
     (if contentType (.setContentType f contentType))
     (if metadata (.putAll (.getMetaData f) (coerce metadata [:clojure :mongo])))
     (.save f)
-    (coerce f [:gridfs :clojure])))
+    (coerce f [:mongo :clojure])))
  
 (defunk destroy-file!
    "Removes file from gridfs. Takes a GridFS name and
@@ -255,9 +255,9 @@
         n-fs   (get-gridfs fs)]
     (if one?
       (if-let [m (.findOne #^GridFS n-fs #^DBObject n-where)]
-        (coerce m [:gridfs :clojure]) nil)
+        (coerce m [:mongo :clojure]) nil)
       (if-let [m (.find #^GridFS n-fs #^DBObject n-where)]
-        (coerce m [:gridfs :clojure] :many true) nil))))
+        (coerce m [:mongo :clojure] :many true) nil))))
  
 (defn fetch-one-file [fs & options]
   (apply fetch-files fs (concat options '[:one? true])))
