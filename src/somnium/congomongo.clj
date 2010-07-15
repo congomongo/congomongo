@@ -26,9 +26,10 @@
             [somnium.congomongo.util   :only [named defunk]]
             [somnium.congomongo.coerce :only [coerce coerce-fields]]
             [clojure.contrib.json read write])
-  (:import  [com.mongodb Mongo DB DBCollection DBObject ObjectId]
+  (:import  [com.mongodb Mongo DB DBCollection DBObject]
             [com.mongodb.gridfs GridFS]
-            [com.mongodb.util JSON]))
+            [com.mongodb.util JSON]
+            [org.bson.types ObjectId]))
 
 (defunk mongo!
   "Creates a Mongo object and sets the default database.
@@ -159,7 +160,7 @@
    {:arglists '(collection fields {:unique false :force true})}
    [c f :unique false :force true]
    (-> (get-coll c)
-       (.ensureIndex (coerce-fields f) force unique)))
+       (.ensureIndex (coerce-fields f) (coerce {:force force :unique unique} [:clojure :mongo]))))
 
 (defn drop-index!
   "Drops an index on the collection for the specified fields"

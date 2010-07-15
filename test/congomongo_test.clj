@@ -128,8 +128,8 @@
   (with-mongo
     (let [f (insert-file! :testfs (.getBytes "nuts")
                           :metadata { :calories 50, :opinion "tasty"})]
-      (is (= "tasty" (-> f :metadata :opinion)))
-      (is (= f (fetch-one-file :testfs :where { :metadata.opinion "tasty" }))))))
+      (is (= "tasty" (f :opinion)))
+      (is (= f (fetch-one-file :testfs :where { :opinion "tasty" }))))))
  
 (deftest gridfs-write-file-to
   (with-mongo
