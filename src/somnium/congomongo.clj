@@ -53,6 +53,11 @@
 (definline object-id [s]
   `(ObjectId. #^String ~s))
 
+;; Make ObjectIds printable under *print-dup*, hiding the
+;; implementation-dependent ObjectId class
+(defmethod print-dup ObjectId [x w]
+  (.write w (str "#=" `(object-id ~(.toString x)))))
+
 ;; add convenience get-timestamp method
 (defn get-timestamp
   "pulls the timestamp from an ObjectId or a map with a valid
