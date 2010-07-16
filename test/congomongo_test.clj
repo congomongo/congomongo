@@ -105,6 +105,16 @@
      (is (some #(= (into {} (% "key")) {"x" 1})
                (get-indexes :points)))))
 
+(defrecord Foo [a b])
+
+(deftest can-insert-records-as-maps
+  (with-mongo
+    (insert! :foos (Foo. 1 2))
+    (let [found (fetch-one :foos)]
+      (are (= 1 (:a found))
+           (= 2 (:b found))
+           ))))
+
 (deftest gridfs-insert-and-fetch
   (with-mongo
     (is (empty? (fetch-files :testfs)))
