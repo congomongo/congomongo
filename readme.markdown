@@ -5,29 +5,21 @@ What?
 ------
 A toolkit for using MongoDB with Clojure.
 
-Recent Changes
+News
 --------------
-Added a few convenience fns related to object-ids:     
+Clojure 1.2 is almost upon us.
 
-'object-id:   creates a com.mongodb.ObjectId from a string so      
-you don't have to import it anymore.      
+The .java shall fade into the ether and be replaced    
+by magical concurrent unicorns. Unicorns or protocols,    
+whichever proves more feasible.    
 
-'fetch-by-id: takes a collection and a string/object-id and      
-fetches the result      
+There is now a [Google Group](http://groups.google.com/group/congomongo-dev)
+Come help us make ponies for great good.
 
-'get-timestamp: takes a map with a valid :_id or an ObjectId and
-returns the embedded timestamp       
-       
-GridFs support courtesy of Steve Purcell.     
-
-Bumped version to 0.1.2.          
-
-Clojars group is now congomongo.                 
+Clojars group is congomongo.         
 
 Summary
 ---------
-note: The .java bits are likely to disappear once Clojure 1.2 is stable.
-
 CongoMongo is essentially two parts.
 
 One is the ClojureDBObject class written in java.
@@ -136,4 +128,4 @@ TODO
 ### Feedback
 
 CongoMongo is a work in progress. If you've used, improved, 
-or abused it I'd love to hear about it. Contact me at boekhoffa@gmail.com
+or abused it tell us about it at our [Google Group](http://groups.google.com/group/congomongo-dev).
