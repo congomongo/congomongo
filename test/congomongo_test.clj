@@ -27,23 +27,74 @@
 
 (def test-db "congomongotestdb")
 (defn setup! [] (mongo! :db test-db))
-(defn teardown! [] (drop-database! test-db))
+(defn teardown! []
+  (drop-database! test-db)
+  (close-all-connections))
 
-(defmacro with-mongo [& body]
+(defmacro with-test-mongo [& body]
   `(do
      (setup!)
      ~@body
      (teardown!)))
 
+(deftest test-add-remove-connections
+  (with-test-mongo
+    (is (= test-db (.getName (*mongo-config* :db))))
+
+    (testing "mongo! does not contribute to connections"
+      (is (= 0 (count @connections))))
+
+    (let [db-a "congomongotest-a"
+          db-b "congomongotest-b"]
+      (add-connection :db "congomongotest-db-a" :name :a)
+      (add-connection :db "congomongotest-db-b" :name :b)
+      (testing "add-connection adds to connections"
+        (is (= 2 (count @connections))))
+      
+      (testing "add connection does not interfere with current config"
+        (is (= test-db (.getName (*mongo-config* :db)))))
+
+      (drop-database! db-b)
+      (close-connection :b)
+      (testing "close-connection removes connections"
+        (is (= 1 (count @connections))))
+      (drop-database! db-a)
+      (close-connection :a))))
+
+(deftest add-connection-with-no-name-throws
+  (with-test-mongo
+    (is (thrown? Exception (add-connection :db "congomongotest-db-a")))))
+
+(deftest with-mongo-interactions
+  (with-test-mongo
+    (add-connection :db "congomongotest-db-a" :name :a)
+    (add-connection :db "congomongotest-db-b" :name :b)
+    (with-mongo :a
+      (testing "with-mongo sets the mongo-config"
+        (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))
+      (testing "mongo! inside with-mongo stomps on current config"
+        (mongo! :db "congomongotest-db-b")
+        (is (= "congomongotest-db-b" (.getName (*mongo-config* :db))))))
+    (testing "and previous mongo! inside with-mongo is visible afterwards"
+      (is (= "congomongotest-db-b" (.getName (*mongo-config* :db)))))))
+
+(deftest closing-with-mongo
+  (with-test-mongo
+    (add-connection :db "congomongotest-db-a" :name :a)
+    (with-mongo :a
+      (testing "close-connection inside with-mongo sets mongo-config to nil"
+        (close-connection :a)
+        (is (= nil *mongo-config*))))))
+
 (deftest databases-test
-  (with-mongo
+  (with-test-mongo
     (let [test-db2 "congomongotestdb-part-deux"]
     
-      (is (= test-db (.getName (@*mongo-config* :db)))
+      (is (= test-db (.getName (*mongo-config* :db)))
           "default DB exists")
       (set-database! test-db2)
 
-      (is (= test-db2 (.getName (@*mongo-config* :db)))
+      (is (= test-db2 (.getName (*mongo-config* :db)))
           "changed DB exists")
       (drop-database! test-db2))))
 
@@ -55,14 +106,14 @@
      (insert! :points {:x x :y y}))))
 
 (deftest slow-insert-and-fetch
-  (with-mongo
+  (with-test-mongo
     (make-points!)
     (is (= (* 100 100)) (fetch-count :points))
     (is (= (fetch-count :points
                         :where {:x 42}) 100))))
 
 (deftest destroy
-  (with-mongo
+  (with-test-mongo
     (make-points!)
     (let [point-id (:_id (fetch-one :points))]
       (destroy! :points
@@ -72,7 +123,7 @@
                             :where {:_id point-id}))))))
 
 (deftest update
-  (with-mongo
+  (with-test-mongo
     (make-points!)
     (let [point-id (:_id (fetch-one :points))]
       (update! :points
@@ -86,7 +137,7 @@
 ;; ;; will need to implement some sort of chunking algorithm
 
  (deftest mass-insert
-   (with-mongo
+   (with-test-mongo
      (println "mass insert of 10000 points")
      (time
       (mass-insert! :points
@@ -99,7 +150,7 @@
          "mass-insert okay")))
 
  (deftest basic-indexing
-   (with-mongo
+   (with-test-mongo
      (make-points!)
      (add-index! :points [:x])
      (is (some #(= (into {} (% "key")) {"x" 1})
@@ -108,7 +159,7 @@
 (defrecord Foo [a b])
 
 (deftest can-insert-records-as-maps
-  (with-mongo
+  (with-test-mongo
     (insert! :foos (Foo. 1 2))
     (let [found (fetch-one :foos)]
       (are (= 1 (:a found))
@@ -116,7 +167,7 @@
            ))))
 
 (deftest gridfs-insert-and-fetch
-  (with-mongo
+  (with-test-mongo
     (is (empty? (fetch-files :testfs)))
     (let [f (insert-file! :testfs (.getBytes "toasted")
                           :filename "muffin" :contentType "food/breakfast")]
@@ -129,27 +180,27 @@
       (is (= (list f) (fetch-files :testfs))))))
  
 (deftest gridfs-destroy
-  (with-mongo
+  (with-test-mongo
     (insert-file! :testfs (.getBytes "banana") :filename "lunch")
     (destroy-file! :testfs {:filename "lunch"})
     (is (empty? (fetch-files :testfs)))))
  
 (deftest gridfs-insert-with-metadata
-  (with-mongo
+  (with-test-mongo
     (let [f (insert-file! :testfs (.getBytes "nuts")
                           :metadata { :calories 50, :opinion "tasty"})]
       (is (= "tasty" (f :opinion)))
       (is (= f (fetch-one-file :testfs :where { :opinion "tasty" }))))))
  
 (deftest gridfs-write-file-to
-  (with-mongo
+  (with-test-mongo
     (let [f (insert-file! :testfs (.getBytes "banana"))]
       (let [o (java.io.ByteArrayOutputStream.)]
         (write-file-to :testfs f o)
         (is (= "banana" (str o)))))))
 
 (deftest test-server-eval
-  (with-mongo
+  (with-test-mongo
     (is (= (server-eval
             "
 function ()

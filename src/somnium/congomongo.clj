@@ -22,13 +22,62 @@
   #^{:author "Andrew Boekhoff",
      :doc "Various wrappers and utilities for the mongodb-java-driver"}
   somnium.congomongo
-  (:use     [somnium.congomongo.config :only [*mongo-config*]]
+  (:use     [somnium.congomongo.config :only [*mongo-config* connections]]
             [somnium.congomongo.util   :only [named defunk]]
             [somnium.congomongo.coerce :only [coerce coerce-fields]])
   (:import  [com.mongodb Mongo DB DBCollection DBObject]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
+
+(defunk make-connection
+  {:arglists '({:name ? :db ? :host "localhost" :port 27017})
+   :private true}
+  [:name nil :db nil :host "localhost" :port 27017]
+  (let [mongo  (Mongo. host port)
+        n-db     (if db (.getDB mongo (named db)) nil)]
+    {:name name :mongo mongo :db n-db}))
+
+(defunk add-connection
+  "Creates a new connection, but does not make it the active connection."
+  {:arglists '({:name ? :db ? :host "localhost" :port 27017})}
+  [:name nil :db nil :host "localhost" :port 27017]
+  (when-not name
+    (throw (Exception. "Name is required")))
+  (dosync
+   (alter connections assoc name (make-connection :name name :db db :host host :port 27017))))
+
+(defn close-connection [name]
+  (dosync
+   (alter connections dissoc name))
+  (when (if (= name (:name *mongo-config*))
+          (if (thread-bound? #'*mongo-config*)
+            (set! *mongo-config* nil)
+            (alter-var-root #'*mongo-config* (constantly nil))))))
+
+(defn close-all-connections []
+  (dosync
+   (doseq [[name conn] @connections]
+     (close-connection name))))
+
+(defmacro with-mongo [name & body]
+  `(let [conn# (get @connections ~name)]
+     (assert conn#)
+     (binding [*mongo-config* conn#]
+       ~@body)))
+
+(defn- set-connection* [connection]
+  (alter-var-root #'*mongo-config*
+                  (constantly connection)
+                  (when (thread-bound? #'*mongo-config*)
+                    (set! *mongo-config* connection))))
+
+(defn set-connection!
+  "Makes the connection active. Name refers to a connection already created with add-connection."
+  [name]
+  (let [conn (get @connections name)]
+    (assert conn)
+    (set-connection* conn)))
 
 (defunk mongo!
   "Creates a Mongo object and sets the default database.
@@ -38,15 +87,8 @@
    :db   -> defaults to nil (you'll have to set it anyway, might as well do it now.)"
   {:arglists '({:db ? :host "localhost" :port 27017})}
   [:db nil :host "localhost" :port 27017]
-   (let [mongo  (Mongo. host port)
-         n-db     (if db (.getDB mongo (named db)) nil)]
-     (reset! *mongo-config*
-             {:mongo mongo
-              :db    n-db})
-     true))
-
-;; perhaps split *mongo-config* out into vars for thread-local
-;; changes. 
+  (set-connection* (make-connection :db db :host host :port port))
+  true)
 
 ;; add some convenience fns for manipulating object-ids
 (definline object-id [s]
@@ -69,7 +111,7 @@
 (definline get-coll
   "Returns a DBCollection object"
   [collection]
-  `(.getCollection #^DB (:db @*mongo-config*)
+  `(.getCollection #^DB (:db *mongo-config*)
                    #^String (named ~collection)))
 
 (defunk fetch 
@@ -185,29 +227,29 @@
 (defn drop-database!
  "drops a database from the mongo server"
  [title]
- (.dropDatabase (:mongo @*mongo-config*) (named title)))
+ (.dropDatabase (:mongo *mongo-config*) (named title)))
 
 (defn set-database!
   "atomically alters the current database"
   [title]
-  (if-let [db (.getDB (:mongo @*mongo-config*) (named title))]
-    (swap! *mongo-config* merge {:db db})
+  (if-let [db (.getDB (:mongo *mongo-config*) (named title))]
+    (alter-var-root #'*mongo-config* merge {:db db})
     (throw (RuntimeException. (str "database with title " title " does not exist.")))))
 
 ;;;; go ahead and have these retucn seqs
 
 (defn databases
   "List databases on the mongo server" []
-  (seq (.getDatabaseNames (:mongo @*mongo-config*))))
+  (seq (.getDatabaseNames (:mongo *mongo-config*))))
 
 (defn collections
   "Returns the set of collections stored in the current database" []
-  (seq (.getCollectionNames #^DB (:db @*mongo-config*))))
+  (seq (.getCollectionNames #^DB (:db *mongo-config*))))
 
 (defn drop-coll!
   [collection]
   "Permanently deletes a collection. Use with care."
-  (.drop #^DBCollection (.getCollection #^DB (:db @*mongo-config*)
+  (.drop #^DBCollection (.getCollection #^DB (:db *mongo-config*)
                                         #^String (named collection))))
 
 ;;;; GridFS, contributed by Steve Purcell
@@ -216,7 +258,7 @@
 (definline get-gridfs
   "Returns a GridFS object for the named bucket"
   [bucket]
-  `(GridFS. #^DB (:db @*mongo-config*) #^String (named ~bucket)))
+  `(GridFS. #^DB (:db *mongo-config*) #^String (named ~bucket)))
  
 ;; The naming of :contentType is ugly, but consistent with that
 ;; returned by GridFSFile
@@ -276,7 +318,7 @@
 (defn server-eval
   "Sends javascript to the server to be evaluated. js should define a function that takes no arguments. The server will call the function."
   [js & args]
-  (let [db #^com.mongodb.DB (:db @somnium.congomongo.config/*mongo-config*)
+  (let [db #^com.mongodb.DB (:db somnium.congomongo.config/*mongo-config*)
         m (.doEval db js (into-array Object args))]
     (let [result (coerce m [:mongo :clojure])]
       (if (= 1 (:ok result))
