@@ -22,7 +22,7 @@
   #^{:author "Andrew Boekhoff",
      :doc "Various wrappers and utilities for the mongodb-java-driver"}
   somnium.congomongo
-  (:use     [somnium.congomongo.config :only [*mongo-config* connections]]
+  (:use     [somnium.congomongo.config :only [*mongo-config*]]
             [somnium.congomongo.util   :only [named defunk]]
             [somnium.congomongo.coerce :only [coerce coerce-fields]])
   (:import  [com.mongodb Mongo DB DBCollection DBObject]
@@ -30,54 +30,49 @@
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
 
-(defunk make-connection
-  {:arglists '({:name ? :db ? :host "localhost" :port 27017})
-   :private true}
-  [:name nil :db nil :host "localhost" :port 27017]
-  (let [mongo  (Mongo. host port)
+(defn make-connection
+  "Creates a connection to a mongoDB that can be used with set-connection! and with-mongo"
+  [db & {:keys [host port]}] 
+  (let [host (or host "localhost")
+        port (or port 27017)
+        mongo  (Mongo. host port)
         n-db     (if db (.getDB mongo (named db)) nil)]
-    {:name name :mongo mongo :db n-db}))
+    {:mongo mongo :db n-db}))
 
-(defunk add-connection
-  "Creates a new connection, but does not make it the active connection."
-  {:arglists '({:name ? :db ? :host "localhost" :port 27017})}
-  [:name nil :db nil :host "localhost" :port 27017]
-  (when-not name
-    (throw (Exception. "Name is required")))
-  (dosync
-   (alter connections assoc name (make-connection :name name :db db :host host :port 27017))))
+(defn connection? [x]
+  (and (map? x)
+       (:db x)
+       (:mongo x)))
 
-(defn close-connection [name]
-  (dosync
-   (alter connections dissoc name))
-  (when (if (= name (:name *mongo-config*))
-          (if (thread-bound? #'*mongo-config*)
-            (set! *mongo-config* nil)
-            (alter-var-root #'*mongo-config* (constantly nil))))))
+(defn close-connection
+  "Closes the connection, and unsets it as the active connection if necessary"
+  [conn]
+  (assert (connection? conn))
+  (if (= conn *mongo-config*)
+    (if (thread-bound? #'*mongo-config*)
+      (set! *mongo-config* nil)
+      (alter-var-root #'*mongo-config* (constantly nil))))
+  (.close (:mongo conn)))
 
-(defn close-all-connections []
-  (dosync
-   (doseq [[name conn] @connections]
-     (close-connection name))))
+(defmacro with-mongo
+  "Makes conn the active connection in the enclosing scope.
 
-(defmacro with-mongo [name & body]
-  `(let [conn# (get @connections ~name)]
-     (assert conn#)
-     (binding [*mongo-config* conn#]
+  When with-mongo and set-connection! interact, last one wins"
+  [conn & body]
+  `(do
+     (assert (connection? ~conn))
+     (binding [*mongo-config* ~conn]
        ~@body)))
 
-(defn- set-connection* [connection]
+(defn set-connection!
+  "Makes the connection active. Takes a connection created by make-connection.
+
+When with-mongo and set-connection! interact, last one wins"
+  [connection]
   (alter-var-root #'*mongo-config*
                   (constantly connection)
                   (when (thread-bound? #'*mongo-config*)
                     (set! *mongo-config* connection))))
-
-(defn set-connection!
-  "Makes the connection active. Name refers to a connection already created with add-connection."
-  [name]
-  (let [conn (get @connections name)]
-    (assert conn)
-    (set-connection* conn)))
 
 (defunk mongo!
   "Creates a Mongo object and sets the default database.
@@ -87,7 +82,7 @@
    :db   -> defaults to nil (you'll have to set it anyway, might as well do it now.)"
   {:arglists '({:db ? :host "localhost" :port 27017})}
   [:db nil :host "localhost" :port 27017]
-  (set-connection* (make-connection :db db :host host :port port))
+  (set-connection! (make-connection db :host host :port port))
   true)
 
 ;; add some convenience fns for manipulating object-ids

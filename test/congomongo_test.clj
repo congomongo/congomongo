@@ -28,8 +28,7 @@
 (def test-db "congomongotestdb")
 (defn setup! [] (mongo! :db test-db))
 (defn teardown! []
-  (drop-database! test-db)
-  (close-all-connections))
+  (drop-database! test-db))
 
 (defmacro with-test-mongo [& body]
   `(do
@@ -37,54 +36,26 @@
      ~@body
      (teardown!)))
 
-(deftest test-add-remove-connections
-  (with-test-mongo
-    (is (= test-db (.getName (*mongo-config* :db))))
-
-    (testing "mongo! does not contribute to connections"
-      (is (= 0 (count @connections))))
-
-    (let [db-a "congomongotest-a"
-          db-b "congomongotest-b"]
-      (add-connection :db "congomongotest-db-a" :name :a)
-      (add-connection :db "congomongotest-db-b" :name :b)
-      (testing "add-connection adds to connections"
-        (is (= 2 (count @connections))))
-      
-      (testing "add connection does not interfere with current config"
-        (is (= test-db (.getName (*mongo-config* :db)))))
-
-      (drop-database! db-b)
-      (close-connection :b)
-      (testing "close-connection removes connections"
-        (is (= 1 (count @connections))))
-      (drop-database! db-a)
-      (close-connection :a))))
-
-(deftest add-connection-with-no-name-throws
-  (with-test-mongo
-    (is (thrown? Exception (add-connection :db "congomongotest-db-a")))))
-
 (deftest with-mongo-interactions
   (with-test-mongo
-    (add-connection :db "congomongotest-db-a" :name :a)
-    (add-connection :db "congomongotest-db-b" :name :b)
-    (with-mongo :a
-      (testing "with-mongo sets the mongo-config"
-        (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))
-      (testing "mongo! inside with-mongo stomps on current config"
-        (mongo! :db "congomongotest-db-b")
-        (is (= "congomongotest-db-b" (.getName (*mongo-config* :db))))))
-    (testing "and previous mongo! inside with-mongo is visible afterwards"
-      (is (= "congomongotest-db-b" (.getName (*mongo-config* :db)))))))
+    (let [a (make-connection "congomongotest-db-a")
+          b (make-connection "congomongotest-db-b")]
+      (with-mongo a
+        (testing "with-mongo sets the mongo-config"
+          (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))
+        (testing "mongo! inside with-mongo stomps on current config"
+          (mongo! :db "congomongotest-db-b")
+          (is (= "congomongotest-db-b" (.getName (*mongo-config* :db))))))
+      (testing "and previous mongo! inside with-mongo is visible afterwards"
+        (is (= "congomongotest-db-b" (.getName (*mongo-config* :db))))))))
 
 (deftest closing-with-mongo
   (with-test-mongo
-    (add-connection :db "congomongotest-db-a" :name :a)
-    (with-mongo :a
-      (testing "close-connection inside with-mongo sets mongo-config to nil"
-        (close-connection :a)
-        (is (= nil *mongo-config*))))))
+    (let [a (make-connection "congomongotest-db-a")]
+      (with-mongo a
+        (testing "close-connection inside with-mongo sets mongo-config to nil"
+          (close-connection a)
+          (is (= nil *mongo-config*)))))))
 
 (deftest fetch-sort
   (with-test-mongo
