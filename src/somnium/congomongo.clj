@@ -126,15 +126,17 @@
    :skip   -> number of records to skip
    :limit  -> number of records to return
    :one?   -> defaults to false, use fetch-one as a shortcut
-   :count? -> defaults to false, use fetch-count as a shortcut"
+   :count? -> defaults to false, use fetch-count as a shortcut
+   :sort   -> sort the results by a specific key"
   {:arglists
-   '([collection :where :only :limit :skip :as :from :one? :count?])}
+   '([collection :where :only :limit :skip :as :from :one? :count? :sort])}
   [coll :where {} :only [] :as :clojure :from :clojure
-   :one? false :count? false :limit 0 :skip 0]
+   :one? false :count? false :limit 0 :skip 0 :sort nil]
   (let [n-where (coerce where [from :mongo])
         n-only  (coerce-fields only)
         n-col   (get-coll coll)
-        n-limit (if limit (- 0 (Math/abs limit)) 0)]
+        n-limit (if limit (- 0 (Math/abs limit)) 0)
+        n-sort (when sort (coerce sort [from :mongo]))]
     (cond
       count? (.getCount n-col n-where n-only)
       one?   (if-let [m (.findOne
@@ -142,12 +144,14 @@
                          #^DBObject n-where
                          #^DBObject n-only)]
                (coerce m [:mongo as]) nil)
-      :else  (if-let [m (.find #^DBCollection n-col
+      :else  (when-let [m (.find #^DBCollection n-col
                                #^DBObject n-where
                                #^DBObject n-only
                                (int skip)
                                (int n-limit))]
-               (coerce m [:mongo as] :many :true) nil))))
+               (coerce (if n-sort
+                         (.sort m n-sort)
+                         m) [:mongo as] :many :true)))))
 
 (defn fetch-one [col & options]
   (apply fetch col (concat options '[:one? true])))

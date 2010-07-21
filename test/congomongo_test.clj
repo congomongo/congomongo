@@ -86,7 +86,17 @@
         (close-connection :a)
         (is (= nil *mongo-config*))))))
 
-(deftest databases-test
+(deftest fetch-sort
+  (with-test-mongo
+    (let [unsorted [3 10 7 0 2]]
+      (mass-insert! :points
+                  (for [i unsorted]
+                    {:x i}))
+      (is (= (map :x (fetch :points :sort {:x 1})) (sort unsorted)))
+      (is (= (map :x (fetch :points :sort {:x -1})) (reverse (sort unsorted)))))))
+
+
+`(deftest databases-test
   (with-test-mongo
     (let [test-db2 "congomongotestdb-part-deux"]
     
