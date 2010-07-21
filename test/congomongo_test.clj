@@ -4,10 +4,8 @@
         somnium.congomongo.config
         somnium.congomongo.util
         somnium.congomongo.coerce
-        clojure.contrib.json.read
-        clojure.contrib.json.write
         clojure.contrib.pprint)
-  (:import somnium.congomongo.ClojureDBObject))
+  (:use [clojure.contrib.json :only (read-json json-str)]))
 
 (deftest coercions
   (let [forms   [:clojure :mongo :json]
@@ -107,6 +105,16 @@
      (is (some #(= (into {} (% "key")) {"x" 1})
                (get-indexes :points)))))
 
+(defrecord Foo [a b])
+
+(deftest can-insert-records-as-maps
+  (with-mongo
+    (insert! :foos (Foo. 1 2))
+    (let [found (fetch-one :foos)]
+      (are (= 1 (:a found))
+           (= 2 (:b found))
+           ))))
+
 (deftest gridfs-insert-and-fetch
   (with-mongo
     (is (empty? (fetch-files :testfs)))
@@ -130,8 +138,8 @@
   (with-mongo
     (let [f (insert-file! :testfs (.getBytes "nuts")
                           :metadata { :calories 50, :opinion "tasty"})]
-      (is (= "tasty" (-> f :metadata :opinion)))
-      (is (= f (fetch-one-file :testfs :where { :metadata.opinion "tasty" }))))))
+      (is (= "tasty" (f :opinion)))
+      (is (= f (fetch-one-file :testfs :where { :opinion "tasty" }))))))
  
 (deftest gridfs-write-file-to
   (with-mongo
@@ -139,3 +147,17 @@
       (let [o (java.io.ByteArrayOutputStream.)]
         (write-file-to :testfs f o)
         (is (= "banana" (str o)))))))
+
+(deftest test-server-eval
+  (with-mongo
+    (is (= (server-eval
+            "
+function ()
+{
+ function square (n)
+ {
+  return n*n;                           ;
+  }
+ return square (25);
+ }
+") 625))))

@@ -24,12 +24,11 @@
   somnium.congomongo
   (:use     [somnium.congomongo.config :only [*mongo-config*]]
             [somnium.congomongo.util   :only [named defunk]]
-            [somnium.congomongo.coerce :only [coerce coerce-fields]]
-            [clojure.contrib.json read write])
-  (:import  [com.mongodb Mongo DB DBCollection DBObject ObjectId]
+            [somnium.congomongo.coerce :only [coerce coerce-fields]])
+  (:import  [com.mongodb Mongo DB DBCollection DBObject]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
-            [somnium.congomongo ClojureDBObject]))
+            [org.bson.types ObjectId]))
 
 (defunk mongo!
   "Creates a Mongo object and sets the default database.
@@ -53,6 +52,11 @@
 (definline object-id [s]
   `(ObjectId. #^String ~s))
 
+;; Make ObjectIds printable under *print-dup*, hiding the
+;; implementation-dependent ObjectId class
+(defmethod print-dup ObjectId [x w]
+  (.write w (str "#=" `(object-id ~(.toString x)))))
+
 ;; add convenience get-timestamp method
 (defn get-timestamp
   "pulls the timestamp from an ObjectId or a map with a valid
@@ -65,9 +69,8 @@
 (definline get-coll
   "Returns a DBCollection object"
   [collection]
-  `(doto (.getCollection #^DB (:db @*mongo-config*)
-                         #^String (named ~collection))
-     (.setObjectClass ClojureDBObject)))
+  `(.getCollection #^DB (:db @*mongo-config*)
+                   #^String (named ~collection)))
 
 (defunk fetch 
   "Fetches objects from a collection.
@@ -161,7 +164,7 @@
    {:arglists '(collection fields {:unique false :force true})}
    [c f :unique false :force true]
    (-> (get-coll c)
-       (.ensureIndex (coerce-fields f) force unique)))
+       (.ensureIndex (coerce-fields f) (coerce {:force force :unique unique} [:clojure :mongo]))))
 
 (defn drop-index!
   "Drops an index on the collection for the specified fields"
@@ -231,7 +234,7 @@
     (if contentType (.setContentType f contentType))
     (if metadata (.putAll (.getMetaData f) (coerce metadata [:clojure :mongo])))
     (.save f)
-    (coerce f [:gridfs :clojure])))
+    (coerce f [:mongo :clojure])))
  
 (defunk destroy-file!
    "Removes file from gridfs. Takes a GridFS name and
@@ -256,9 +259,9 @@
         n-fs   (get-gridfs fs)]
     (if one?
       (if-let [m (.findOne #^GridFS n-fs #^DBObject n-where)]
-        (coerce m [:gridfs :clojure]) nil)
+        (coerce m [:mongo :clojure]) nil)
       (if-let [m (.find #^GridFS n-fs #^DBObject n-where)]
-        (coerce m [:gridfs :clojure] :many true) nil))))
+        (coerce m [:mongo :clojure] :many true) nil))))
  
 (defn fetch-one-file [fs & options]
   (apply fetch-files fs (concat options '[:one? true])))
@@ -269,3 +272,13 @@
   [fs file out]
   (if-let [f (.findOne (get-gridfs fs) (coerce file [:clojure :mongo]))]
     (.writeTo f out)))
+
+(defn server-eval
+  "Sends javascript to the server to be evaluated. js should define a function that takes no arguments. The server will call the function."
+  [js & args]
+  (let [db #^com.mongodb.DB (:db @somnium.congomongo.config/*mongo-config*)
+        m (.doEval db js (into-array Object args))]
+    (let [result (coerce m [:mongo :clojure])]
+      (if (= 1 (:ok result))
+        (:retval result)
+        (throw (Exception. (format "failure executing javascript: %s" (str result))))))))

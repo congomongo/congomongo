@@ -1,33 +1,83 @@
 (ns somnium.congomongo.coerce
   (:use [somnium.congomongo.util :only [defunk]]
-        [clojure.contrib.json read write]
+        [clojure.contrib.json :only [json-str read-json]]
         [clojure.contrib.def :only [defvar]]
         [clojure.contrib.core :only [seqable?]])
-  (:import [com.mongodb DBObject]
-           [somnium.congomongo ClojureDBObject]
-           [clojure.lang IPersistentMap Keyword]
-           [java.util Map List Map$Entry]
+  (:import [clojure.lang IPersistentMap IPersistentVector Keyword]
+           [java.util Map List]
+           [com.mongodb DBObject BasicDBObject]
+           [com.mongodb.gridfs GridFSFile]
            [com.mongodb.util JSON]))
 
 (defvar *keywordize* true
-  "Set this to false to prevent ClojureDBObject from setting string keys to keywords")
+  "Set this to false to prevent coercion from setting string keys to keywords")
 
-(defn- dbobject->clojure
-  "Not every DBObject returned from Mongo is a ClojureDBObject,
-   since we can't setObjectClass on the collections used to back GridFS;
-   those collections have GridFSDBFile as their object class.
- 
-   This function uses ClojureDBObject to marshal such DBObjects
-   into Clojure structures; in practice, this applies only to GridFSFile
-   and its subclasses."
-  [#^DBObject f keywordize]
-  (let [keys (.keySet f)]
-    (.toClojure
-     #^ClojureDBObject (ClojureDBObject. (zipmap keys (map #(.get f %) keys)))
-     keywordize)))
 
-(defunk 
-  coerce
+;;; Converting data from mongo into Clojure data objects
+
+(defprotocol ConvertibleFromMongo
+  (mongo->clojure [o keywordize]))
+
+(defn- assocs->clojure [kvs keywordize]
+  ;; Taking the keywordize test out of the fn reduces derefs
+  ;; dramatically, which was the main barrier to matching pure-Java
+  ;; performance for this marshalling
+  (reduce (if keywordize
+            (fn [m [#^String k v]] (assoc m (keyword k) (mongo->clojure v true)))
+            (fn [m [#^String k v]] (assoc m k           (mongo->clojure v false))))
+          {} kvs))
+
+
+(extend-protocol ConvertibleFromMongo
+  Map
+  (mongo->clojure [#^Map m keywordize] (assocs->clojure (.entrySet m) keywordize))
+
+  List
+  (mongo->clojure [#^List l keywordize] (vec (map #(mongo->clojure % keywordize) l)))
+
+  Object
+  (mongo->clojure [o keywordize] o)
+
+  nil
+  (mongo->clojure [o keywordize] o)
+
+  DBObject
+  (mongo->clojure [#^DBObject f keywordize]
+                  ;; DBObject provides .toMap, but the implementation in
+                  ;; subclass GridFSFile unhelpfully throws
+                  ;; UnsupportedOperationException
+                  (assocs->clojure (for [k (.keySet f)] [k (.get f k)]) keywordize)))
+
+
+;;; Converting data from Clojure into data objects suitable for Mongo
+
+(defprotocol ConvertibleToMongo
+  (clojure->mongo [o]))
+
+(extend-protocol ConvertibleToMongo
+  IPersistentMap
+  (clojure->mongo [m] (let [dbo (BasicDBObject.)]
+                        (doseq [[k v] m]
+                          (.put dbo
+                                (clojure->mongo k)
+                                (clojure->mongo v)))
+                        dbo))
+
+  Keyword
+  (clojure->mongo [#^Keyword o] (.getName o))
+
+  List
+  (clojure->mongo [#^List o] (map clojure->mongo o))
+
+  Object
+  (clojure->mongo [o] o)
+
+  nil
+  (clojure->mongo [o] o))
+
+
+
+(defunk coerce
   {:arglists '([obj [:from :to] {:many false}])
    :doc
    "takes an object, a vector of keywords:
@@ -39,15 +89,13 @@
       obj
       (let [fun
             (condp = from-to
-              [:clojure :mongo  ] #(ClojureDBObject. #^IPersistentMap %)
-              [:clojure :json   ] #(-> % (ClojureDBObject.) JSON/serialize)
-              [:mongo   :clojure] #(.toClojure #^ClojureDBObject %
-                                               #^Boolean/TYPE *keywordize*)
-              [:mongo   :json   ] #(.toString #^ClojureDBObject %)
-              [:gridfs  :clojure] #(dbobject->clojure #^GridFSFile % *keywordize*)
-              [:json    :clojure] #(binding [*json-keyword-keys* *keywordize*] (read-json %))
+              [:clojure :mongo  ] clojure->mongo
+              [:clojure :json   ] json-str
+              [:mongo   :clojure] #(mongo->clojure #^DBObject % #^Boolean/TYPE *keywordize*)
+              [:mongo   :json   ] #(.toString #^DBObject %)
+              [:json    :clojure] #(read-json % *keywordize*)
               [:json    :mongo  ] #(JSON/parse %)
-              :else               (throw (RuntimeException.   
+              :else               (throw (RuntimeException.
                                           "unsupported keyword pair")))]
         (if many (map fun (if (seqable? obj)
                             obj
@@ -56,4 +104,5 @@
 (defn coerce-fields
   "only used for creating argument object for :only"
   [fields]
-  (ClojureDBObject. #^IPersistentMap (zipmap fields (repeat 1))))
+  (clojure->mongo #^IPersistentMap (zipmap fields (repeat 1))))
+

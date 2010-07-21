@@ -9,28 +9,15 @@ News
 --------------
 Clojure 1.2 is almost upon us.
 
-The .java shall fade into the ether and be replaced    
-by magical concurrent unicorns. Unicorns or protocols,    
-whichever proves more feasible.    
-
-There is now a [Google Group](http://groups.google.com/group/congomongo-dev)
+There is now a [Google Group](http://groups.google.com/group/congomongo-dev)    
 Come help us make ponies for great good.
 
-Clojars group is congomongo.         
+Clojars group is congomongo.
 
-Summary
----------
-CongoMongo is essentially two parts.
+=======
 
-One is the ClojureDBObject class written in java.
-It extends the BasicDBObject class with two methods (putClojure,
-toClojure) and a convenience constructor.
-
-It is basically a close-to-the-metal wrapper around the mongo-java-driver's
-BasicDBObject class to handle coercions (keyword->string and nested structures)        
-while offering similar performance to the BasicDBObject class itself.
-
-The rest is a Clojure api for the mongo-java-driver.
+CongoMongo is essentially a Clojure api for the mongo-java-driver,
+transparently handling coercions between Clojure and Java data types.
 
 Basics
 --------
@@ -118,12 +105,6 @@ Just add
 to your project.clj and do
     $lein deps
 to get congomongo and all of its dependencies.    
-
-TODO
-----
-
-* convenient dsl for advanced queries/features 
-* orm-like schemas/validations?
 
 ### Feedback
 
