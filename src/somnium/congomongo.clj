@@ -30,6 +30,50 @@
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
 
+(defn make-connection
+  "Creates a connection to a mongoDB that can be used with set-connection! and with-mongo"
+  [db & {:keys [host port]}] 
+  (let [host (or host "localhost")
+        port (or port 27017)
+        mongo  (Mongo. host port)
+        n-db     (if db (.getDB mongo (named db)) nil)]
+    {:mongo mongo :db n-db}))
+
+(defn connection? [x]
+  (and (map? x)
+       (:db x)
+       (:mongo x)))
+
+(defn close-connection
+  "Closes the connection, and unsets it as the active connection if necessary"
+  [conn]
+  (assert (connection? conn))
+  (if (= conn *mongo-config*)
+    (if (thread-bound? #'*mongo-config*)
+      (set! *mongo-config* nil)
+      (alter-var-root #'*mongo-config* (constantly nil))))
+  (.close (:mongo conn)))
+
+(defmacro with-mongo
+  "Makes conn the active connection in the enclosing scope.
+
+  When with-mongo and set-connection! interact, last one wins"
+  [conn & body]
+  `(do
+     (assert (connection? ~conn))
+     (binding [*mongo-config* ~conn]
+       ~@body)))
+
+(defn set-connection!
+  "Makes the connection active. Takes a connection created by make-connection.
+
+When with-mongo and set-connection! interact, last one wins"
+  [connection]
+  (alter-var-root #'*mongo-config*
+                  (constantly connection)
+                  (when (thread-bound? #'*mongo-config*)
+                    (set! *mongo-config* connection))))
+
 (defunk mongo!
   "Creates a Mongo object and sets the default database.
    Keyword arguments include:
@@ -38,15 +82,8 @@
    :db   -> defaults to nil (you'll have to set it anyway, might as well do it now.)"
   {:arglists '({:db ? :host "localhost" :port 27017})}
   [:db nil :host "localhost" :port 27017]
-   (let [mongo  (Mongo. host port)
-         n-db     (if db (.getDB mongo (named db)) nil)]
-     (reset! *mongo-config*
-             {:mongo mongo
-              :db    n-db})
-     true))
-
-;; perhaps split *mongo-config* out into vars for thread-local
-;; changes. 
+  (set-connection! (make-connection db :host host :port port))
+  true)
 
 ;; add some convenience fns for manipulating object-ids
 (definline object-id [s]
@@ -69,7 +106,7 @@
 (definline get-coll
   "Returns a DBCollection object"
   [collection]
-  `(.getCollection #^DB (:db @*mongo-config*)
+  `(.getCollection #^DB (:db *mongo-config*)
                    #^String (named ~collection)))
 
 (defunk fetch 
@@ -84,15 +121,17 @@
    :skip   -> number of records to skip
    :limit  -> number of records to return
    :one?   -> defaults to false, use fetch-one as a shortcut
-   :count? -> defaults to false, use fetch-count as a shortcut"
+   :count? -> defaults to false, use fetch-count as a shortcut
+   :sort   -> sort the results by a specific key"
   {:arglists
-   '([collection :where :only :limit :skip :as :from :one? :count?])}
+   '([collection :where :only :limit :skip :as :from :one? :count? :sort])}
   [coll :where {} :only [] :as :clojure :from :clojure
-   :one? false :count? false :limit 0 :skip 0]
+   :one? false :count? false :limit 0 :skip 0 :sort nil]
   (let [n-where (coerce where [from :mongo])
         n-only  (coerce-fields only)
         n-col   (get-coll coll)
-        n-limit (if limit (- 0 (Math/abs limit)) 0)]
+        n-limit (if limit (- 0 (Math/abs limit)) 0)
+        n-sort (when sort (coerce sort [from :mongo]))]
     (cond
       count? (.getCount n-col n-where n-only)
       one?   (if-let [m (.findOne
@@ -100,12 +139,14 @@
                          #^DBObject n-where
                          #^DBObject n-only)]
                (coerce m [:mongo as]) nil)
-      :else  (if-let [m (.find #^DBCollection n-col
+      :else  (when-let [m (.find #^DBCollection n-col
                                #^DBObject n-where
                                #^DBObject n-only
                                (int skip)
                                (int n-limit))]
-               (coerce m [:mongo as] :many :true) nil))))
+               (coerce (if n-sort
+                         (.sort m n-sort)
+                         m) [:mongo as] :many :true)))))
 
 (defn fetch-one [col & options]
   (apply fetch col (concat options '[:one? true])))
@@ -185,29 +226,29 @@
 (defn drop-database!
  "drops a database from the mongo server"
  [title]
- (.dropDatabase (:mongo @*mongo-config*) (named title)))
+ (.dropDatabase (:mongo *mongo-config*) (named title)))
 
 (defn set-database!
   "atomically alters the current database"
   [title]
-  (if-let [db (.getDB (:mongo @*mongo-config*) (named title))]
-    (swap! *mongo-config* merge {:db db})
+  (if-let [db (.getDB (:mongo *mongo-config*) (named title))]
+    (alter-var-root #'*mongo-config* merge {:db db})
     (throw (RuntimeException. (str "database with title " title " does not exist.")))))
 
 ;;;; go ahead and have these retucn seqs
 
 (defn databases
   "List databases on the mongo server" []
-  (seq (.getDatabaseNames (:mongo @*mongo-config*))))
+  (seq (.getDatabaseNames (:mongo *mongo-config*))))
 
 (defn collections
   "Returns the set of collections stored in the current database" []
-  (seq (.getCollectionNames #^DB (:db @*mongo-config*))))
+  (seq (.getCollectionNames #^DB (:db *mongo-config*))))
 
 (defn drop-coll!
   [collection]
   "Permanently deletes a collection. Use with care."
-  (.drop #^DBCollection (.getCollection #^DB (:db @*mongo-config*)
+  (.drop #^DBCollection (.getCollection #^DB (:db *mongo-config*)
                                         #^String (named collection))))
 
 ;;;; GridFS, contributed by Steve Purcell
@@ -216,7 +257,7 @@
 (definline get-gridfs
   "Returns a GridFS object for the named bucket"
   [bucket]
-  `(GridFS. #^DB (:db @*mongo-config*) #^String (named ~bucket)))
+  `(GridFS. #^DB (:db *mongo-config*) #^String (named ~bucket)))
  
 ;; The naming of :contentType is ugly, but consistent with that
 ;; returned by GridFSFile
@@ -276,7 +317,7 @@
 (defn server-eval
   "Sends javascript to the server to be evaluated. js should define a function that takes no arguments. The server will call the function."
   [js & args]
-  (let [db #^com.mongodb.DB (:db @somnium.congomongo.config/*mongo-config*)
+  (let [db #^com.mongodb.DB (:db somnium.congomongo.config/*mongo-config*)
         m (.doEval db js (into-array Object args))]
     (let [result (coerce m [:mongo :clojure])]
       (if (= 1 (:ok result))
