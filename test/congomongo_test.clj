@@ -25,8 +25,9 @@
     (doseq [t results]
       (is (= (t 0) (t 1)) (str (t 2) " " (t 3))))))
 
+(def test-db-host "127.0.0.1")
 (def test-db "congomongotestdb")
-(defn setup! [] (mongo! :db test-db))
+(defn setup! [] (mongo! :db test-db :host test-db-host))
 (defn teardown! []
   (drop-database! test-db))
 
@@ -38,20 +39,20 @@
 
 (deftest with-mongo-interactions
   (with-test-mongo
-    (let [a (make-connection "congomongotest-db-a")
-          b (make-connection "congomongotest-db-b")]
+    (let [a (make-connection "congomongotest-db-a" :host test-db-host)
+          b (make-connection "congomongotest-db-b" :host test-db-host)]
       (with-mongo a
         (testing "with-mongo sets the mongo-config"
           (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))
         (testing "mongo! inside with-mongo stomps on current config"
-          (mongo! :db "congomongotest-db-b")
+          (mongo! :db "congomongotest-db-b" :host test-db-host)
           (is (= "congomongotest-db-b" (.getName (*mongo-config* :db))))))
       (testing "and previous mongo! inside with-mongo is visible afterwards"
         (is (= "congomongotest-db-b" (.getName (*mongo-config* :db))))))))
 
 (deftest closing-with-mongo
   (with-test-mongo
-    (let [a (make-connection "congomongotest-db-a")]
+    (let [a (make-connection "congomongotest-db-a" :host test-db-host)]
       (with-mongo a
         (testing "close-connection inside with-mongo sets mongo-config to nil"
           (close-connection a)
