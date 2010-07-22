@@ -7,7 +7,9 @@ A toolkit for using MongoDB with Clojure.
 
 News
 --------------
-Clojure 1.2 is almost upon us.
+Clojure 1.2 is almost upon us; as of congomongo 1.3.0, Clojure 1.2 and
+Clojure-contrib 1.2 are required. If you need compatibility with Clojure 1.1,
+please stick with congomongo 1.2.0.
 
 There is now a [Google Group](http://groups.google.com/group/congomongo-dev)    
 Come help us make ponies for great good.
@@ -101,7 +103,7 @@ Install
 
 Leiningen is the recommended way to use congomongo.
 Just add 
-    [congomongo "0.1.2-SNAPSHOT"]
+    [congomongo "0.1.3-SNAPSHOT"]
 to your project.clj and do
     $lein deps
 to get congomongo and all of its dependencies.    
