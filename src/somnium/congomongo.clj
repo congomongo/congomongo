@@ -322,3 +322,16 @@ When with-mongo and set-connection! interact, last one wins"
       (if (= 1 (:ok result))
         (:retval result)
         (throw (Exception. (format "failure executing javascript: %s" (str result))))))))
+
+(def write-concern-map
+     {:none com.mongodb.DB$WriteConcern/NONE
+      :normal com.mongodb.DB$WriteConcern/NORMAL
+      :strict com.mongodb.DB$WriteConcern/STRICT})
+
+(defn set-write-concern
+  "Sets the write concern on the connection. Setting is one of :none, :normal, :strict"
+  [connection setting]
+  (assert (connection? connection))
+  (assert (contains? (set (keys write-concern-map)) setting))
+  (.setWriteConcern (:db connection)
+                    (get write-concern-map setting)))
