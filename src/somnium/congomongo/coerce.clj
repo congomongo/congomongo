@@ -5,7 +5,7 @@
         [clojure.contrib.core :only [seqable?]])
   (:import [clojure.lang IPersistentMap IPersistentVector Keyword]
            [java.util Map List]
-           [com.mongodb DBObject BasicDBObject]
+           [com.mongodb DBObject BasicDBObject BasicDBList]
            [com.mongodb.gridfs GridFSFile]
            [com.mongodb.util JSON]))
 
@@ -23,17 +23,21 @@
   ;; dramatically, which was the main barrier to matching pure-Java
   ;; performance for this marshalling
   (reduce (if keywordize
-            (fn [m [#^String k v]] (assoc m (keyword k) (mongo->clojure v true)))
-            (fn [m [#^String k v]] (assoc m k           (mongo->clojure v false))))
+            (fn [m [#^String k v]]
+              (assoc m (keyword k) (mongo->clojure v true)))
+            (fn [m [#^String k v]]
+              (assoc m k (mongo->clojure v false))))
           {} kvs))
 
 
 (extend-protocol ConvertibleFromMongo
   Map
-  (mongo->clojure [#^Map m keywordize] (assocs->clojure (.entrySet m) keywordize))
+  (mongo->clojure [#^Map m keywordize]
+                  (assocs->clojure (.entrySet m) keywordize))
 
   List
-  (mongo->clojure [#^List l keywordize] (vec (map #(mongo->clojure % keywordize) l)))
+  (mongo->clojure [#^List l keywordize]
+                  (vec (map #(mongo->clojure % keywordize) l)))
 
   Object
   (mongo->clojure [o keywordize] o)
@@ -41,6 +45,10 @@
   nil
   (mongo->clojure [o keywordize] o)
 
+  BasicDBList 
+  (mongo->clojure [#^BasicDBList l keywordize]
+                  (vec (map #(mongo->clojure % keywordize) l)))
+  
   DBObject
   (mongo->clojure [#^DBObject f keywordize]
                   ;; DBObject provides .toMap, but the implementation in
