@@ -145,8 +145,15 @@
     (insert! :foos (Foo. 1 2))
     (let [found (fetch-one :foos)]
       (are (= 1 (:a found))
-           (= 2 (:b found))
-           ))))
+           (= 2 (:b found))))))
+
+(deftest insert-returns-id
+  (with-test-mongo
+    (let [ret (insert! :foos {:a 1 :b 2})]
+      (is (map? ret))
+      (is (= (:a ret) 1))
+      (is (= (:b ret) 2))
+      (is (:_id ret)))))
 
 (deftest gridfs-insert-and-fetch
   (with-test-mongo
@@ -180,6 +187,12 @@
       (let [o (java.io.ByteArrayOutputStream.)]
         (write-file-to :testfs f o)
         (is (= "banana" (str o)))))))
+
+(deftest test-roundtrip-vector
+  (with-test-mongo
+    (insert! :stuff {:name "name" :vector [ "foo" "bar"]})
+    (let [return (fetch-one :stuff :where {:name "name"})]
+      (is (vector? (:vector return))))))
 
 (deftest test-server-eval
   (with-test-mongo

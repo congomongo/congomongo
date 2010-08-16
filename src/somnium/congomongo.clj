@@ -165,12 +165,11 @@ When with-mongo and set-connection! interact, last one wins"
    as a side-effect only specify :to as nil."
   {:arglists '([coll obj {:many false :from :clojure :to :clojure}])}
   [coll obj :from :clojure :to :clojure :many false]
-  (let [res (.insert #^DBCollection (get-coll coll)
-                     (if many
+  (let [coerced-obj (if many
                        #^java.util.List (coerce obj [from :mongo] :many many)
-                       #^DBObject (coerce obj [from :mongo] :many many)))]
-      (if to
-        (coerce res [:mongo to] :many many))))
+                       #^DBObject (coerce obj [from :mongo] :many many))
+        res (.insert #^DBCollection (get-coll coll) coerced-obj)]
+    (coerce coerced-obj [:mongo to] :many many)))
 
 (defunk mass-insert!
   {:arglists '([coll objs {:from :clojure :to :clojure}])}
