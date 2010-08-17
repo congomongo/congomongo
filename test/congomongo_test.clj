@@ -5,7 +5,8 @@
         somnium.congomongo.util
         somnium.congomongo.coerce
         clojure.contrib.pprint)
-  (:use [clojure.contrib.json :only (read-json json-str)]))
+  (:use [clojure.contrib.json :only (read-json json-str)])
+  (:use [clojure.contrib.duck-streams :only (slurp*)]))
 
 (deftest coercions
   (let [forms   [:clojure :mongo :json]
@@ -187,6 +188,13 @@
       (let [o (java.io.ByteArrayOutputStream.)]
         (write-file-to :testfs f o)
         (is (= "banana" (str o)))))))
+
+(deftest gridfs-stream-from
+  (with-test-mongo
+    (let [f (insert-file! :testfs (.getBytes "plantain"))
+          stream (stream-from :testfs f)
+          data (slurp* stream)]
+      (is (= "plantain" data)))))
 
 (deftest test-roundtrip-vector
   (with-test-mongo
