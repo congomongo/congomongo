@@ -323,6 +323,63 @@ When with-mongo and set-connection! interact, last one wins"
         (:retval result)
         (throw (Exception. (format "failure executing javascript: %s" (str result))))))))
 
+(defunk map-reduce
+  "Performs a map-reduce job on the server.
+
+  Mandatory arguments
+  collection -> the collection to run the job on
+  mapfn -> a JavaScript map function, as a String.  Should take no arguments.
+  reducefn -> a JavaScript reduce function, as a String.  Should take two arguments: a key, and a corresponding array of values
+
+  See http://www.mongodb.org/display/DOCS/MapReduce for more information, as well as the test code in congomongo_test.clj.
+
+  Optional Arguments
+  :query       -> a query map against collection; if this is specified, the map-reduce job is run on the result of this query instead of on the collection as a whole.
+  :query-from  -> if query is supplied, specifies what form it is in (:clojure, :json, or :mongo).  Defaults to :clojure.
+  :sort        -> if you want query sorted (for optimization), specify a map of sort clauses here.
+  :sort-from   -> if sort is supplied, specifies what form it is in (:clojure, :json, or :mongo).  Defaults to :clojure.
+  :limit       -> the number of objects to return from a query collection (defaults to 0; that is, everything).  This pertains to query, NOT the result of the overall map-reduce job!
+  :out         -> output collection name (String or keyword).  If this is specified, the output collection is made permanent.
+  :keeptemp    -> should the output collection be treated as permanent? true or false (defaults to false).
+  :finalize    -> a finalizaton function (JavaScript, as a String).  Should take two arguments: a key and a single value (not an array of values).
+  :scope       -> a scope object; variables in the object will be available in the global scope of map, reduce, and finalize functions.
+  :scope-from  -> if scope is supplied, specifies what form it is in (:clojure, :json, or :mongo).  Defaults to :clojure.
+  :output      -> if you want the resulting documents from the map-reduce job, specify :documents; otherwise, if you want the name of the result collection as a keyword, specify :collection.  Defaults to :documents.
+  :as          -> if :output is set to :documents, determines the form the results take (:clojure, :json, or :mongo) (has no effect if :output is set to :collection; that is always returned as a Clojure keyword).
+"
+  {:arglists
+   '([collection mapfn reducefn :query :query-from :sort :sort-from :limit :out :keeptemp :finalize :scope :scope-from :output :as])}
+  [collection mapfn reducefn
+   :query {}
+   :query-from :clojure
+   :sort {}
+   :sort-from :clojure
+   :limit 0
+   :out nil
+   :keeptemp nil
+   :finalize ""
+   :scope nil
+   :scope-from :clojure
+   :output :documents
+   :as :clojure]
+  (let [mr-query {:mapreduce collection
+                  :map mapfn
+                  :reduce reducefn
+                  :query (coerce query [query-from :mongo])
+                  :sort (coerce sort [sort-from :mongo])
+                  :limit limit
+                  :out out
+                  :keeptemp keeptemp
+                  :finalize finalize
+                  :scope (coerce scope [scope-from :mongo])}
+        mr-query (coerce mr-query [:clojure :mongo])
+        result (.mapReduce (get-coll collection) mr-query)]
+    (if (= output :documents)
+      (coerce (.results result) [:mongo as] :many :true)
+      (-> (.getOutputCollection result)
+            .getName
+            keyword))))
+
 (def write-concern-map
      {:none com.mongodb.DB$WriteConcern/NONE
       :normal com.mongodb.DB$WriteConcern/NORMAL

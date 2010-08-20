@@ -194,6 +194,70 @@
     (let [return (fetch-one :stuff :where {:name "name"})]
       (is (vector? (:vector return))))))
 
+(deftest test-map-reduce
+  (with-test-mongo
+    (insert! :mr {:fruit "bananas" :count 1})
+    (insert! :mr {:fruit "bananas" :count 2})
+    (insert! :mr {:fruit "plantains" :count 3})
+    (insert! :mr {:fruit "plantains" :count 2})
+    (insert! :mr {:fruit "pineapples" :count 4})
+    (insert! :mr {:fruit "pineapples" :count 2})
+    (let [mapfn
+          "function(){
+              emit(this.fruit, {count: this.count});
+          }"
+          mapfn-with-scope
+          "function(){
+              emit((adj + ' ' + this.fruit), {count: this.count});
+          }"
+          reducefn
+          "function(key, values){
+              var total = 0;
+              for ( var i=0; i<values.length; i++ ){
+                  total += values[i].count;
+              }
+              return { count : total };
+          }"
+          target-collection :monkey-shopping-list]
+      ;; See that the base case works
+      (is (= (map-reduce :mr mapfn reducefn)
+             (seq [{:_id "bananas" :value {:count 3}}
+                   {:_id "pineapples" :value {:count 6}}
+                   {:_id "plantains" :value {:count 5}}])))
+      ;; See if we can assign a name to the results collection
+      (is (= (map-reduce :mr mapfn reducefn :out target-collection)
+             (seq [{:_id "bananas" :value {:count 3}}
+                   {:_id "pineapples" :value {:count 6}}
+                   {:_id "plantains" :value {:count 5}}])))
+      (is (= (fetch target-collection)
+             (seq [{:_id "bananas" :value {:count 3}}
+                   {:_id "pineapples" :value {:count 6}}
+                   {:_id "plantains" :value {:count 5}}])))
+      ;; Make sure we get the collection name back, too
+      (is (= (map-reduce :mr mapfn reducefn :out target-collection :output :collection)
+             target-collection))
+      ;; Check limit
+      (is (= (map-reduce :mr mapfn reducefn :limit 2)
+             (seq [{:_id "bananas" :value {:count 3}}])))
+      ;; Check sort
+      (is (= (map-reduce :mr mapfn reducefn :sort {:fruit -1} :limit 2)
+             (seq [{:_id "plantains" :value {:count 5}}])))
+      ;; check query
+      (is (= (map-reduce :mr mapfn reducefn :query {:fruit "pineapples"})
+             (seq [{:_id "pineapples" :value {:count 6}}])))
+      ;; check finalize
+      (is (= (map-reduce :mr mapfn reducefn
+                         :finalize "function(key, value){return 'There are ' + value.count + ' ' + key}")
+             (seq [{:_id "bananas" :value "There are 3 bananas"}
+                   {:_id "pineapples" :value "There are 6 pineapples"}
+                   {:_id "plantains" :value "There are 5 plantains"}])))
+      ;; check scope
+      (is (= (map-reduce :mr mapfn-with-scope reducefn
+                         :scope {:adj "tasty"})
+             (seq [{:_id "tasty bananas" :value {:count 3}}
+                   {:_id "tasty pineapples" :value {:count 6}}
+                   {:_id "tasty plantains" :value {:count 5}}]))))))
+
 (deftest test-server-eval
   (with-test-mongo
     (is (= (server-eval
