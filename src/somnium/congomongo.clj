@@ -313,6 +313,12 @@ When with-mongo and set-connection! interact, last one wins"
   (if-let [f (.findOne (get-gridfs fs) (coerce file [:clojure :mongo]))]
     (.writeTo f out)))
 
+(defn stream-from
+  "Returns an InputStream from the GridFS file specified"
+  [fs file]
+  (if-let [f (.findOne (get-gridfs fs) (coerce file [:clojure :mongo]))]
+    (.getInputStream f)))
+
 (defn server-eval
   "Sends javascript to the server to be evaluated. js should define a function that takes no arguments. The server will call the function."
   [js & args]
