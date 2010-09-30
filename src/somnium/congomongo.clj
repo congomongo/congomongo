@@ -159,7 +159,23 @@ When with-mongo and set-connection! interact, last one wins"
   (let [id (if (instance? ObjectId id) id (object-id id))]
       (apply fetch col (concat options [:one? true :where {:_id id}]))))
 
-(defunk insert! 
+(defunk distinct-values
+  "Queries a collection for the distinct values of a given key.
+   Returns a vector of the values by default (but see the :as keyword argument).
+   The key (a String) can refer to a nested object, using dot notation, e.g., \"foo.bar.baz\".
+
+   Optional arguments include
+   :where  -> a query object.  If supplied, distinct values from the result of the query on the collection (rather than from the entire collection) are returned.
+   :from   -> specifies what form a supplied :where query is in (:clojure, :json, or :mongo).  Defaults to :clojure.  Has no effect if there is no :where query.
+   :as     -> results format (:clojure, :json, or :mongo).  Defaults to :clojure."
+  {:arglists
+   '([collection key :where :from :as])}
+  [coll k :where {} :from :clojure :as :clojure]
+  (let [query (coerce where [from :mongo])]
+    (coerce (.distinct (get-coll coll) k query)
+            [:mongo as])))
+
+(defunk insert!
   "Inserts a map into collection. Will not overwrite existing maps.
    Takes optional from and to keyword arguments. To insert
    as a side-effect only specify :to as nil."
