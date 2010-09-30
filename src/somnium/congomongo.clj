@@ -234,7 +234,7 @@ When with-mongo and set-connection! interact, last one wins"
     (alter-var-root #'*mongo-config* merge {:db db})
     (throw (RuntimeException. (str "database with title " title " does not exist.")))))
 
-;;;; go ahead and have these retucn seqs
+;;;; go ahead and have these return seqs
 
 (defn databases
   "List databases on the mongo server" []
