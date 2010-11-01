@@ -85,6 +85,19 @@ When with-mongo and set-connection! interact, last one wins"
   (set-connection! (make-connection db :host host :port port))
   true)
 
+(def write-concern-map
+     {:none com.mongodb.DB$WriteConcern/NONE
+      :normal com.mongodb.DB$WriteConcern/NORMAL
+      :strict com.mongodb.DB$WriteConcern/STRICT})
+
+(defn set-write-concern
+  "Sets the write concern on the connection. Setting is one of :none, :normal, :strict"
+  [connection setting]
+  (assert (connection? connection))
+  (assert (contains? (set (keys write-concern-map)) setting))
+  (.setWriteConcern (:db connection)
+                    (get write-concern-map setting)))
+
 ;; add some convenience fns for manipulating object-ids
 (definline object-id [s]
   `(ObjectId. #^String ~s))
@@ -168,7 +181,9 @@ When with-mongo and set-connection! interact, last one wins"
   (let [coerced-obj (if many
                        #^java.util.List (coerce obj [from :mongo] :many many)
                        #^DBObject (coerce obj [from :mongo] :many many))
-        res (.insert #^DBCollection (get-coll coll) coerced-obj)]
+        res (if many
+	      (.insert #^DBCollection (get-coll coll) coerced-obj)
+	      (.insert #^DBCollection (get-coll coll) coerced-obj (get write-concern-map :normal)))]
     (coerce coerced-obj [:mongo to] :many many)))
 
 (defunk mass-insert!
@@ -386,15 +401,4 @@ When with-mongo and set-connection! interact, last one wins"
             .getName
             keyword))))
 
-(def write-concern-map
-     {:none com.mongodb.DB$WriteConcern/NONE
-      :normal com.mongodb.DB$WriteConcern/NORMAL
-      :strict com.mongodb.DB$WriteConcern/STRICT})
 
-(defn set-write-concern
-  "Sets the write concern on the connection. Setting is one of :none, :normal, :strict"
-  [connection setting]
-  (assert (connection? connection))
-  (assert (contains? (set (keys write-concern-map)) setting))
-  (.setWriteConcern (:db connection)
-                    (get write-concern-map setting)))
