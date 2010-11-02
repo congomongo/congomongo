@@ -58,7 +58,7 @@ Basics
 
 #### destroy
 
-    (destroy! my-robot) => nil
+    (destroy! :robots my-robot) => nil
     (fetch :robots) => ()
 
 ### More Sophisticated Tasks
