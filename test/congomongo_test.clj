@@ -119,7 +119,6 @@
 
 (deftest test-distinct-values
   (with-test-mongo
-    (println "testing distinct-values")
     (insert! :distinct {:genus "Pan" :species "troglodytes" :common-name "chimpanzee"})
     (insert! :distinct {:genus "Pan" :species "pansicus" :common-name "bonobo"})
     (insert! :distinct {:genus "Homo" :species "sapiens" :common-name "human"})
@@ -136,9 +135,8 @@
     (let [json (distinct-values :distinct "genus" :as :json)]
       ;; I don't think you can influence the order in which distinct results are returned,
       ;; so just check both possibilities
-      (is (or (= json "[Pan, Homo]")
-              (= json "[Homo, Pan]"))))
-    (println "finished with distinct-values")))
+      (is (or (= (read-json json) ["Pan", "Homo"])
+              (= (read-json json) ["Homo", "Pan"]))))))
 
 
 ;; ;; mass insert chokes on excessively large inserts
