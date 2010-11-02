@@ -116,6 +116,31 @@
                             :where {:_id point-id}))
              "suffusion of yellow")))))
 
+
+(deftest test-distinct-values
+  (with-test-mongo
+    (println "testing distinct-values")
+    (insert! :distinct {:genus "Pan" :species "troglodytes" :common-name "chimpanzee"})
+    (insert! :distinct {:genus "Pan" :species "pansicus" :common-name "bonobo"})
+    (insert! :distinct {:genus "Homo" :species "sapiens" :common-name "human"})
+    (insert! :distinct {:genus "Homo" :species "floresiensis" :common-name "hobbit"})
+
+    (is (= (set (distinct-values :distinct "genus"))
+           #{"Pan" "Homo"}))
+    (is (= (set (distinct-values :distinct "common-name"))
+           #{"chimpanzee" "bonobo" "human" "hobbit"}))
+    (is (= (set (distinct-values :distinct "species" :where {:genus "Pan"}))
+           #{"troglodytes" "pansicus"}))
+    (is (= (set (distinct-values :distinct "species" :where "{\"genus\": \"Pan\"}" :from :json))
+           #{"troglodytes" "pansicus"}))
+    (let [json (distinct-values :distinct "genus" :as :json)]
+      ;; I don't think you can influence the order in which distinct results are returned,
+      ;; so just check both possibilities
+      (is (or (= json "[Pan, Homo]")
+              (= json "[Homo, Pan]"))))
+    (println "finished with distinct-values")))
+
+
 ;; ;; mass insert chokes on excessively large inserts
 ;; ;; will need to implement some sort of chunking algorithm
 
