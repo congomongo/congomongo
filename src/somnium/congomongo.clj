@@ -169,8 +169,7 @@ When with-mongo and set-connection! interact, last one wins"
 
 ;; add fetch-by-id fn
 (defn fetch-by-id [col id & options]
-  (let [id (if (instance? ObjectId id) id (object-id id))]
-      (apply fetch col (concat options [:one? true :where {:_id id}]))))
+  (apply fetch col (concat options [:one? true :where {:_id id}])))
 
 (defunk distinct-values
   "Queries a collection for the distinct values of a given key.

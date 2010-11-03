@@ -68,6 +68,12 @@
       (is (= (map :x (fetch :points :sort {:x 1})) (sort unsorted)))
       (is (= (map :x (fetch :points :sort {:x -1})) (reverse (sort unsorted)))))))
 
+(deftest fetch-by-id-of-any-type
+  (with-test-mongo
+    (insert! :by-id {:_id "Blarney" :val "Stone"})
+    (insert! :by-id {:_id 300 :val "warriors"})
+    (is (= "Stone" (:val (fetch-by-id :by-id "Blarney"))))
+    (is (= "warriors" (:val (fetch-by-id :by-id 300))))))
 
 `(deftest databases-test
   (with-test-mongo
