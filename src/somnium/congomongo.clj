@@ -24,7 +24,7 @@
   somnium.congomongo
   (:use     [somnium.congomongo.config :only [*mongo-config*]]
             [somnium.congomongo.util   :only [named defunk]]
-            [somnium.congomongo.coerce :only [coerce coerce-fields]])
+            [somnium.congomongo.coerce :only [coerce coerce-fields coerce-index-fields]])
   (:import  [com.mongodb Mongo DB DBCollection DBObject]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
@@ -227,14 +227,27 @@ When with-mongo and set-connection! interact, last one wins"
             #^DBObject (coerce q [from :mongo])))
 
 (defunk add-index!
-   "Adds an index on the collection for the specified fields if it does not exist.
+  "Adds an index on the collection for the specified fields if it does not exist.  Ordering of fields is
+   significant; an index on [:a :b] is not the same as an index on [:b :a].
+
+   By default, all fields are indexed in ascending order.  To index a field in descending order, specify it as
+   a vector with a direction signifier (i.e., -1), like so:
+
+   [:a [:b -1] :c]
+
+   This will generate an index on:
+
+      :a ascending, :b descending, :c ascending
+
+   Similarly, [[:a 1] [:b -1] :c] will generate the same index (\"1\" indicates ascending order, the default).
+
     Options include:
     :unique -> defaults to false
     :force  -> defaults to true"
    {:arglists '(collection fields {:unique false :force true})}
    [c f :unique false :force true]
    (-> (get-coll c)
-       (.ensureIndex (coerce-fields f) (coerce {:force force :unique unique} [:clojure :mongo]))))
+       (.ensureIndex (coerce-index-fields f) (coerce {:force force :unique unique} [:clojure :mongo]))))
 
 (defn drop-index!
   "Drops an index on the collection for the specified fields"

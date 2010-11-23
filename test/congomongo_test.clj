@@ -6,7 +6,8 @@
         somnium.congomongo.coerce
         clojure.contrib.pprint)
   (:use [clojure.contrib.json :only (read-json json-str)])
-  (:use [clojure.contrib.duck-streams :only (slurp*)]))
+  (:use [clojure.contrib.duck-streams :only (slurp*)])
+  (:import [com.mongodb BasicDBObject]))
 
 (deftest coercions
   (let [forms   [:clojure :mongo :json]
@@ -167,6 +168,56 @@
      (add-index! :points [:x])
      (is (some #(= (into {} (% "key")) {"x" 1})
                (get-indexes :points)))))
+
+(defn- index-keys-in-same-order
+  [a b]
+  (every? identity (map #(= %1 %2) (.keySet a) (.keySet b))))
+
+
+(deftest test-coerce-index-fields
+  (let [objects-have-same-data (fn [a b] (= a b))]
+    (let [bdo (doto (BasicDBObject.)
+                   (.put "a" 1)
+                   (.put "b" 1)
+                   (.put "c" 1))
+          index (coerce-index-fields [:a :b :c])]
+      (is (objects-have-same-data bdo index))
+      (is (index-keys-in-same-order bdo index)))
+    (let [bdo (doto (BasicDBObject.)
+                (.put "a" 1)
+                (.put "b" -1)
+                (.put "c" 1))
+          index (coerce-index-fields [:a [:b -1] :c])]
+      (is (objects-have-same-data bdo index))
+      (is (index-keys-in-same-order bdo index)))))
+
+(defn- get-named-index [coll name]
+  (first (filter #(= (get % "name") name)
+                 (get-indexes coll))))
+
+(deftest complex-indexing
+  (with-test-mongo
+    (add-index! :testing-indexes [:a :b :c])
+    (let [auto-generated-index-name "a_1_b_1_c_1"
+          actual-index (get (get-named-index :testing-indexes auto-generated-index-name)
+                            "key")
+          expected-index (doto (BasicDBObject.)
+                           (.put "a" 1)
+                           (.put "b" 1)
+                           (.put "c" 1))]
+      (is (= actual-index expected-index))
+      (is (index-keys-in-same-order actual-index expected-index)))
+
+    (add-index! :testing-indexes [:a [:b -1] :c])
+    (let [auto-generated-index-name "a_1_b_-1_c_1"
+          actual-index (get (get-named-index :testing-indexes auto-generated-index-name)
+                            "key")
+          expected-index (doto (BasicDBObject.)
+                           (.put "a" 1)
+                           (.put "b" -1)
+                           (.put "c" 1))]
+      (is (= actual-index expected-index))
+      (is (index-keys-in-same-order actual-index expected-index)))))
 
 (defrecord Foo [a b])
 

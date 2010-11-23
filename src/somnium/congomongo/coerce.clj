@@ -27,8 +27,7 @@
               (assoc m (keyword k) (mongo->clojure v true)))
             (fn [m [#^String k v]]
               (assoc m k (mongo->clojure v false))))
-          {} kvs))
-
+          (sorted-map) kvs))            ;sorted-map because BasicBSONObject extends LinkedHashMap
 
 (extend-protocol ConvertibleFromMongo
   Map
@@ -114,3 +113,18 @@
   [fields]
   (clojure->mongo #^IPersistentMap (zipmap fields (repeat 1))))
 
+
+(defn coerce-index-fields
+  "Used for creating index specifications.
+
+  [:a :b :c] => (sorted-map :a 1 :b 1 :c 1)
+  [:a [:b 1] :c] => (sorted-map :a 1 :b -1 :c 1)
+
+  See also somnium.congomongo/add-index!"
+  [fields]
+  (clojure->mongo #^IPersistentMap (apply conj
+                                          (sorted-map)
+                                          (for [f fields]
+                                            (if (vector? f)
+                                              f
+                                              [f 1])))))
