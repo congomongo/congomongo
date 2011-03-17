@@ -218,6 +218,32 @@ When with-mongo and set-connection! interact, last one wins"
                     #^DBObject (coerce new [from :mongo])
               upsert multiple) [:mongo as]))
 
+(defunk fetch-and-modify
+  "Finds the first document in the query and updates it.
+   Parameters:
+       coll         -> the collection
+       where        -> query to match
+       update       -> update to apply     
+       :only        -> fields to be returned
+       :sort        -> sort to apply before picking first document
+       :remove?     -> if true, document found will be removed
+       :return-new? -> if true, the updated document is returned,
+                       otherwise the old document is returned
+                       (or it would be lost forever)
+       :upsert?     -> do upsert (insert if document not present)"
+  {:arglists '([collection where update {:only nil :sort nil :remove? false
+                                         :return-new? false :upsert? false :from :clojure :as :clojure}])}
+  [coll where update :only nil :sort nil :remove? false
+   :return-new? false :upsert? false :from :clojure :as :clojure]
+  (coerce (.findAndModify #^DBCollection (get-coll coll)
+                          #^DBObject (coerce where [from :mongo])
+                          #^DBObject (coerce only [from :mongo])
+                          #^DBObject (coerce sort [from :mongo])
+                          remove?
+                          #^DBObject (coerce update [from :mongo])
+                          return-new? upsert?) [:mongo as]))
+
+
 (defunk destroy!
    "Removes map from collection. Takes a collection name and
     a query map"
