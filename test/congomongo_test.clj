@@ -359,6 +359,8 @@
       (is (= (map-reduce :mr mapfn reducefn target-collection :limit 2)
              (seq [{:_id "bananas" :value {:count 3}}])))
       ;; Check sort
+      ;; sort requires an index to work?
+      (add-index! :mr [:fruit])
       (is (= (map-reduce :mr mapfn reducefn target-collection :sort {:fruit -1} :limit 2)
              (seq [{:_id "plantains" :value {:count 5}}])))
       ;; check query
