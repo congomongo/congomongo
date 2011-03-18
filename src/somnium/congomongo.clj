@@ -354,7 +354,7 @@ releases.  Please use 'make-connection' in combination with
   (let [f (.createFile (get-gridfs fs) data)]
     (if filename (.setFilename f filename))
     (if contentType (.setContentType f contentType))
-    (if metadata (.putAll (.getMetaData f) (coerce metadata [:clojure :mongo])))
+    (if metadata (.setMetaData f (coerce metadata [:clojure :mongo])))
     (.save f)
     (coerce f [:mongo :clojure])))
  

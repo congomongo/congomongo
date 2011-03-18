@@ -258,10 +258,10 @@
 (deftest gridfs-insert-with-metadata
   (with-test-mongo
     (let [f (insert-file! :testfs (.getBytes "nuts")
-                          :metadata { :calories 50, :opinion "tasty"})]
-      (is (= "tasty" (f :opinion)))
-      (is (= f (fetch-one-file :testfs :where { :opinion "tasty" }))))))
- 
+                          :metadata {:calories 50, :opinion "tasty"})]
+      (is (= "tasty" (get-in f [:metadata :opinion])))
+      (is (= f (fetch-one-file :testfs :where { :metadata.opinion "tasty" }))))))
+
 (deftest gridfs-write-file-to
   (with-test-mongo
     (let [f (insert-file! :testfs (.getBytes "banana"))]
