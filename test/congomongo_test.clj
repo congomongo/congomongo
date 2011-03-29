@@ -219,6 +219,14 @@
       (is (= actual-index expected-index))
       (is (index-keys-in-same-order actual-index expected-index)))))
 
+(deftest index-name
+  (with-test-mongo
+    (let [coll :test-index-name
+          index "customIndexName"]
+      (add-index! coll [:foo :bar :baz] :name index)
+      (is (= (get (get-named-index coll index)
+                  "key"))))))
+
 (defrecord Foo [a b])
 
 (deftest can-insert-records-as-maps
