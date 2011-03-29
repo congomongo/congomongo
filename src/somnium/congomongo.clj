@@ -421,54 +421,65 @@ releases.  Please use 'make-connection' in combination with
   collection -> the collection to run the job on
   mapfn -> a JavaScript map function, as a String.  Should take no arguments.
   reducefn -> a JavaScript reduce function, as a String.  Should take two arguments: a key, and a corresponding array of values
+  out -> output descriptor
+      With MongoDB 1.8, there are many options:
+          a collection name (String or Keyword): output is saved in the named collection, removing any data that previously existed there.
+      Or, a configuration map:
+          {:replace collection-name}: same as above
+          {:merge collection-name}: incorporates results of the MapReduce with any data already in the collection
+          {:reduce collection-name}: further reduces with any data already in the collection
+          {:inline 1}: creates no collection, and returns the results directly
 
   See http://www.mongodb.org/display/DOCS/MapReduce for more information, as well as the test code in congomongo_test.clj.
 
   Optional Arguments
+  :out-from    -> indicates what form the out parameter is specified in (:clojure, :json, or :mongo).  Defaults to :clojure.
   :query       -> a query map against collection; if this is specified, the map-reduce job is run on the result of this query instead of on the collection as a whole.
   :query-from  -> if query is supplied, specifies what form it is in (:clojure, :json, or :mongo).  Defaults to :clojure.
   :sort        -> if you want query sorted (for optimization), specify a map of sort clauses here.
   :sort-from   -> if sort is supplied, specifies what form it is in (:clojure, :json, or :mongo).  Defaults to :clojure.
   :limit       -> the number of objects to return from a query collection (defaults to 0; that is, everything).  This pertains to query, NOT the result of the overall map-reduce job!
-  :out         -> output collection name (String or keyword).  If this is specified, the output collection is made permanent.
-  :keeptemp    -> should the output collection be treated as permanent? true or false (defaults to false).
   :finalize    -> a finalizaton function (JavaScript, as a String).  Should take two arguments: a key and a single value (not an array of values).
   :scope       -> a scope object; variables in the object will be available in the global scope of map, reduce, and finalize functions.
   :scope-from  -> if scope is supplied, specifies what form it is in (:clojure, :json, or :mongo).  Defaults to :clojure.
-  :output      -> if you want the resulting documents from the map-reduce job, specify :documents; otherwise, if you want the name of the result collection as a keyword, specify :collection.  Defaults to :documents.
+  :output      -> if you want the resulting documents from the map-reduce job, specify :documents; otherwise, if you want the name of the result collection as a keyword, specify :collection.
+                  Defaults to :documents.  If the value of 'out' is {:inline 1}, you will get documents, regardless of what you actually put here.
   :as          -> if :output is set to :documents, determines the form the results take (:clojure, :json, or :mongo) (has no effect if :output is set to :collection; that is always returned as a Clojure keyword).
 "
   {:arglists
-   '([collection mapfn reducefn :query :query-from :sort :sort-from :limit :out :keeptemp :finalize :scope :scope-from :output :as])}
-  [collection mapfn reducefn
-   :query {}
+   '([collection mapfn reducefn out :out-from :query :query-from :sort :sort-from :limit :finalize :scope :scope-from :output :as])}
+  [collection mapfn reducefn out
+   :out-from :clojure
+   :query nil
    :query-from :clojure
-   :sort {}
+   :sort nil
    :sort-from :clojure
-   :limit 0
-   :out nil
-   :keeptemp nil
-   :finalize ""
+   :limit nil
+   :finalize nil
    :scope nil
    :scope-from :clojure
    :output :documents
    :as :clojure]
-  (let [mr-query {:mapreduce collection
-                  :map mapfn
-                  :reduce reducefn
-                  :query (coerce query [query-from :mongo])
-                  :sort (coerce sort [sort-from :mongo])
-                  :limit limit
-                  :out out
-                  :keeptemp keeptemp
-                  :finalize finalize
-                  :scope (coerce scope [scope-from :mongo])}
+  (let [;; BasicDBObject requires key-value pairs in the correct order... apparently the first one
+        ;; must be :mapreduce
+        mr-query (apply
+                  array-map
+                  (flatten (remove nil? [[:mapreduce collection]
+                                         [:map mapfn]
+                                         [:reduce reducefn]
+                                         [:out (coerce out [out-from :mongo])]
+                                         [:verbose true]
+                                         (if query [:query (coerce query [query-from :mongo])])
+                                         (if sort [:sort (coerce sort [sort-from :mongo])])
+                                         (if limit [:limit limit])
+                                         (if finalize [:finalize finalize])
+                                         (if scope [:scope (coerce scope [scope-from :mongo])])])))
         mr-query (coerce mr-query [:clojure :mongo])
         result (.mapReduce (get-coll collection) mr-query)]
-    (if (= output :documents)
+    (if (or (= output :documents)
+            (= (coerce out [out-from :clojure])
+               {:inline 1}))
       (coerce (.results result) [:mongo as] :many :true)
       (-> (.getOutputCollection result)
             .getName
             keyword))))
-
-
