@@ -281,12 +281,15 @@ releases.  Please use 'make-connection' in combination with
    Similarly, [[:a 1] [:b -1] :c] will generate the same index (\"1\" indicates ascending order, the default).
 
     Options include:
+    :name   -> defaults to the system-generated default
     :unique -> defaults to false
     :force  -> defaults to true"
-   {:arglists '(collection fields {:unique false :force true})}
-   [c f :unique false :force true]
+   {:arglists '(collection fields {:name nil :unique false :force true})}
+   [c f :name nil :unique false :force true]
    (-> (get-coll c)
-       (.ensureIndex (coerce-index-fields f) (coerce {:force force :unique unique} [:clojure :mongo]))))
+       (.ensureIndex (coerce-index-fields f) (coerce (merge {:force force :unique unique}
+                                                            (if name {:name name}))
+                                                     [:clojure :mongo]))))
 
 (defn drop-index!
   "Drops an index on the collection for the specified fields"
