@@ -99,9 +99,9 @@ releases.  Please use 'make-connection' in combination with
   true)
 
 (def write-concern-map
-     {:none com.mongodb.DB$WriteConcern/NONE
-      :normal com.mongodb.DB$WriteConcern/NORMAL
-      :strict com.mongodb.DB$WriteConcern/STRICT})
+     {:none com.mongodb.WriteConcern/NONE
+      :normal com.mongodb.WriteConcern/NORMAL
+      :strict com.mongodb.WriteConcern/SAFE})
 
 (defn set-write-concern
   "Sets the write concern on the connection. Setting is one of :none, :normal, :strict"
