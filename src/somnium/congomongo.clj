@@ -25,7 +25,7 @@
   (:use     [somnium.congomongo.config :only [*mongo-config*]]
             [somnium.congomongo.util   :only [named defunk]]
             [somnium.congomongo.coerce :only [coerce coerce-fields coerce-index-fields]])
-  (:import  [com.mongodb Mongo DB DBCollection DBObject ServerAddress]
+  (:import  [com.mongodb Mongo DB DBCollection DBObject]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
@@ -37,14 +37,6 @@
         port (or port 27017)
         mongo  (Mongo. host port)
         n-db     (if db (.getDB mongo (named db)) nil)]
-    {:mongo mongo :db n-db}))
-
-(defn make-rs-connection
-  "Connects to mongo replica sets. hosts is a sequence of {:host :port}"
-  [db hosts]
-  (let [addresses (map (fn [r] (ServerAddress. (:host r) (:port r))) hosts)
-        mongo (Mongo. addresses)
-        n-db (if db (.getDB mongo (named db)) nil)]
     {:mongo mongo :db n-db}))
 
 (defn connection? [x]
@@ -91,14 +83,6 @@ When with-mongo and set-connection! interact, last one wins"
   {:arglists '({:db ? :host "localhost" :port 27017})}
   [:db nil :host "localhost" :port 27017]
   (set-connection! (make-connection db :host host :port port))
-  true)
-
-(defunk mongo-rs!
-  "Allows connecting to replica set. Defaults to localhost:27017.
-Example: (mongo-rs! :hosts '({:host \"127.0.0.1\" :port 27017} {:host \"127.0.0.1\" :port 27018)"
-  {:arglists '({:db ? :hosts {:host "localhost" :port 27017}})}
-  [:db nil :hosts '({:host "localhost" :port 27017})]
-  (set-connection! (make-rs-connection db hosts))
   true)
 
 (def write-concern-map
