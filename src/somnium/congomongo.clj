@@ -25,19 +25,27 @@
   (:use     [somnium.congomongo.config :only [*mongo-config*]]
             [somnium.congomongo.util   :only [named defunk]]
             [somnium.congomongo.coerce :only [coerce coerce-fields coerce-index-fields]])
-  (:import  [com.mongodb Mongo DB DBCollection DBObject]
+  (:import  [com.mongodb Mongo DB DBCollection DBObject ServerAddress]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
 
 (defn make-connection
-  "Creates a connection to a mongoDB that can be used with set-connection! and with-mongo"
-  [db & {:keys [host port]}] 
-  (let [host (or host "localhost")
-        port (or port 27017)
-        mongo  (Mongo. host port)
-        n-db     (if db (.getDB mongo (named db)) nil)]
-    {:mongo mongo :db n-db}))
+  "Connects to one or more mongo instances, returning a connection
+that can be used with set-connection! and with-mongo. Each instance is
+a map containing values for :host and/or :port."
+  ([db]
+     (make-connection db {}))
+  ([db & instances]
+     (let [addresses (->> (if (symbol? (first instances))
+                            (apply array-map instances) ; Handle legacy connect args
+                            instances)
+                          (map (fn [{:keys [host port]}]
+                            (ServerAddress. (or host "127.0.0.1") (or port 27017)))))
+           mongo (Mongo. addresses)
+           n-db (if db (.getDB mongo (named db)) nil)]
+       {:mongo mongo :db n-db})))
+
 
 (defn connection? [x]
   (and (map? x)
@@ -76,6 +84,11 @@ When with-mongo and set-connection! interact, last one wins"
 
 (defunk mongo!
   "Creates a Mongo object and sets the default database.
+
+Does not support replica sets, and will be deprecated in future
+releases.  Please use 'make-connection' in combination with
+'with-mongo' or 'set-connection!' instead.
+
    Keyword arguments include:
    :host -> defaults to localhost
    :port -> defaults to 27017
@@ -86,9 +99,9 @@ When with-mongo and set-connection! interact, last one wins"
   true)
 
 (def write-concern-map
-     {:none com.mongodb.DB$WriteConcern/NONE
-      :normal com.mongodb.DB$WriteConcern/NORMAL
-      :strict com.mongodb.DB$WriteConcern/STRICT})
+     {:none com.mongodb.WriteConcern/NONE
+      :normal com.mongodb.WriteConcern/NORMAL
+      :strict com.mongodb.WriteConcern/SAFE})
 
 (defn set-write-concern
   "Sets the write concern on the connection. Setting is one of :none, :normal, :strict"
