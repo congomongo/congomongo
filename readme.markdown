@@ -7,8 +7,13 @@ A toolkit for using MongoDB with Clojure.
 
 News
 --------------
-Clojure 1.2 is almost upon us;     
-as of congomongo 0.1.3, Clojure 1.2 and Clojure-contrib 1.2 are required.    
+Congomongo 0.1.4 introduces support for the MongoDB 1.8's modified
+map-reduce functionality, wherein the 'out' parameter is
+required. With this and future Congomongo releases, it will no longer
+be possible to access the map-reduce features of older MongoDB
+instances.
+
+As of congomongo 0.1.3, Clojure 1.2 and Clojure-contrib 1.2 are required.    
 If you need compatibility with Clojure 1.1,     
 please stick with congomongo 0.1.2.
 
@@ -104,7 +109,7 @@ Install
 
 Leiningen is the recommended way to use congomongo.
 Just add 
-    [congomongo "0.1.3-SNAPSHOT"]
+    [congomongo "0.1.4-SNAPSHOT"]
 to your project.clj and do
     $lein deps
 to get congomongo and all of its dependencies.    
