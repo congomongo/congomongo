@@ -1,4 +1,4 @@
-(ns congomongo-test
+(ns somnium.test.congomongo
   (:use clojure.test
         somnium.congomongo
         somnium.congomongo.config
@@ -79,7 +79,7 @@
 `(deftest databases-test
   (with-test-mongo
     (let [test-db2 "congomongotestdb-part-deux"]
-    
+
       (is (= test-db (.getName (*mongo-config* :db)))
           "default DB exists")
       (set-database! test-db2)
@@ -256,13 +256,13 @@
       (is (= f (fetch-one-file :testfs :where {:filename "muffin"})))
       (is (= f (fetch-one-file :testfs :where {:contentType "food/breakfast"})))
       (is (= (list f) (fetch-files :testfs))))))
- 
+
 (deftest gridfs-destroy
   (with-test-mongo
     (insert-file! :testfs (.getBytes "banana") :filename "lunch")
     (destroy-file! :testfs {:filename "lunch"})
     (is (empty? (fetch-files :testfs)))))
- 
+
 (deftest gridfs-insert-with-metadata
   (with-test-mongo
     (let [f (insert-file! :testfs (.getBytes "nuts")
