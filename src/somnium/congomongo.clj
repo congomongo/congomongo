@@ -98,6 +98,16 @@ releases.  Please use 'make-connection' in combination with
   (set-connection! (make-connection db :host host :port port))
   true)
 
+(defn authenticate
+  "Authenticate against either the current or a specified database connection.
+   Note that authenticating twice against the same database will raise an error."
+  ([conn username password]
+     (.authenticate #^DB (:db conn)
+                    #^String username
+                    (.toCharArray #^String password)))
+  ([username password]
+     (authenticate *mongo-config* username password)))
+
 (def write-concern-map
      {:none com.mongodb.WriteConcern/NONE
       :normal com.mongodb.WriteConcern/NORMAL
