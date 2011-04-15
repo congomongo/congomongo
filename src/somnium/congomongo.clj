@@ -68,9 +68,10 @@ a map containing values for :host and/or :port."
   When with-mongo and set-connection! interact, last one wins"
   [conn & body]
   `(do
-     (assert (connection? ~conn))
-     (binding [*mongo-config* ~conn]
-       ~@body)))
+     (let [c# ~conn]
+       (assert (connection? c#))
+       (binding [*mongo-config* c#]
+         ~@body))))
 
 (defn set-connection!
   "Makes the connection active. Takes a connection created by make-connection.
