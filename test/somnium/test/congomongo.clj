@@ -169,28 +169,6 @@
      (is (some #(= (into {} (% "key")) {"x" 1})
                (get-indexes :points)))))
 
-(defn- index-keys-in-same-order
-  [a b]
-  (every? identity (map #(= %1 %2) (.keySet a) (.keySet b))))
-
-
-(deftest test-coerce-index-fields
-  (let [objects-have-same-data (fn [a b] (= a b))]
-    (let [bdo (doto (BasicDBObject.)
-                   (.put "a" 1)
-                   (.put "b" 1)
-                   (.put "c" 1))
-          index (coerce-index-fields [:a :b :c])]
-      (is (objects-have-same-data bdo index))
-      (is (index-keys-in-same-order bdo index)))
-    (let [bdo (doto (BasicDBObject.)
-                (.put "a" 1)
-                (.put "b" -1)
-                (.put "c" 1))
-          index (coerce-index-fields [:a [:b -1] :c])]
-      (is (objects-have-same-data bdo index))
-      (is (index-keys-in-same-order bdo index)))))
-
 (defn- get-named-index [coll name]
   (first (filter #(= (get % "name") name)
                  (get-indexes coll))))
@@ -205,8 +183,7 @@
                            (.put "a" 1)
                            (.put "b" 1)
                            (.put "c" 1))]
-      (is (= actual-index expected-index))
-      (is (index-keys-in-same-order actual-index expected-index)))
+      (is (= (.toString actual-index) (.toString expected-index))))
 
     (add-index! :testing-indexes [:a [:b -1] :c])
     (let [auto-generated-index-name "a_1_b_-1_c_1"
@@ -216,8 +193,7 @@
                            (.put "a" 1)
                            (.put "b" -1)
                            (.put "c" 1))]
-      (is (= actual-index expected-index))
-      (is (index-keys-in-same-order actual-index expected-index)))))
+      (is (= (.toString actual-index) (.toString expected-index))))))
 
 (deftest index-name
   (with-test-mongo

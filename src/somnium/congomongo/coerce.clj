@@ -122,9 +122,9 @@
 
   See also somnium.congomongo/add-index!"
   [fields]
-  (clojure->mongo #^IPersistentMap (apply conj
-                                          (sorted-map)
-                                          (for [f fields]
-                                            (if (vector? f)
-                                              f
-                                              [f 1])))))
+  (clojure->mongo #^IPersistentMap (apply array-map
+                                          (flatten
+                                           (for [f fields]
+                                             (if (vector? f)
+                                               f
+                                               [f 1]))))))
