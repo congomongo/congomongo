@@ -305,9 +305,18 @@ releases.  Please use 'make-connection' in combination with
                                                      [:clojure :mongo]))))
 
 (defn drop-index!
-  "Drops an index on the collection for the specified fields"
-  [coll fields]
-  (.dropIndex (get-coll coll) (coerce-fields fields)))
+  "Drops an index on the collection for the specified fields.
+
+  `index` may be a vector representing the key(s) of the index (see somnium.congomongo/add-index! for the
+  expected format).  It may also be a String or Keyword, in which case it is taken to be the name of the
+  index to be deleted.
+
+  Due to how the underlying MongoDB driver works, if you defined an index with a custom name, you *must*
+  delete the index using that name, and not the keys."
+  [coll index]
+  (if (vector? index)
+    (.dropIndex (get-coll coll) (coerce-index-fields index))
+    (.dropIndex (get-coll coll) (coerce index [:clojure :mongo]))))
 
 (defn drop-all-indexes!
   "Drops all indexes from a collection"

@@ -169,15 +169,24 @@
      (is (some #(= (into {} (% "key")) {"x" 1})
                (get-indexes :points)))))
 
-(defn- get-named-index [coll name]
-  (first (filter #(= (get % "name") name)
-                 (get-indexes coll))))
+(defn- get-index
+  "Retrieve an index, either by name or by key vector"
+  [coll index]
+  (let [selector (if (vector? index)
+                   (fn [i]
+                     (= (get i "key")
+                        (coerce-index-fields index)))
+                   (fn [i]
+                     (= (get i "name")
+                        index)))]
+    (first (filter selector (get-indexes coll)))))
+
 
 (deftest complex-indexing
   (with-test-mongo
     (add-index! :testing-indexes [:a :b :c])
     (let [auto-generated-index-name "a_1_b_1_c_1"
-          actual-index (get (get-named-index :testing-indexes auto-generated-index-name)
+          actual-index (get (get-index :testing-indexes auto-generated-index-name)
                             "key")
           expected-index (doto (BasicDBObject.)
                            (.put "a" 1)
@@ -187,7 +196,7 @@
 
     (add-index! :testing-indexes [:a [:b -1] :c])
     (let [auto-generated-index-name "a_1_b_-1_c_1"
-          actual-index (get (get-named-index :testing-indexes auto-generated-index-name)
+          actual-index (get (get-index :testing-indexes auto-generated-index-name)
                             "key")
           expected-index (doto (BasicDBObject.)
                            (.put "a" 1)
@@ -200,8 +209,28 @@
     (let [coll :test-index-name
           index "customIndexName"]
       (add-index! coll [:foo :bar :baz] :name index)
-      (is (= (get (get-named-index coll index)
+      (is (= (get (get-index coll index)
                   "key"))))))
+
+(deftest test-delete-index
+  (with-test-mongo
+    (let [test-collection :testing-indexes
+          index-name "test_index"
+          index-key [:c :b [:a -1]]]
+      ;; Test using keys
+      (is (nil? (get-index test-collection index-key)))
+      (add-index! test-collection index-key)
+      (is (get-index test-collection index-key))
+      (drop-index! test-collection index-key)
+      (is (nil? (get-index test-collection index-key)))
+
+      ;; Test using names
+      (is (nil? (get-index test-collection index-name)))
+      (add-index! test-collection index-key :name index-name)
+      (is (get-index test-collection index-name))
+      (drop-index! test-collection index-name)
+      (is (nil? (get-index test-collection index-name))))))
+
 
 (defrecord Foo [a b])
 
