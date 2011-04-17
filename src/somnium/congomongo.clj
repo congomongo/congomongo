@@ -37,12 +37,14 @@ a map containing values for :host and/or :port."
   ([db]
      (make-connection db {}))
   ([db & instances]
-     (let [addresses (->> (if (symbol? (first instances))
-                            (apply array-map instances) ; Handle legacy connect args
+     (let [addresses (->> (if (keyword? (first instances))
+                            (list (apply array-map instances)) ; Handle legacy connect args
                             instances)
                           (map (fn [{:keys [host port]}]
                             (ServerAddress. (or host "127.0.0.1") (or port 27017)))))
-           mongo (Mongo. addresses)
+           mongo (if (> (count addresses) 1)
+                   (Mongo. addresses)
+                   (Mongo. (first addresses)))
            n-db (if db (.getDB mongo (named db)) nil)]
        {:mongo mongo :db n-db})))
 
