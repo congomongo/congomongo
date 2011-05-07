@@ -27,7 +27,7 @@
               (assoc m (keyword k) (mongo->clojure v true)))
             (fn [m [#^String k v]]
               (assoc m k (mongo->clojure v false))))
-          (sorted-map) kvs))            ;sorted-map because BasicBSONObject extends LinkedHashMap
+          {} (reverse kvs)))
 
 (extend-protocol ConvertibleFromMongo
   Map
