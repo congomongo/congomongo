@@ -22,7 +22,8 @@
   #^{:author "Andrew Boekhoff",
      :doc "Various wrappers and utilities for the mongodb-java-driver"}
   somnium.congomongo
-  (:use     [somnium.congomongo.config :only [*mongo-config*]]
+  (:use     [clojure.walk :only (postwalk)]
+            [somnium.congomongo.config :only [*mongo-config*]]
             [somnium.congomongo.util   :only [named defunk]]
             [somnium.congomongo.coerce :only [coerce coerce-fields coerce-index-fields]])
   (:import  [com.mongodb Mongo DB DBCollection DBObject DBRef ServerAddress WriteConcern]
@@ -148,6 +149,9 @@ releases.  Please use 'make-connection' in combination with
            #^String (named ~ns)
            #^Object ~id))
 
+(defn db-ref? [x]
+  (instance? DBRef x))
+
 (definline get-coll
   "Returns a DBCollection object"
   [collection]
@@ -202,6 +206,20 @@ releases.  Please use 'make-connection' in combination with
 ;; add fetch-by-id fn
 (defn fetch-by-id [col id & options]
   (apply fetch col (concat options [:one? true :where {:_id id}])))
+
+(defn with-ref-fetching
+  "Returns a decorated fetcher fn which eagerly loads db-refs."
+  [fetcher]
+  (fn [& args]
+    (letfn [(f [[k v]]
+               (if (db-ref? v)
+                 [k (.fetch v)]
+                 [k v]))]
+      (postwalk (fn [x]
+                  (if (map? x)
+                    (into {} (map f x))
+                    x))
+                (apply fetcher args)))))
 
 (defunk distinct-values
   "Queries a collection for the distinct values of a given key.
