@@ -25,7 +25,7 @@
   (:use     [somnium.congomongo.config :only [*mongo-config*]]
             [somnium.congomongo.util   :only [named defunk]]
             [somnium.congomongo.coerce :only [coerce coerce-fields coerce-index-fields]])
-  (:import  [com.mongodb Mongo DB DBCollection DBObject ServerAddress WriteConcern]
+  (:import  [com.mongodb Mongo DB DBCollection DBObject DBRef ServerAddress WriteConcern]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
@@ -141,6 +141,12 @@ releases.  Please use 'make-connection' in combination with
   (let [id (if (instance? ObjectId obj) obj (:_id obj))]
     (when id (.getTime id))))
 
+(definline db-ref
+  "Convenience DBRef constructor."
+  [ns id]
+  `(DBRef. #^DB (:db *mongo-config*)
+           #^String (named ~ns)
+           #^Object ~id))
 
 (definline get-coll
   "Returns a DBCollection object"
