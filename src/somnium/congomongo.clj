@@ -211,9 +211,12 @@ releases.  Please use 'make-connection' in combination with
   "Returns a decorated fetcher fn which eagerly loads db-refs."
   [fetcher]
   (fn [& args]
-    (letfn [(f [[k v]]
-               (if (db-ref? v)
-                 [k (.fetch v)]
+    (let [as (or (second (drop-while (partial not= :as) args))
+                 :clojure)
+          f  (fn [[k v]]
+               (if (db-ref? v)                 
+                 [k (coerce (.fetch v)
+                            [:mongo as])]
                  [k v]))]
       (postwalk (fn [x]
                   (if (map? x)
