@@ -7,3 +7,4 @@ classes/*
 .#*
 \#*#
 pom.xml
+/.lein-failures
