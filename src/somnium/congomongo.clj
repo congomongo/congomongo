@@ -356,6 +356,18 @@ releases.  Please use 'make-connection' in combination with
    [coll :as :clojure]
    (map #(into {} %) (.getIndexInfo (get-coll coll))))
 
+(defunk command
+  "Executes a database command."
+  {:arglists '([cmd {:options nil :from :clojure :to :clojure}])}
+  [cmd :options nil :from :clojure :to :clojure]
+  (coerce (if options
+            (.command #^DB (:db *mongo-config*)
+                      #^DBObject (coerce cmd [from :mongo])
+                      (int options))
+            (.command #^DB (:db *mongo-config*)
+                      #^DBObject (coerce cmd [from :mongo])))
+          [:mongo to]))
+  
 (defn drop-database!
  "drops a database from the mongo server"
  [title]
