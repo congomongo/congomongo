@@ -76,6 +76,55 @@
     (is (= "Stone" (:val (fetch-by-id :by-id "Blarney"))))
     (is (= "warriors" (:val (fetch-by-id :by-id 300))))))
 
+(deftest eager-ref-fetching
+  (let [fetch-eagerly       (with-ref-fetching fetch)
+        fetch-eagerly-by-id (with-ref-fetching fetch-by-id)
+        command-eagerly     (with-ref-fetching command)]
+    (with-test-mongo
+      (insert! :users {:_id "js" :name "John Smith" :email "jsmith@foo.bar"})
+      (insert! :users {:_id "jd" :name "Jane Doe"   :email "jdoe@foo.bar"})
+      (insert! :posts {:_id "p1"
+                       :user (db-ref :users "js")
+                       :comment "great site!"
+                       :location [-10.001 -20.001]})
+      (insert! :posts {:_id "p2"
+                       :user (db-ref :users "jd")
+                       :comment "I agree..."
+                       :location [10.001 20.001]})
+      (add-index! :posts [[:location "2d"]])
+      
+      ;; leave db-refs alone, assumes manual, lazy fetching
+      (is (db-ref? (-> (fetch :posts :where {:comment "great site!"}) first :user)))
+      (is (db-ref? (-> (fetch :posts :where {:comment "I agree..."})  first :user)))
+      
+      ;; eagerly fetch db-refs
+      (is (map?           (-> (fetch-eagerly :posts :where {:comment "great site!"}) first :user)))      
+      (is (= "John Smith" (-> (fetch-eagerly :posts :where {:comment "great site!"}) first :user :name)))
+      (is (map?           (-> (fetch-eagerly :posts :where {:comment "I agree..."})  first :user)))
+      (is (= "Jane Doe"   (-> (fetch-eagerly :posts :where {:comment "I agree..."})  first :user :name)))
+      
+      ;; the decorator works on existing retrieval fns
+      (is (db-ref? (:user (fetch-by-id         :posts "p1"))))
+      (is (map?    (:user (fetch-eagerly-by-id :posts "p1"))))
+      
+      ;; it also works on seq results
+      (is (db-ref? (-> (fetch :posts)         first :user)))
+      (is (map?    (-> (fetch-eagerly :posts) first :user)))
+      
+      ;; and on database commands
+      (let [earth-radius (* 6378 1000) ; in meters
+            radians      (fn [meters]
+                           (float (/ meters earth-radius)))
+            cmd          {:geoNear     :posts
+                          :near        [10 20]
+                          :spherical   true
+                          :maxDistance (radians 1000)} 
+            lazy-result  (command cmd)
+            eager-result (command-eagerly cmd)]
+        (is (db-ref?      (-> lazy-result  :results first :obj :user)))
+        (is (map?         (-> eager-result :results first :obj :user)))
+        (is (= "Jane Doe" (-> eager-result :results first :obj :user :name)))))))
+
 `(deftest databases-test
   (with-test-mongo
     (let [test-db2 "congomongotestdb-part-deux"]
