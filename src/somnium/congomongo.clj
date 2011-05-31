@@ -22,10 +22,11 @@
   #^{:author "Andrew Boekhoff",
      :doc "Various wrappers and utilities for the mongodb-java-driver"}
   somnium.congomongo
-  (:use     [somnium.congomongo.config :only [*mongo-config*]]
+  (:use     [clojure.walk :only (postwalk)]
+            [somnium.congomongo.config :only [*mongo-config*]]
             [somnium.congomongo.util   :only [named defunk]]
             [somnium.congomongo.coerce :only [coerce coerce-fields coerce-index-fields]])
-  (:import  [com.mongodb Mongo DB DBCollection DBObject ServerAddress WriteConcern]
+  (:import  [com.mongodb Mongo DB DBCollection DBObject DBRef ServerAddress WriteConcern]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
@@ -141,6 +142,15 @@ releases.  Please use 'make-connection' in combination with
   (let [id (if (instance? ObjectId obj) obj (:_id obj))]
     (when id (.getTime id))))
 
+(definline db-ref
+  "Convenience DBRef constructor."
+  [ns id]
+  `(DBRef. #^DB (:db *mongo-config*)
+           #^String (named ~ns)
+           #^Object ~id))
+
+(defn db-ref? [x]
+  (instance? DBRef x))
 
 (definline get-coll
   "Returns a DBCollection object"
@@ -196,6 +206,23 @@ releases.  Please use 'make-connection' in combination with
 ;; add fetch-by-id fn
 (defn fetch-by-id [col id & options]
   (apply fetch col (concat options [:one? true :where {:_id id}])))
+
+(defn with-ref-fetching
+  "Returns a decorated fetcher fn which eagerly loads db-refs."
+  [fetcher]
+  (fn [& args]
+    (let [as (or (second (drop-while (partial not= :as) args))
+                 :clojure)
+          f  (fn [[k v]]
+               (if (db-ref? v)                 
+                 [k (coerce (.fetch v)
+                            [:mongo as])]
+                 [k v]))]
+      (postwalk (fn [x]
+                  (if (map? x)
+                    (into {} (map f x))
+                    x))
+                (apply fetcher args)))))
 
 (defunk distinct-values
   "Queries a collection for the distinct values of a given key.
@@ -329,6 +356,18 @@ releases.  Please use 'make-connection' in combination with
    [coll :as :clojure]
    (map #(into {} %) (.getIndexInfo (get-coll coll))))
 
+(defunk command
+  "Executes a database command."
+  {:arglists '([cmd {:options nil :from :clojure :to :clojure}])}
+  [cmd :options nil :from :clojure :to :clojure]
+  (coerce (if options
+            (.command #^DB (:db *mongo-config*)
+                      #^DBObject (coerce cmd [from :mongo])
+                      (int options))
+            (.command #^DB (:db *mongo-config*)
+                      #^DBObject (coerce cmd [from :mongo])))
+          [:mongo to]))
+  
 (defn drop-database!
  "drops a database from the mongo server"
  [title]
