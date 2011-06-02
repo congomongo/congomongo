@@ -44,10 +44,10 @@
   nil
   (mongo->clojure [o keywordize] o)
 
-  BasicDBList 
+  BasicDBList
   (mongo->clojure [#^BasicDBList l keywordize]
                   (vec (map #(mongo->clojure % keywordize) l)))
-  
+
   DBObject
   (mongo->clojure [#^DBObject f keywordize]
                   ;; DBObject provides .toMap, but the implementation in
@@ -95,7 +95,7 @@
     "takes an object, a vector of keywords:
      from [ :clojure :mongo :json ]
      to   [ :clojure :mongo :json ],
-     and an an optional :many keyword parameter which defaults to false"    
+     and an an optional :many keyword parameter which defaults to false"
     {:arglists '([obj [:from :to] {:many false}])}
     [obj [from to] :many false]
     (cond (= from to) obj

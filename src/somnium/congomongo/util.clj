@@ -1,6 +1,6 @@
 (ns somnium.congomongo.util)
 
-(defmacro defunk 
+(defmacro defunk
   "Mostly identitical to defnk in clojure.contrib.def but keeps argmap meta data."
   {:arglists '([title docstring? attr-map? [params*] body])}
   [title & stuff]
@@ -16,7 +16,7 @@
         default-map             {:keys (vec syms)
                                        :or   sym-vals}]
     `(defn ~title
-       ~@metad 
+       ~@metad
        [~@args & options#]
        (let [~default-map (apply hash-map options#)]
                ~@body))))

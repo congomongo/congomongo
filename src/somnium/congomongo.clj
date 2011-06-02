@@ -158,7 +158,7 @@ releases.  Please use 'make-connection' in combination with
   `(.getCollection #^DB (:db *mongo-config*)
                    #^String (named ~collection)))
 
-(defunk fetch 
+(defunk fetch
   "Fetches objects from a collection.
    Note that MongoDB always adds the _id and _ns
    fields to objects returned from the database.
@@ -214,7 +214,7 @@ releases.  Please use 'make-connection' in combination with
     (let [as (or (second (drop-while (partial not= :as) args))
                  :clojure)
           f  (fn [[k v]]
-               (if (db-ref? v)                 
+               (if (db-ref? v)
                  [k (coerce (.fetch v)
                             [:mongo as])]
                  [k v]))]
@@ -250,15 +250,15 @@ releases.  Please use 'make-connection' in combination with
                        #^java.util.List (coerce obj [from :mongo] :many many)
                        #^DBObject (coerce obj [from :mongo] :many many))
         res (if many
-	      (.insert #^DBCollection (get-coll coll) coerced-obj)
-	      (.insert #^DBCollection (get-coll coll) coerced-obj (get write-concern-map :normal)))]
+              (.insert #^DBCollection (get-coll coll) coerced-obj)
+              (.insert #^DBCollection (get-coll coll) coerced-obj (get write-concern-map :normal)))]
     (coerce coerced-obj [:mongo to] :many many)))
 
 (defunk mass-insert!
   {:arglists '([coll objs {:from :clojure :to :clojure}])}
   [coll objs :from :clojure :to :clojure]
   (insert! coll objs :from from :to to :many true))
-  
+
 ;; should this raise an exception if _ns and _id aren't present?
 (defunk update!
    "Alters/inserts a map in a collection. Overwrites existing objects.
@@ -276,7 +276,7 @@ releases.  Please use 'make-connection' in combination with
    Parameters:
        coll         -> the collection
        where        -> query to match
-       update       -> update to apply     
+       update       -> update to apply
        :only        -> fields to be returned
        :sort        -> sort to apply before picking first document
        :remove?     -> if true, document found will be removed
@@ -367,7 +367,7 @@ releases.  Please use 'make-connection' in combination with
             (.command #^DB (:db *mongo-config*)
                       #^DBObject (coerce cmd [from :mongo])))
           [:mongo to]))
-  
+
 (defn drop-database!
  "drops a database from the mongo server"
  [title]
@@ -398,12 +398,12 @@ releases.  Please use 'make-connection' in combination with
 
 ;;;; GridFS, contributed by Steve Purcell
 ;;;; question: keep the camelCase keyword for :contentType ?
- 
+
 (definline get-gridfs
   "Returns a GridFS object for the named bucket"
   [bucket]
   `(GridFS. #^DB (:db *mongo-config*) #^String (named ~bucket)))
- 
+
 ;; The naming of :contentType is ugly, but consistent with that
 ;; returned by GridFSFile
 (defunk insert-file!
@@ -421,7 +421,7 @@ releases.  Please use 'make-connection' in combination with
     (if metadata (.setMetaData f (coerce metadata [:clojure :mongo])))
     (.save f)
     (coerce f [:mongo :clojure])))
- 
+
 (defunk destroy-file!
    "Removes file from gridfs. Takes a GridFS name and
     a query map"
@@ -429,7 +429,7 @@ releases.  Please use 'make-connection' in combination with
    [fs q :from :clojure]
    (.remove (get-gridfs fs)
             #^DBObject (coerce q [from :mongo])))
- 
+
 (defunk fetch-files
   "Fetches objects from a GridFS
    Note that MongoDB always adds the _id and _ns
@@ -448,10 +448,10 @@ releases.  Please use 'make-connection' in combination with
         (coerce m [:mongo :clojure]) nil)
       (if-let [m (.find #^GridFS n-fs #^DBObject n-where)]
         (coerce m [:mongo :clojure] :many true) nil))))
- 
+
 (defn fetch-one-file [fs & options]
   (apply fetch-files fs (concat options '[:one? true])))
- 
+
 (defn write-file-to
   "Writes the data stored for a file to the supplied output, which
    should be either an OutputStream, File, or the String path for a file."

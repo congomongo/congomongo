@@ -97,25 +97,25 @@
                        :comment "I agree..."
                        :location [10.001 20.001]})
       (add-index! :posts [[:location "2d"]])
-      
+
       ;; leave db-refs alone, assumes manual, lazy fetching
       (is (db-ref? (-> (fetch :posts :where {:comment "great site!"}) first :user)))
       (is (db-ref? (-> (fetch :posts :where {:comment "I agree..."})  first :user)))
-      
+
       ;; eagerly fetch db-refs
-      (is (map?           (-> (fetch-eagerly :posts :where {:comment "great site!"}) first :user)))      
+      (is (map?           (-> (fetch-eagerly :posts :where {:comment "great site!"}) first :user)))
       (is (= "John Smith" (-> (fetch-eagerly :posts :where {:comment "great site!"}) first :user :name)))
       (is (map?           (-> (fetch-eagerly :posts :where {:comment "I agree..."})  first :user)))
       (is (= "Jane Doe"   (-> (fetch-eagerly :posts :where {:comment "I agree..."})  first :user :name)))
-      
+
       ;; the decorator works on existing retrieval fns
       (is (db-ref? (:user (fetch-by-id         :posts "p1"))))
       (is (map?    (:user (fetch-eagerly-by-id :posts "p1"))))
-      
+
       ;; it also works on seq results
       (is (db-ref? (-> (fetch :posts)         first :user)))
       (is (map?    (-> (fetch-eagerly :posts) first :user)))
-      
+
       ;; and on database commands
       (let [earth-radius (* 6378 1000) ; in meters
             radians      (fn [meters]
@@ -123,7 +123,7 @@
             cmd          {:geoNear     :posts
                           :near        [10 20]
                           :spherical   true
-                          :maxDistance (radians 1000)} 
+                          :maxDistance (radians 1000)}
             lazy-result  (command cmd)
             eager-result (command-eagerly cmd)]
         (is (db-ref?      (-> lazy-result  :results first :obj :user)))
