@@ -203,25 +203,25 @@
 ;; ;; mass insert chokes on excessively large inserts
 ;; ;; will need to implement some sort of chunking algorithm
 
- (deftest mass-insert
-   (with-test-mongo
-     (println "mass insert of 10000 points")
-     (time
-      (mass-insert! :points
-                    (for [x (range 100) y (range 100)]
-                      {:x x
-                       :y y
-                       :z (* x y)})))
-     (is (= (* 100 100)
-            (fetch-count :points))
-         "mass-insert okay")))
+(deftest mass-insert
+  (with-test-mongo
+    (println "mass insert of 10000 points")
+    (time
+     (mass-insert! :points
+                   (for [x (range 100) y (range 100)]
+                     {:x x
+                      :y y
+                      :z (* x y)})))
+    (is (= (* 100 100)
+           (fetch-count :points))
+        "mass-insert okay")))
 
- (deftest basic-indexing
-   (with-test-mongo
-     (make-points!)
-     (add-index! :points [:x])
-     (is (some #(= (into {} (% "key")) {"x" 1})
-               (get-indexes :points)))))
+(deftest basic-indexing
+  (with-test-mongo
+    (make-points!)
+    (add-index! :points [:x])
+    (is (some #(= (into {} (% "key")) {"x" 1})
+              (get-indexes :points)))))
 
 (defn- get-index
   "Retrieve an index, either by name or by key vector"
