@@ -5,7 +5,11 @@
   {:arglists '([title docstring? attr-map? [params*] body])}
   [title & stuff]
   (let [[metad [argvec & body]] (split-with (complement vector?) stuff)
-        [args kwargs]           (split-with symbol? argvec)
+        [args kwargs]           (split-with (fn [arg]
+                                              (reduce #(or %1 %2)
+                                                      (map #(% arg)
+                                                           [symbol? map? vector?])))
+                                            argvec)
         syms                    (map #(-> % name symbol) (take-nth 2 kwargs))
         values                  (take-nth 2 (rest kwargs))
         sym-vals                (apply hash-map (interleave syms values))
