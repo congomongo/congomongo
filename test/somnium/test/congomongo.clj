@@ -7,25 +7,30 @@
         clojure.contrib.pprint)
   (:use [clojure.contrib.json :only (read-json json-str)])
   (:use [clojure.contrib.duck-streams :only (slurp*)])
-  (:import [com.mongodb BasicDBObject]))
+  (:import [com.mongodb BasicDBObject BasicDBObjectBuilder]))
 
 (deftest coercions
-  (let [forms   [:clojure :mongo :json]
-        input   {:a {:b "c" :d "e" :f ["a" "b" "c"] :g {:h ["i" "j"]}}}
-        results (for [from forms
-                      to   forms
-                      :let [start (condp = from
-                                        :clojure input
-                                        :json    (json-str input)
-                                        :mongo   (coerce input [:clojure :mongo]))
-                            x (coerce start [from to])
-                            y (coerce x [to from])]
-                      :when (not= from to)]
-                  (if (= from :json)
-                    [(read-json start) (read-json y) from to]
-                    [start y from to]))]
-    (doseq [t results]
-      (is (= (t 0) (t 1)) (str (t 2) " " (t 3))))))
+  (let [clojure      {:a {:b "c" :d 1 :f ["a" "b" "c"] :g {:h ["i" "j" -42.42]}}}
+        mongo        (.. (BasicDBObjectBuilder/start)
+                         (push "a")
+                         (add "b" "c")
+                         (add "d" 1)
+                         (add "f" ["a" "b" "c"])
+                         (push "g")
+                         (add "h" ["i" "j" -42.42])
+                         get)
+        clojure-json (json-str clojure) ; no padding
+        mongo-json   (str mongo)        ; contains whitespace padding
+        from    {:clojure clojure
+                 :mongo   mongo
+                 :json    clojure-json}
+        to      (assoc from nil nil)]
+    (doseq [[from original] from, [to expected] to
+            :let [actual   (coerce original [from to])
+                  expected (if (= [from to] [:mongo :json]) ; padding diff
+                             mongo-json
+                             expected)]]
+      (is (= actual expected) [from to]))))
 
 (def test-db-host "127.0.0.1")
 (def test-db "congomongotestdb")

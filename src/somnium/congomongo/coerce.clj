@@ -84,29 +84,29 @@
 
 
 
-(defunk coerce
-  {:arglists '([obj [:from :to] {:many false}])
-   :doc
-   "takes an object, a vector of keywords:
-    from [ :clojure :mongo :json ]
-    to   [ :clojure :mongo :json ],
-    and an an optional :many keyword parameter which defaults to false"}
-  [obj from-to :many false]
-  (if (= (from-to 0) (from-to 1))
-      obj
-      (let [fun
-            (condp = from-to
-              [:clojure :mongo  ] clojure->mongo
-              [:clojure :json   ] json-str
-              [:mongo   :clojure] #(mongo->clojure #^DBObject % #^Boolean/TYPE *keywordize*)
-              [:mongo   :json   ] #(.toString #^DBObject %)
-              [:json    :clojure] #(read-json % *keywordize*)
-              [:json    :mongo  ] #(JSON/parse %)
-              :else               (throw (RuntimeException.
-                                          "unsupported keyword pair")))]
-        (if many (map fun (if (seqable? obj)
-                            obj
-                            (iterator-seq obj))) (fun obj)))))
+(let [translator {[:clojure :mongo  ] clojure->mongo
+                  [:clojure :json   ] json-str
+                  [:mongo   :clojure] #(mongo->clojure #^DBObject % #^Boolean/TYPE *keywordize*)
+                  [:mongo   :json   ] #(.toString #^DBObject %)
+                  [:json    :clojure] #(read-json % *keywordize*)
+                  [:json    :mongo  ] #(JSON/parse %)
+                  }]
+  (defunk coerce
+    "takes an object, a vector of keywords:
+     from [ :clojure :mongo :json ]
+     to   [ :clojure :mongo :json ],
+     and an an optional :many keyword parameter which defaults to false"    
+    {:arglists '([obj [:from :to] {:many false}])}
+    [obj [from to] :many false]
+    (cond (= from to) obj
+          (nil?   to) nil
+          :else       (if-let [f (translator [from to])]
+                        (if many
+                          (map f (if (seqable? obj)
+                                   obj
+                                   (iterator-seq obj)))
+                          (f obj))
+                        (throw (RuntimeException. "unsupported keyword pair"))))))
 
 (defn coerce-fields
   "only used for creating argument object for :only"
