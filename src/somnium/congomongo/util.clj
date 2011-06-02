@@ -1,7 +1,7 @@
 (ns somnium.congomongo.util)
 
 (defmacro defunk
-  "Mostly identitical to defnk in clojure.contrib.def but keeps argmap meta data."
+  "Mostly identical to defnk in clojure.contrib.def but keeps argmap meta data."
   {:arglists '([title docstring? attr-map? [params*] body])}
   [title & stuff]
   (let [[metad [argvec & body]] (split-with (complement vector?) stuff)
