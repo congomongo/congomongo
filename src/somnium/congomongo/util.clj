@@ -6,9 +6,9 @@
   [title & stuff]
   (let [[metad [argvec & body]] (split-with (complement vector?) stuff)
         [args kwargs]           (split-with (fn [arg]
-                                              (reduce #(or %1 %2)
-                                                      (map #(% arg)
-                                                           [symbol? map? vector?])))
+                                              (or (symbol? arg)
+                                                  (map?    arg)
+                                                  (vector? arg)))
                                             argvec)
         syms                    (map #(-> % name symbol) (take-nth 2 kwargs))
         values                  (take-nth 2 (rest kwargs))
