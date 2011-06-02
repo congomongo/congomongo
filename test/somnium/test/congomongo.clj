@@ -7,7 +7,7 @@
         clojure.contrib.pprint)
   (:use [clojure.contrib.json :only (read-json json-str)])
   (:use [clojure.contrib.duck-streams :only (slurp*)])
-  (:import [com.mongodb BasicDBObject]))
+  (:import [com.mongodb BasicDBObject BasicDBObjectBuilder]))
 
 (deftest coercions
   (let [clojure      {:a {:b "c" :d 1 :f ["a" "b" "c"] :g {:h ["i" "j" -42.42]}}}
