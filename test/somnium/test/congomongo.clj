@@ -216,6 +216,10 @@
            (fetch-count :points))
         "mass-insert okay")))
 
+(deftest insert-for-side-effects-only
+  (with-test-mongo
+    (is (nil? (insert! :beers {:beer "Franziskaner" :wheaty true} :to nil)))))
+
 (deftest basic-indexing
   (with-test-mongo
     (make-points!)
