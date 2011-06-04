@@ -2,7 +2,6 @@
   (:use clojure.test
         somnium.congomongo
         somnium.congomongo.config
-        somnium.congomongo.util
         somnium.congomongo.coerce
         clojure.contrib.pprint)
   (:use [clojure.contrib.json :only (read-json json-str)])

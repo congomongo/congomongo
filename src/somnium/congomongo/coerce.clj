@@ -1,7 +1,6 @@
 (ns somnium.congomongo.coerce
-  (:use [somnium.congomongo.util :only [defunk]]
-        [clojure.contrib.json :only [json-str read-json]]
-        [clojure.contrib.def :only [defvar]]
+  (:use [clojure.contrib.json :only [json-str read-json]]
+        [clojure.contrib.def :only [defvar defnk]]
         [clojure.contrib.core :only [seqable?]])
   (:import [clojure.lang IPersistentMap IPersistentVector Keyword]
            [java.util Map List]
@@ -84,29 +83,29 @@
 
 
 
-(let [translator {[:clojure :mongo  ] clojure->mongo
-                  [:clojure :json   ] json-str
-                  [:mongo   :clojure] #(mongo->clojure #^DBObject % #^Boolean/TYPE *keywordize*)
-                  [:mongo   :json   ] #(.toString #^DBObject %)
-                  [:json    :clojure] #(read-json % *keywordize*)
-                  [:json    :mongo  ] #(JSON/parse %)
-                  }]
-  (defunk coerce
+(let [translations {[:clojure :mongo  ] clojure->mongo
+                    [:clojure :json   ] json-str
+                    [:mongo   :clojure] #(mongo->clojure #^DBObject % #^Boolean/TYPE *keywordize*)
+                    [:mongo   :json   ] #(.toString #^DBObject %)
+                    [:json    :clojure] #(read-json % *keywordize*)
+                    [:json    :mongo  ] #(JSON/parse %)}]
+  (defnk coerce
     "takes an object, a vector of keywords:
      from [ :clojure :mongo :json ]
      to   [ :clojure :mongo :json ],
      and an an optional :many keyword parameter which defaults to false"
     {:arglists '([obj [:from :to] {:many false}])}
-    [obj [from to] :many false]
-    (cond (= from to) obj
-          (nil?   to) nil
-          :else       (if-let [f (translator [from to])]
-                        (if many
-                          (map f (if (seqable? obj)
-                                   obj
-                                   (iterator-seq obj)))
-                          (f obj))
-                        (throw (RuntimeException. "unsupported keyword pair"))))))
+    [obj from-and-to :many false]
+    (let [[from to] from-and-to]
+      (cond (= from to) obj
+            (nil?   to) nil
+            :else       (if-let [f (translations from-and-to)]
+                          (if many
+                            (map f (if (seqable? obj)
+                                     obj
+                                     (iterator-seq obj)))
+                            (f obj))
+                          (throw (RuntimeException. "unsupported keyword pair")))))))
 
 (defn coerce-fields
   "only used for creating argument object for :only"
