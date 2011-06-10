@@ -1,15 +1,15 @@
 (ns somnium.congomongo.coerce
-  (:use [clojure.contrib.json :only [json-str read-json]]
-        [clojure.contrib.def :only [defvar defnk]]
-        [clojure.contrib.core :only [seqable?]])
+  (:use [clojure.data.json :only [json-str read-json]]
+        [clojure.core.incubator :only [seqable?]])
   (:import [clojure.lang IPersistentMap IPersistentVector Keyword]
            [java.util Map List]
            [com.mongodb DBObject BasicDBObject BasicDBList]
            [com.mongodb.gridfs GridFSFile]
            [com.mongodb.util JSON]))
 
-(defvar *keywordize* true
-  "Set this to false to prevent coercion from setting string keys to keywords")
+(def ^{:dynamic true
+       :doc "Set this to false to prevent coercion from setting string keys to keywords"}
+      *keywordize* true)
 
 
 ;;; Converting data from mongo into Clojure data objects
@@ -89,13 +89,13 @@
                     [:mongo   :json   ] #(.toString #^DBObject %)
                     [:json    :clojure] #(read-json % *keywordize*)
                     [:json    :mongo  ] #(JSON/parse %)}]
-  (defnk coerce
+  (defn coerce
     "takes an object, a vector of keywords:
      from [ :clojure :mongo :json ]
      to   [ :clojure :mongo :json ],
      and an an optional :many keyword parameter which defaults to false"
     {:arglists '([obj [:from :to] {:many false}])}
-    [obj from-and-to :many false]
+    [obj from-and-to & {:keys [many] :or {many false}}]
     (let [[from to] from-and-to]
       (cond (= from to) obj
             (nil?   to) nil
