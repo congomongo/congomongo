@@ -1,3 +1,3 @@
 (ns somnium.congomongo.config)
 
-(def *mongo-config* {})
+(def ^{:dynamic true} *mongo-config* {})
