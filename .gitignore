@@ -1,6 +1,8 @@
 lib/*
 build/*
 classes/*
+.classpath
+.project
 *.jar
 *.class
 *~
