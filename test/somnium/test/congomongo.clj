@@ -3,9 +3,8 @@
         somnium.congomongo
         somnium.congomongo.config
         somnium.congomongo.coerce
-        clojure.contrib.pprint)
-  (:use [clojure.contrib.json :only (read-json json-str)])
-  (:use [clojure.contrib.duck-streams :only (slurp*)])
+        clojure.pprint)
+  (:use [clojure.data.json :only (read-json json-str)])
   (:import [com.mongodb BasicDBObject BasicDBObjectBuilder]))
 
 (deftest coercions
@@ -343,7 +342,7 @@
   (with-test-mongo
     (let [f (insert-file! :testfs (.getBytes "plantain"))
           stream (stream-from :testfs f)
-          data (slurp* stream)]
+          data (slurp stream)]
       (is (= "plantain" data)))))
 
 (deftest test-roundtrip-vector
@@ -351,6 +350,10 @@
     (insert! :stuff {:name "name" :vector [ "foo" "bar"]})
     (let [return (fetch-one :stuff :where {:name "name"})]
       (is (vector? (:vector return))))))
+
+;; Note: with Clojure 1.3.0, 1.0 != 1 and the JS stuff returns floating point numbers instead
+;; of integers so I've changed the tests to use floats in the expected values - except for the
+;; 1000000 value which _does_ come back as an integer! -- Sean Corfield
 
 (deftest test-map-reduce
   (with-test-mongo
@@ -379,9 +382,9 @@
           target-collection :monkey-shopping-list]
       ;; See that the base case works
       (is (= (map-reduce :mr mapfn reducefn target-collection)
-             (seq [{:_id "bananas" :value {:count 3}}
-                   {:_id "pineapples" :value {:count 6}}
-                   {:_id "plantains" :value {:count 5}}])))
+             (seq [{:_id "bananas" :value {:count 3.0}}
+                   {:_id "pineapples" :value {:count 6.0}}
+                   {:_id "plantains" :value {:count 5.0}}])))
       ;; Make sure we get the collection name back, too
       (is (= (map-reduce :mr mapfn reducefn target-collection :output :collection)
              target-collection))
@@ -392,50 +395,50 @@
       (drop-coll! target-collection)
       (insert! target-collection {:dummy-data true}) ;; we should not find this!
       (is (= (map-reduce :mr mapfn reducefn {:replace target-collection})
-             (seq [{:_id "bananas" :value {:count 3}}
-                   {:_id "pineapples" :value {:count 6}}
-                   {:_id "plantains" :value {:count 5}}])))
+             (seq [{:_id "bananas" :value {:count 3.0}}
+                   {:_id "pineapples" :value {:count 6.0}}
+                   {:_id "plantains" :value {:count 5.0}}])))
 
       ;; Merge data in the target collection
       (drop-coll! target-collection)
       (insert! target-collection {:_id "macadamia nuts" :value {:count 1000000}})
       (is (= (map-reduce :mr mapfn reducefn {:merge target-collection})
              (seq [{:_id "macadamia nuts" :value {:count 1000000}}
-                   {:_id "bananas" :value {:count 3}}
-                   {:_id "pineapples" :value {:count 6}}
-                   {:_id "plantains" :value {:count 5}}])))
+                   {:_id "bananas" :value {:count 3.0}}
+                   {:_id "pineapples" :value {:count 6.0}}
+                   {:_id "plantains" :value {:count 5.0}}])))
 
       ;; Reduce with existing data
       (drop-coll! target-collection)
       (insert! target-collection {:_id "bananas" :value {:count 10}})
       (is (= (map-reduce :mr mapfn reducefn {:reduce target-collection})
-             (seq [{:_id "bananas" :value {:count 13}}
-                   {:_id "pineapples" :value {:count 6}}
-                   {:_id "plantains" :value {:count 5}}])))
+             (seq [{:_id "bananas" :value {:count 13.0}}
+                   {:_id "pineapples" :value {:count 6.0}}
+                   {:_id "plantains" :value {:count 5.0}}])))
 
       ;; inline data (no output collection)
       (is (= (map-reduce :mr mapfn reducefn {:inline 1})
-             (seq [{:_id "bananas" :value {:count 3}}
-                   {:_id "pineapples" :value {:count 6}}
-                   {:_id "plantains" :value {:count 5}}])))
+             (seq [{:_id "bananas" :value {:count 3.0}}
+                   {:_id "pineapples" :value {:count 6.0}}
+                   {:_id "plantains" :value {:count 5.0}}])))
 
       ;; inline output ignores if you ask for an output collection name instead
       (is (= (map-reduce :mr mapfn reducefn {:inline 1} :output :collection)
-             (seq [{:_id "bananas" :value {:count 3}}
-                   {:_id "pineapples" :value {:count 6}}
-                   {:_id "plantains" :value {:count 5}}])))
+             (seq [{:_id "bananas" :value {:count 3.0}}
+                   {:_id "pineapples" :value {:count 6.0}}
+                   {:_id "plantains" :value {:count 5.0}}])))
 
       ;; Check limit
       (is (= (map-reduce :mr mapfn reducefn target-collection :limit 2)
-             (seq [{:_id "bananas" :value {:count 3}}])))
+             (seq [{:_id "bananas" :value {:count 3.0}}])))
       ;; Check sort
       ;; sort requires an index to work?
       (add-index! :mr [:fruit])
       (is (= (map-reduce :mr mapfn reducefn target-collection :sort {:fruit -1} :limit 2)
-             (seq [{:_id "plantains" :value {:count 5}}])))
+             (seq [{:_id "plantains" :value {:count 5.0}}])))
       ;; check query
       (is (= (map-reduce :mr mapfn reducefn target-collection :query {:fruit "pineapples"})
-             (seq [{:_id "pineapples" :value {:count 6}}])))
+             (seq [{:_id "pineapples" :value {:count 6.0}}])))
       ;; check finalize
       (is (= (map-reduce :mr mapfn reducefn target-collection
                          :finalize "function(key, value){return 'There are ' + value.count + ' ' + key}")
@@ -445,9 +448,9 @@
       ;; check scope
       (is (= (map-reduce :mr mapfn-with-scope reducefn target-collection
                          :scope {:adj "tasty"})
-             (seq [{:_id "tasty bananas" :value {:count 3}}
-                   {:_id "tasty pineapples" :value {:count 6}}
-                   {:_id "tasty plantains" :value {:count 5}}])))
+             (seq [{:_id "tasty bananas" :value {:count 3.0}}
+                   {:_id "tasty pineapples" :value {:count 6.0}}
+                   {:_id "tasty plantains" :value {:count 5.0}}])))
       )))
 
 (deftest test-server-eval
@@ -462,4 +465,4 @@ function ()
   }
  return square (25);
  }
-") 625))))
+") 625.0))))
