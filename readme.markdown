@@ -7,6 +7,9 @@ A toolkit for using MongoDB with Clojure.
 
 News
 --------------
+Version 0.1.5 adds compatibility with both Clojure 1.3, in addition
+to 1.2.
+
 Congomongo 0.1.4 introduces support for the MongoDB 1.8's modified
 map-reduce functionality, wherein the 'out' parameter is
 required. With this and future Congomongo releases, it will no longer
