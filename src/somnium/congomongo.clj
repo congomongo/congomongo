@@ -25,7 +25,7 @@
   (:use     [clojure.walk :only (postwalk)]
             [somnium.congomongo.config :only [*mongo-config*]]
             [somnium.congomongo.coerce :only [coerce coerce-fields coerce-index-fields]])
-  (:import  [com.mongodb Mongo DB DBCollection DBObject DBRef ServerAddress WriteConcern]
+  (:import  [com.mongodb Mongo DB DBCollection DBObject DBRef ServerAddress WriteConcern Bytes]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
@@ -38,7 +38,6 @@
   (named [s] (name s))
   Object
   (named [s] s))
-
 
 (defn make-connection
   "Connects to one or more mongo instances, returning a connection
@@ -168,30 +167,49 @@ releases.  Please use 'make-connection' in combination with
   `(.getCollection #^DB (:db *mongo-config*)
                    #^String (named ~collection)))
 
+(def *query-options*
+  {:tailable    Bytes/QUERYOPTION_TAILABLE
+   :slaveok     Bytes/QUERYOPTION_SLAVEOK
+   :oplogreplay Bytes/QUERYOPTION_OPLOGREPLAY
+   :notimeout   Bytes/QUERYOPTION_NOTIMEOUT
+   :awaitdata   Bytes/QUERYOPTION_AWAITDATA})
+
+(defn calculate-query-option [options]
+  "Calculates the cursor's query option from a list of options"
+  (if (coll? options)
+    (if (empty? options)
+      0
+      (reduce bit-or (map *query-options* options)))
+    (if (keyword? options)
+      (*query-options* options)
+      0)))
+
 (defn fetch
   "Fetches objects from a collection.
    Note that MongoDB always adds the _id and _ns
    fields to objects returned from the database.
    Optional arguments include
-   :where  -> takes a query map
-   :only   -> takes an array of keys to retrieve
-   :as     -> what to return, defaults to :clojure, can also be :json or :mongo
-   :from   -> argument type, same options as above
-   :skip   -> number of records to skip
-   :limit  -> number of records to return
-   :one?   -> defaults to false, use fetch-one as a shortcut
-   :count? -> defaults to false, use fetch-count as a shortcut
-   :sort   -> sort the results by a specific key"
+   :where   -> takes a query map
+   :only    -> takes an array of keys to retrieve
+   :as      -> what to return, defaults to :clojure, can also be :json or :mongo
+   :from    -> argument type, same options as above
+   :skip    -> number of records to skip
+   :limit   -> number of records to return
+   :one?    -> defaults to false, use fetch-one as a shortcut
+   :count?  -> defaults to false, use fetch-count as a shortcut
+   :sort    -> sort the results by a specific key
+   :options -> query options [:tailable :slaveok :oplogreplay :notimeout :awaitdata]"
   {:arglists
-   '([collection :where :only :limit :skip :as :from :one? :count? :sort])}
-  [coll & {:keys [where only as from one? count? limit skip sort]
+   '([collection :where :only :limit :skip :as :from :one? :count? :sort :options])}
+  [coll & {:keys [where only as from one? count? limit skip sort options]
            :or {where {} only [] as :clojure from :clojure 
-                one? false count? false limit 0 skip 0 sort nil}}]
+                one? false count? false limit 0 skip 0 sort nil options nil}}]
   (let [n-where (coerce where [from :mongo])
         n-only  (coerce-fields only)
         n-col   (get-coll coll)
         n-limit (if limit (- 0 (Math/abs limit)) 0)
-        n-sort (when sort (coerce sort [from :mongo]))]
+        n-sort (when sort (coerce sort [from :mongo]))
+        n-options (calculate-query-option options)]
     (cond
       count? (.getCount n-col n-where n-only)
       one?   (if-let [m (.findOne
@@ -203,7 +221,8 @@ releases.  Please use 'make-connection' in combination with
                                #^DBObject n-where
                                #^DBObject n-only
                                (int skip)
-                               (int n-limit))]
+                               (int n-limit)
+                               (int n-options))]
                (coerce (if n-sort
                          (.sort m n-sort)
                          m) [:mongo as] :many :true)))))

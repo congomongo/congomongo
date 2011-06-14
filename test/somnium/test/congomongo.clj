@@ -63,6 +63,15 @@
           (close-connection a)
           (is (= nil *mongo-config*)))))))
 
+(deftest query-options
+  (are [x y] (= (calculate-query-option x) y)
+       nil 0
+       [] 0
+       [:tailable] 2
+       [:tailable :slaveok] 6
+       [:tailable :slaveok :notimeout] 22
+       :notimeout 16))
+
 (deftest fetch-sort
   (with-test-mongo
     (let [unsorted [3 10 7 0 2]]
