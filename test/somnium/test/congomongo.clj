@@ -64,13 +64,21 @@
           (is (= nil *mongo-config*)))))))
 
 (deftest query-options
-  (are [x y] (= (calculate-query-option x) y)
+  (are [x y] (= (calculate-query-options x) y)
        nil 0
        [] 0
        [:tailable] 2
        [:tailable :slaveok] 6
        [:tailable :slaveok :notimeout] 22
        :notimeout 16))
+
+(deftest fetch-with-options
+  (with-test-mongo
+    (insert! :thingies {:foo 1})
+    (is (= 1 (-> (fetch :thingies :where {:foo 1} :options nil) first :foo)))
+    (is (= 1 (-> (fetch :thingies :where {:foo 1} :options []) first :foo)))
+    (is (= 1 (-> (fetch :thingies :where {:foo 1} :options :notimeout) first :foo)))
+    (is (= 1 (-> (fetch :thingies :where {:foo 1} :options [:notimeout]) first :foo)))))
 
 (deftest fetch-sort
   (with-test-mongo

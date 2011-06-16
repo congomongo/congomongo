@@ -167,22 +167,19 @@ releases.  Please use 'make-connection' in combination with
   `(.getCollection #^DB (:db *mongo-config*)
                    #^String (named ~collection)))
 
-(def *query-options*
+(def query-option-map
   {:tailable    Bytes/QUERYOPTION_TAILABLE
    :slaveok     Bytes/QUERYOPTION_SLAVEOK
    :oplogreplay Bytes/QUERYOPTION_OPLOGREPLAY
    :notimeout   Bytes/QUERYOPTION_NOTIMEOUT
    :awaitdata   Bytes/QUERYOPTION_AWAITDATA})
 
-(defn calculate-query-option [options]
+(defn calculate-query-options
   "Calculates the cursor's query option from a list of options"
-  (if (coll? options)
-    (if (empty? options)
-      0
-      (reduce bit-or (map *query-options* options)))
-    (if (keyword? options)
-      (*query-options* options)
-      0)))
+   [options]
+   (reduce bit-or 0 (map query-option-map (if (keyword? options)
+                                            (list options)
+                                            options))))
 
 (defn fetch
   "Fetches objects from a collection.
@@ -203,13 +200,13 @@ releases.  Please use 'make-connection' in combination with
    '([collection :where :only :limit :skip :as :from :one? :count? :sort :options])}
   [coll & {:keys [where only as from one? count? limit skip sort options]
            :or {where {} only [] as :clojure from :clojure 
-                one? false count? false limit 0 skip 0 sort nil options nil}}]
+                one? false count? false limit 0 skip 0 sort nil options []}}]
   (let [n-where (coerce where [from :mongo])
         n-only  (coerce-fields only)
         n-col   (get-coll coll)
         n-limit (if limit (- 0 (Math/abs limit)) 0)
         n-sort (when sort (coerce sort [from :mongo]))
-        n-options (calculate-query-option options)]
+        n-options (calculate-query-options options)]
     (cond
       count? (.getCount n-col n-where n-only)
       one?   (if-let [m (.findOne
