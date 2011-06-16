@@ -106,7 +106,7 @@ releases.  Please use 'make-connection' in combination with
    :port -> defaults to 27017
    :db   -> defaults to nil (you'll have to set it anyway, might as well do it now.)"
   {:arglists '([:db ? :host "localhost" :port 27017])}
-  [& {:keys [db host port] 
+  [& {:keys [db host port]
       :or {db nil host "localhost" port 27017}}]
   (set-connection! (make-connection db :host host :port port))
   true)
@@ -223,7 +223,7 @@ releases.  Please use 'make-connection' in combination with
   {:arglists
    '([collection :where :only :limit :skip :as :from :one? :count? :sort :options])}
   [coll & {:keys [where only as from one? count? limit skip sort options]
-           :or {where {} only [] as :clojure from :clojure 
+           :or {where {} only [] as :clojure from :clojure
                 one? false count? false limit 0 skip 0 sort nil options []}}]
   (let [n-where (coerce where [from :mongo])
         n-only  (coerce-fields only)
@@ -239,14 +239,14 @@ releases.  Please use 'make-connection' in combination with
                          #^DBObject n-only)]
                (coerce m [:mongo as]) nil)
       :else  (when-let [m (.find #^DBCollection n-col
-                               #^DBObject n-where
-                               #^DBObject n-only
-                               (int skip)
-                               (int n-limit)
-                               (int n-options))]
+                                 #^DBObject n-where
+                                 #^DBObject n-only
+                                 (int skip)
+                                 (int n-limit)
+                                 (int n-options))]
                (coerce (if n-sort
                          (.sort m n-sort)
-                         m) [:mongo as] :many :true)))))
+                         m) [:mongo as] :many true)))))
 
 (defn fetch-one [col & options]
   (apply fetch col (concat options '[:one? true])))
