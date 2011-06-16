@@ -161,6 +161,30 @@ releases.  Please use 'make-connection' in combination with
 (defn db-ref? [x]
   (instance? DBRef x))
 
+(defn collection-exists?
+  "Query whether the named collection has been created within the DB."
+  [collection]
+  (.collectionExists #^DB (:db *mongo-config*)
+                     #^String (named collection)))
+
+(defn create-collection!
+  "Explicitly create a collection with the given name, which must not already exist.
+
+   Most users will not need this function, and will instead allow
+   MongoDB to implicitly create collections when they are written
+   to. This function exists primarily to allow the creation of capped
+   collections, and so supports the following keyword arguments:
+
+   :capped -> boolean: if the collection is capped
+   :size   -> int: collection size (in bytes)
+   :max    -> int: max number of documents."
+  {:arglists
+   '([collection :capped :size :max])}
+  ([collection & {:keys [capped size max] :as options}]
+     (.createCollection #^DB (:db *mongo-config*)
+                        #^String (named collection)
+                        (coerce options [:clojure :mongo]))))
+
 (definline get-coll
   "Returns a DBCollection object"
   [collection]

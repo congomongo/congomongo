@@ -80,6 +80,24 @@
     (is (= 1 (-> (fetch :thingies :where {:foo 1} :options :notimeout) first :foo)))
     (is (= 1 (-> (fetch :thingies :where {:foo 1} :options [:notimeout]) first :foo)))))
 
+(deftest collection-existence
+  (with-test-mongo
+    (insert! :notbogus {:foo "bar"})
+    (is (collection-exists? :notbogus))
+    (is (not (collection-exists? :bogus)))
+    (create-collection! :no-options-so-deferred-creation)
+    (is (not (collection-exists? :no-options-so-deferred-creation)))))
+
+(deftest capped-collections
+  (with-test-mongo
+    (create-collection! :cappedcoll :capped true :max 2)
+    (is (collection-exists? :cappedcoll))
+    (insert! :cappedcoll {:foo 1 :bar 1})
+    (insert! :cappedcoll {:foo 1 :bar 2})
+    (insert! :cappedcoll {:foo 1 :bar 3})
+    (let [results (fetch :cappedcoll :where {:foo 1})]
+      (is (= [2 3] (map :bar (take 2 results)))))))
+
 (deftest fetch-sort
   (with-test-mongo
     (let [unsorted [3 10 7 0 2]]
