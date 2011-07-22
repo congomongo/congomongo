@@ -22,19 +22,19 @@
   ;; dramatically, which was the main barrier to matching pure-Java
   ;; performance for this marshalling
   (reduce (if keywordize
-            (fn [m [#^String k v]]
+            (fn [m [^String k v]]
               (assoc m (keyword k) (mongo->clojure v true)))
-            (fn [m [#^String k v]]
+            (fn [m [^String k v]]
               (assoc m k (mongo->clojure v false))))
           {} (reverse kvs)))
 
 (extend-protocol ConvertibleFromMongo
   Map
-  (mongo->clojure [#^Map m keywordize]
+  (mongo->clojure [^Map m keywordize]
                   (assocs->clojure (.entrySet m) keywordize))
 
   List
-  (mongo->clojure [#^List l keywordize]
+  (mongo->clojure [^List l keywordize]
                   (vec (map #(mongo->clojure % keywordize) l)))
 
   Object
@@ -44,11 +44,11 @@
   (mongo->clojure [o keywordize] o)
 
   BasicDBList
-  (mongo->clojure [#^BasicDBList l keywordize]
+  (mongo->clojure [^BasicDBList l keywordize]
                   (vec (map #(mongo->clojure % keywordize) l)))
 
   DBObject
-  (mongo->clojure [#^DBObject f keywordize]
+  (mongo->clojure [^DBObject f keywordize]
                   ;; DBObject provides .toMap, but the implementation in
                   ;; subclass GridFSFile unhelpfully throws
                   ;; UnsupportedOperationException
@@ -70,10 +70,10 @@
                         dbo))
 
   Keyword
-  (clojure->mongo [#^Keyword o] (.getName o))
+  (clojure->mongo [^Keyword o] (.getName o))
 
   List
-  (clojure->mongo [#^List o] (map clojure->mongo o))
+  (clojure->mongo [^List o] (map clojure->mongo o))
 
   Object
   (clojure->mongo [o] o)
@@ -85,8 +85,8 @@
 
 (let [translations {[:clojure :mongo  ] clojure->mongo
                     [:clojure :json   ] json-str
-                    [:mongo   :clojure] #(mongo->clojure #^DBObject % #^Boolean/TYPE *keywordize*)
-                    [:mongo   :json   ] #(.toString #^DBObject %)
+                    [:mongo   :clojure] #(mongo->clojure ^DBObject % ^Boolean/TYPE *keywordize*)
+                    [:mongo   :json   ] #(.toString ^DBObject %)
                     [:json    :clojure] #(read-json % *keywordize*)
                     [:json    :mongo  ] #(JSON/parse %)}]
   (defn coerce
@@ -107,13 +107,13 @@
                             (f obj))
                           (throw (RuntimeException. "unsupported keyword pair")))))))
 
-(defn coerce-fields
+(defn ^DBObject coerce-fields
   "only used for creating argument object for :only"
   [fields]
-  (clojure->mongo #^IPersistentMap (zipmap fields (repeat 1))))
+  (clojure->mongo ^IPersistentMap (zipmap fields (repeat 1))))
 
 
-(defn coerce-index-fields
+(defn ^DBObject coerce-index-fields
   "Used for creating index specifications.
 
   [:a :b :c] => (sorted-map :a 1 :b 1 :c 1)
@@ -121,7 +121,7 @@
 
   See also somnium.congomongo/add-index!"
   [fields]
-  (clojure->mongo #^IPersistentMap (apply array-map
+  (clojure->mongo ^IPersistentMap (apply array-map
                                           (flatten
                                            (for [f fields]
                                              (if (vector? f)

@@ -19,8 +19,8 @@
 ; THE SOFTWARE.
 
 (ns
-  #^{:author "Andrew Boekhoff",
-     :doc "Various wrappers and utilities for the mongodb-java-driver"}
+  ^{:author "Andrew Boekhoff",
+    :doc "Various wrappers and utilities for the mongodb-java-driver"}
   somnium.congomongo
   (:use     [clojure.walk :only (postwalk)]
             [somnium.congomongo.config :only [*mongo-config*]]
@@ -39,24 +39,28 @@
   Object
   (named [s] s))
 
+(defn- make-server-address
+  "Convenience to make a ServerAddress without reflection warnings."
+  [^String host ^Integer port]
+  (ServerAddress. host port))
+
 (defn make-connection
   "Connects to one or more mongo instances, returning a connection
 that can be used with set-connection! and with-mongo. Each instance is
 a map containing values for :host and/or :port."
   ([db]
-     (make-connection db {}))
+    (make-connection db {}))
   ([db & instances]
-     (let [addresses (->> (if (keyword? (first instances))
-                            (list (apply array-map instances)) ; Handle legacy connect args
-                            instances)
-                          (map (fn [{:keys [host port]}]
-                            (ServerAddress. (or host "127.0.0.1") (or port 27017)))))
-           mongo (if (> (count addresses) 1)
-                   (Mongo. addresses)
-                   (Mongo. (first addresses)))
-           n-db (if db (.getDB mongo (named db)) nil)]
-       {:mongo mongo :db n-db})))
-
+    (let [addresses (->> (if (keyword? (first instances))
+                           (list (apply array-map instances)) ; Handle legacy connect args
+                           instances)
+                      (map (fn [{:keys [host port]}]
+                             (make-server-address (or host "127.0.0.1") (or port 27017)))))
+          mongo (if (> (count addresses) 1)
+                  (Mongo. ^ServerAddress addresses)
+                  (Mongo. ^ServerAddress (first addresses)))
+          n-db (if db (.getDB mongo (named db)) nil)]
+      {:mongo mongo :db n-db})))
 
 (defn connection? [x]
   (and (map? x)
@@ -71,7 +75,7 @@ a map containing values for :host and/or :port."
     (if (thread-bound? #'*mongo-config*)
       (set! *mongo-config* nil)
       (alter-var-root #'*mongo-config* (constantly nil))))
-  (.close (:mongo conn)))
+  (.close ^Mongo (:mongo conn)))
 
 (defmacro with-mongo
   "Makes conn the active connection in the enclosing scope.
@@ -115,32 +119,32 @@ releases.  Please use 'make-connection' in combination with
   "Authenticate against either the current or a specified database connection.
    Note that authenticating twice against the same database will raise an error."
   ([conn username password]
-     (.authenticate #^DB (:db conn)
-                    #^String username
-                    (.toCharArray #^String password)))
+     (.authenticate ^DB (:db conn)
+                    ^String username
+                    (.toCharArray ^String password)))
   ([username password]
      (authenticate *mongo-config* username password)))
 
 (def write-concern-map
-     {:none com.mongodb.WriteConcern/NONE
-      :normal com.mongodb.WriteConcern/NORMAL
-      :strict com.mongodb.WriteConcern/SAFE})
+  {:none com.mongodb.WriteConcern/NONE
+   :normal com.mongodb.WriteConcern/NORMAL
+   :strict com.mongodb.WriteConcern/SAFE})
 
 (defn set-write-concern
   "Sets the write concern on the connection. Setting is one of :none, :normal, :strict"
   [connection setting]
   (assert (connection? connection))
   (assert (contains? (set (keys write-concern-map)) setting))
-  (.setWriteConcern (:db connection)
-                    (get write-concern-map setting)))
+  (.setWriteConcern ^Mongo (:db connection)
+                    ^com.mongodb.WriteConcern (get write-concern-map setting)))
 
 ;; add some convenience fns for manipulating object-ids
-(definline object-id [s]
-  `(ObjectId. #^String ~s))
+(definline object-id ^ObjectId [^String s]
+  `(ObjectId. ~s))
 
 ;; Make ObjectIds printable under *print-dup*, hiding the
 ;; implementation-dependent ObjectId class
-(defmethod print-dup ObjectId [x w]
+(defmethod print-dup ObjectId [^ObjectId x ^java.io.Writer w]
   (.write w (str "#=" `(object-id ~(.toString x)))))
 
 ;; add convenience get-timestamp method
@@ -148,15 +152,15 @@ releases.  Please use 'make-connection' in combination with
   "pulls the timestamp from an ObjectId or a map with a valid
    ObjectId in :_id."
   [obj]
-  (let [id (if (instance? ObjectId obj) obj (:_id obj))]
+  (let [^ObjectId id (if (instance? ObjectId obj) obj (:_id obj))]
     (when id (.getTime id))))
 
 (definline db-ref
   "Convenience DBRef constructor."
   [ns id]
-  `(DBRef. #^DB (:db *mongo-config*)
-           #^String (named ~ns)
-           #^Object ~id))
+  `(DBRef. ^DB (:db *mongo-config*)
+           ^String (named ~ns)
+           ^Object ~id))
 
 (defn db-ref? [x]
   (instance? DBRef x))
@@ -164,8 +168,8 @@ releases.  Please use 'make-connection' in combination with
 (defn collection-exists?
   "Query whether the named collection has been created within the DB."
   [collection]
-  (.collectionExists #^DB (:db *mongo-config*)
-                     #^String (named collection)))
+  (.collectionExists ^DB (:db *mongo-config*)
+                     ^String (named collection)))
 
 (defn create-collection!
   "Explicitly create a collection with the given name, which must not already exist.
@@ -181,15 +185,15 @@ releases.  Please use 'make-connection' in combination with
   {:arglists
    '([collection :capped :size :max])}
   ([collection & {:keys [capped size max] :as options}]
-     (.createCollection #^DB (:db *mongo-config*)
-                        #^String (named collection)
+     (.createCollection ^DB (:db *mongo-config*)
+                        ^String (named collection)
                         (coerce options [:clojure :mongo]))))
 
-(definline get-coll
+(definline ^DBCollection get-coll
   "Returns a DBCollection object"
   [collection]
-  `(.getCollection #^DB (:db *mongo-config*)
-                   #^String (named ~collection)))
+  `(.getCollection ^DB (:db *mongo-config*)
+                   ^String (named ~collection)))
 
 (def query-option-map
   {:tailable    Bytes/QUERYOPTION_TAILABLE
@@ -228,19 +232,19 @@ releases.  Please use 'make-connection' in combination with
   (let [n-where (coerce where [from :mongo])
         n-only  (coerce-fields only)
         n-col   (get-coll coll)
-        n-limit (if limit (- 0 (Math/abs limit)) 0)
+        n-limit (if limit (- 0 (Math/abs (long limit))) 0)
         n-sort (when sort (coerce sort [from :mongo]))
         n-options (calculate-query-options options)]
     (cond
       count? (.getCount n-col n-where n-only)
       one?   (if-let [m (.findOne
-                         #^DBCollection n-col
-                         #^DBObject n-where
-                         #^DBObject n-only)]
+                         ^DBCollection n-col
+                         ^DBObject n-where
+                         ^DBObject n-only)]
                (coerce m [:mongo as]) nil)
-      :else  (when-let [m (.find #^DBCollection n-col
-                                 #^DBObject n-where
-                                 #^DBObject n-only
+      :else  (when-let [m (.find ^DBCollection n-col
+                                 ^DBObject n-where
+                                 ^DBObject n-only
                                  (int skip)
                                  (int n-limit)
                                  (int n-options))]
@@ -266,7 +270,7 @@ releases.  Please use 'make-connection' in combination with
                  :clojure)
           f  (fn [[k v]]
                [k (if (db-ref? v)
-                    (coerce (.fetch v) [:mongo as])
+                    (coerce (.fetch ^DBRef v) [:mongo as])
                     v)])]
       (postwalk (fn [x]
                   (if (map? x)
@@ -299,11 +303,12 @@ releases.  Please use 'make-connection' in combination with
   [coll obj & {:keys [from to many]
                :or {from :clojure to :clojure many false}}]
   (let [coerced-obj (if many
-                       #^java.util.List (coerce obj [from :mongo] :many many)
-                       #^DBObject (coerce obj [from :mongo] :many many))
+                       (coerce obj [from :mongo] :many many)
+                       (coerce obj [from :mongo] :many many))
+        ^com.mongodb.WriteConcern normal-concern (get write-concern-map :normal)
         res (if many
-              (.insert #^DBCollection (get-coll coll) coerced-obj)
-              (.insert #^DBCollection (get-coll coll) coerced-obj (get write-concern-map :normal)))]
+              (.insert ^DBCollection (get-coll coll) ^java.util.List coerced-obj)
+              (.insert ^DBCollection (get-coll coll) ^DBObject coerced-obj normal-concern))]
     (coerce coerced-obj [:mongo to] :many many)))
 
 (defn mass-insert!
@@ -320,9 +325,9 @@ releases.  Please use 'make-connection' in combination with
    {:arglists '([collection old new {:upsert true :multiple false :as :clojure :from :clojure}])}
    [coll old new & {:keys [upsert multiple as from]
                     :or {upsert true multiple false as :clojure from :clojure}}]
-   (coerce (.update #^DBCollection  (get-coll coll)
-                    #^DBObject (coerce old [from :mongo])
-                    #^DBObject (coerce new [from :mongo])
+   (coerce (.update ^DBCollection  (get-coll coll)
+                    ^DBObject (coerce old [from :mongo])
+                    ^DBObject (coerce new [from :mongo])
               upsert multiple) [:mongo as]))
 
 (defn fetch-and-modify
@@ -343,12 +348,12 @@ releases.  Please use 'make-connection' in combination with
   [coll where update & {:keys [only sort remove? return-new? upsert? from as]
                         :or {only nil sort nil remove? false
                              return-new? false upsert false from :clojure as :clojure}}]
-  (coerce (.findAndModify #^DBCollection (get-coll coll)
-                          #^DBObject (coerce where [from :mongo])
-                          #^DBObject (coerce only [from :mongo])
-                          #^DBObject (coerce sort [from :mongo])
+  (coerce (.findAndModify ^DBCollection (get-coll coll)
+                          ^DBObject (coerce where [from :mongo])
+                          ^DBObject (coerce only [from :mongo])
+                          ^DBObject (coerce sort [from :mongo])
                           remove?
-                          #^DBObject (coerce update [from :mongo])
+                          ^DBObject (coerce update [from :mongo])
                           return-new? upsert?) [:mongo as]))
 
 
@@ -359,7 +364,7 @@ releases.  Please use 'make-connection' in combination with
    [c q & {:keys [from]
            :or {from :clojure}}]
    (.remove (get-coll c)
-            #^DBObject (coerce q [from :mongo])))
+            ^DBObject (coerce q [from :mongo])))
 
 (defn add-index!
   "Adds an index on the collection for the specified fields if it does not exist.  Ordering of fields is
@@ -384,9 +389,9 @@ releases.  Please use 'make-connection' in combination with
    [c f & {:keys [name unique force]
            :or {name nil unique false force true}}]
    (-> (get-coll c)
-       (.ensureIndex (coerce-index-fields f) (coerce (merge {:force force :unique unique}
-                                                            (if name {:name name}))
-                                                     [:clojure :mongo]))))
+       (.ensureIndex (coerce-index-fields f) ^DBObject (coerce (merge {:force force :unique unique}
+                                                                       (if name {:name name}))
+                                                                [:clojure :mongo]))))
 
 (defn drop-index!
   "Drops an index on the collection for the specified fields.
@@ -400,7 +405,7 @@ releases.  Please use 'make-connection' in combination with
   [coll index]
   (if (vector? index)
     (.dropIndex (get-coll coll) (coerce-index-fields index))
-    (.dropIndex (get-coll coll) (coerce index [:clojure :mongo]))))
+    (.dropIndex (get-coll coll) ^String (coerce index [:clojure :mongo]))))
 
 (defn drop-all-indexes!
   "Drops all indexes from a collection"
@@ -420,22 +425,22 @@ releases.  Please use 'make-connection' in combination with
   [cmd & {:keys [options from to]
           :or {options nil from :clojure to :clojure}}]
   (coerce (if options
-            (.command #^DB (:db *mongo-config*)
-                      #^DBObject (coerce cmd [from :mongo])
+            (.command ^DB (:db *mongo-config*)
+                      ^DBObject (coerce cmd [from :mongo])
                       (int options))
-            (.command #^DB (:db *mongo-config*)
-                      #^DBObject (coerce cmd [from :mongo])))
+            (.command ^DB (:db *mongo-config*)
+                      ^DBObject (coerce cmd [from :mongo])))
           [:mongo to]))
 
 (defn drop-database!
  "drops a database from the mongo server"
  [title]
- (.dropDatabase (:mongo *mongo-config*) (named title)))
+ (.dropDatabase ^Mongo (:mongo *mongo-config*) ^String (named title)))
 
 (defn set-database!
   "atomically alters the current database"
   [title]
-  (if-let [db (.getDB (:mongo *mongo-config*) (named title))]
+  (if-let [db (.getDB ^Mongo (:mongo *mongo-config*) ^String (named title))]
     (alter-var-root #'*mongo-config* merge {:db db})
     (throw (RuntimeException. (str "database with title " title " does not exist.")))))
 
@@ -443,25 +448,25 @@ releases.  Please use 'make-connection' in combination with
 
 (defn databases
   "List databases on the mongo server" []
-  (seq (.getDatabaseNames (:mongo *mongo-config*))))
+  (seq (.getDatabaseNames ^Mongo (:mongo *mongo-config*))))
 
 (defn collections
   "Returns the set of collections stored in the current database" []
-  (seq (.getCollectionNames #^DB (:db *mongo-config*))))
+  (seq (.getCollectionNames ^DB (:db *mongo-config*))))
 
 (defn drop-coll!
   [collection]
   "Permanently deletes a collection. Use with care."
-  (.drop #^DBCollection (.getCollection #^DB (:db *mongo-config*)
-                                        #^String (named collection))))
+  (.drop ^DBCollection (.getCollection ^DB (:db *mongo-config*)
+                                       ^String (named collection))))
 
 ;;;; GridFS, contributed by Steve Purcell
 ;;;; question: keep the camelCase keyword for :contentType ?
 
-(definline get-gridfs
+(definline ^GridFS get-gridfs
   "Returns a GridFS object for the named bucket"
   [bucket]
-  `(GridFS. #^DB (:db *mongo-config*) #^String (named ~bucket)))
+  `(GridFS. ^DB (:db *mongo-config*) ^String (named ~bucket)))
 
 ;; The naming of :contentType is ugly, but consistent with that
 ;; returned by GridFSFile
@@ -473,9 +478,9 @@ releases.  Please use 'make-connection' in combination with
    :contentType -> defaults to nil
    :metadata    -> defaults to nil"
   {:arglists '([fs data {:filename nil :contentType nil :metadata nil}])}
-  [fs data & {:keys [filename contentType metadata]
+  [fs ^bytes data & {:keys [^String filename ^String contentType ^DBObject metadata]
               :or {filename nil contentType nil metadata nil}}]
-  (let [f (.createFile (get-gridfs fs) data)]
+  (let [^com.mongodb.gridfs.GridFSInputFile f (.createFile (get-gridfs fs) data)]
     (if filename (.setFilename f filename))
     (if contentType (.setContentType f contentType))
     (if metadata (.setMetaData f (coerce metadata [:clojure :mongo])))
@@ -489,7 +494,7 @@ releases.  Please use 'make-connection' in combination with
    [fs q & {:keys [from]
             :or {from :clojure}}]
    (.remove (get-gridfs fs)
-            #^DBObject (coerce q [from :mongo])))
+            ^DBObject (coerce q [from :mongo])))
 
 (defn fetch-files
   "Fetches objects from a GridFS
@@ -506,9 +511,9 @@ releases.  Please use 'make-connection' in combination with
   (let [n-where (coerce where [from :mongo])
         n-fs   (get-gridfs fs)]
     (if one?
-      (if-let [m (.findOne #^GridFS n-fs #^DBObject n-where)]
+      (if-let [m (.findOne ^GridFS n-fs ^DBObject n-where)]
         (coerce m [:mongo :clojure]) nil)
-      (if-let [m (.find #^GridFS n-fs #^DBObject n-where)]
+      (if-let [m (.find ^GridFS n-fs ^DBObject n-where)]
         (coerce m [:mongo :clojure] :many true) nil))))
 
 (defn fetch-one-file [fs & options]
@@ -518,24 +523,27 @@ releases.  Please use 'make-connection' in combination with
   "Writes the data stored for a file to the supplied output, which
    should be either an OutputStream, File, or the String path for a file."
   [fs file out]
-  (if-let [f (.findOne (get-gridfs fs) (coerce file [:clojure :mongo]))]
+  ;; since .findOne is overloaded and coerce returns different types, we cannot remove the reflection warning:
+  (if-let [^com.mongodb.gridfs.GridFSDBFile f (.findOne (get-gridfs fs) (coerce file [:clojure :mongo]))]
+    ;; since .writeTo is overloaded and we can pass different types, we cannot remove the reflection warning:
     (.writeTo f out)))
 
 (defn stream-from
   "Returns an InputStream from the GridFS file specified"
   [fs file]
-  (if-let [f (.findOne (get-gridfs fs) (coerce file [:clojure :mongo]))]
+  ;; since .findOne is overloaded and coerce returns different types, we cannot remove the reflection warning:
+  (if-let [^com.mongodb.gridfs.GridFSDBFile f (.findOne (get-gridfs fs) (coerce file [:clojure :mongo]))]
     (.getInputStream f)))
 
 (defn server-eval
   "Sends javascript to the server to be evaluated. js should define a function that takes no arguments. The server will call the function."
   [js & args]
-  (let [db #^com.mongodb.DB (:db somnium.congomongo.config/*mongo-config*)
+  (let [db ^com.mongodb.DB (:db *mongo-config*)
         m (.doEval db js (into-array Object args))]
     (let [result (coerce m [:mongo :clojure])]
       (if (= 1.0 (:ok result)) ;; In Clojure 1.3.0, 1 != 1.0 so we must compare against 1.0 instead (the JS stuff always returns floats)
         (:retval result)
-        (throw (Exception. (format "failure executing javascript: %s" (str result))))))))
+        (throw (Exception. ^String (format "failure executing javascript: %s" (str result))))))))
 
 (defn map-reduce
   "Performs a map-reduce job on the server.
@@ -590,7 +598,7 @@ releases.  Please use 'make-connection' in combination with
                       flatten
                       (apply array-map))
         mr-query (coerce mr-query [:clojure :mongo])
-        result (.mapReduce (get-coll collection) mr-query)]
+        ^com.mongodb.MapReduceOutput result (.mapReduce (get-coll collection) ^DBObject mr-query)]
     (if (or (= output :documents)
             (= (coerce out [out-from :clojure])
                {:inline 1}))
