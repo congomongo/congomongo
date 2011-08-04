@@ -57,7 +57,7 @@ a map containing values for :host and/or :port."
                       (map (fn [{:keys [host port]}]
                              (make-server-address (or host "127.0.0.1") (or port 27017)))))
           mongo (if (> (count addresses) 1)
-                  (Mongo. ^ServerAddress addresses)
+                  (Mongo. ^java.util.List addresses)
                   (Mongo. ^ServerAddress (first addresses)))
           n-db (if db (.getDB mongo (named db)) nil)]
       {:mongo mongo :db n-db})))
