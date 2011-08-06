@@ -7,6 +7,12 @@ A toolkit for using MongoDB with Clojure.
 
 News
 --------------
+Version 0.1.7 (in progress) adds the ability to create MongoOptions
+and pass them into make-connection as the last argument, so that you
+can control autoConnectRetry and timeouts and so on.
+
+Version 0.1.6 removes (almost) all of the reflection warnings.
+
 Version 0.1.5 adds compatibility with both Clojure 1.3, in addition
 to 1.2.
 
