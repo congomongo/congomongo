@@ -42,6 +42,19 @@
      ~@body
      (teardown!)))
 
+(deftest options-on-connections
+  (with-test-mongo
+    ;; set some non-default option values
+    (let [a (make-connection "congomongotest-db-a" :host test-db-host (mongo-options :auto-connect-retry true :w 1 :safe true))
+          m (:mongo a)
+          opts (.getMongoOptions m)]
+      ;; check non-default options attached to Mongo object
+      (is (.autoConnectRetry opts))
+      (is (.safe opts))
+      (is (= 1 (.w opts)))
+      ;; check a default option as well
+      (is (not (.slaveOk opts))))))
+
 (deftest with-mongo-interactions
   (with-test-mongo
     (let [a (make-connection "congomongotest-db-a" :host test-db-host)

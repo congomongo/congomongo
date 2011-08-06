@@ -22,10 +22,11 @@
   ^{:author "Andrew Boekhoff",
     :doc "Various wrappers and utilities for the mongodb-java-driver"}
   somnium.congomongo
+  (:require [clojure.string])
   (:use     [clojure.walk :only (postwalk)]
             [somnium.congomongo.config :only [*mongo-config*]]
             [somnium.congomongo.coerce :only [coerce coerce-fields coerce-index-fields]])
-  (:import  [com.mongodb Mongo DB DBCollection DBObject DBRef ServerAddress WriteConcern Bytes]
+  (:import  [com.mongodb Mongo MongoOptions DB DBCollection DBObject DBRef ServerAddress WriteConcern Bytes]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
@@ -39,6 +40,39 @@
   Object
   (named [s] s))
 
+(def ^{:private true
+       :doc "To avoid yet another level of indirection via reflection, use
+             wrapper functions for field setters for each type. MongoOptions
+             only has int and boolean fields."}
+      type-to-setter
+  {:int (fn [^java.lang.reflect.Field field ^MongoOptions options value] (.setInt field options value))
+   :boolean (fn [^java.lang.reflect.Field field ^MongoOptions options value] (.setBoolean field options value))})
+
+(defn- ->field-name
+  "Convert hyphenated keyword to camelCased string."
+  [s]
+  (clojure.string/replace (named s) #"-." #(str (Character/toUpperCase ^Character (second %)))))
+
+(defn opt!
+  "Set option by name (keyword). Returns options object."
+  [^MongoOptions o k v]
+  (let [^String field-name (->field-name k)
+        ^java.lang.reflect.Field field (-> o .getClass (.getField field-name))
+        type-as-keyword (keyword (.getName (.getType field)))
+        setter (type-as-keyword type-to-setter)]
+    (setter field o v)
+    o))
+
+(defn mongo-options
+  "Return MongoOptions, populated by any specified options. e.g.,
+     (mongo-options :auto-connect-retry true)"
+  [& options]
+  (let [option-map (apply hash-map options)
+        m-options (MongoOptions.)]
+    (doseq [[k v] option-map]
+      (opt! m-options k v))
+    m-options))
+
 (defn- make-server-address
   "Convenience to make a ServerAddress without reflection warnings."
   [^String host ^Integer port]
@@ -47,18 +81,21 @@
 (defn make-connection
   "Connects to one or more mongo instances, returning a connection
 that can be used with set-connection! and with-mongo. Each instance is
-a map containing values for :host and/or :port."
+a map containing values for :host and/or :port. Optionally a MongoOptions
+object may be passed as the last argument."
   ([db]
     (make-connection db {}))
-  ([db & instances]
-    (let [addresses (->> (if (keyword? (first instances))
+  ([db & args]
+    (let [instances (take-while #(not (instance? MongoOptions %)) args)
+          addresses (->> (if (keyword? (first instances))
                            (list (apply array-map instances)) ; Handle legacy connect args
                            instances)
-                      (map (fn [{:keys [host port]}]
-                             (make-server-address (or host "127.0.0.1") (or port 27017)))))
+                      (map (fn [{:keys [host port] :or {host "127.0.0.1" port 27017}}]
+                             (make-server-address host port))))
+          ^MongoOptions options (or (first (filter #(instance? MongoOptions %) args)) (mongo-options))
           mongo (if (> (count addresses) 1)
-                  (Mongo. ^java.util.List addresses)
-                  (Mongo. ^ServerAddress (first addresses)))
+                  (Mongo. ^java.util.List addresses options)
+                  (Mongo. ^ServerAddress (first addresses) options))
           n-db (if db (.getDB mongo (named db)) nil)]
       {:mongo mongo :db n-db})))
 
