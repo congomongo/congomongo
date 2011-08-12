@@ -384,7 +384,7 @@ releases.  Please use 'make-connection' in combination with
                                          :return-new? false :upsert? false :from :clojure :as :clojure}])}
   [coll where update & {:keys [only sort remove? return-new? upsert? from as]
                         :or {only nil sort nil remove? false
-                             return-new? false upsert false from :clojure as :clojure}}]
+                             return-new? false upsert? false from :clojure as :clojure}}]
   (coerce (.findAndModify ^DBCollection (get-coll coll)
                           ^DBObject (coerce where [from :mongo])
                           ^DBObject (coerce only [from :mongo])
