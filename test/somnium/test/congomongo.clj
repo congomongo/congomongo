@@ -501,6 +501,30 @@
                    {:_id "tasty plantains" :value {:count 5.0}}])))
       )))
 
+(defn- gen-tempfile []
+  (let [tmp (doto
+                (java.io.File/createTempFile "test" ".data")
+              (.deleteOnExit))]
+    (with-open [w (java.io.FileOutputStream. tmp)]
+      (doseq [i (range 2048)]
+        (.write w (rem i 255))))
+    tmp))
+
+(deftest test-insert-file!
+  (with-test-mongo
+    (let [file (gen-tempfile)]
+      (insert-file! :filefs file)
+      (insert-file! :filefs (java.io.FileInputStream. file))
+      (insert-file! :filefs (.getBytes "data"))
+      (is (= 3 (count (fetch-files :filefs)))))))
+
+(deftest test-fetch-and-modify
+  (with-test-mongo
+    (insert! :test_col {:key "123"
+                        :value 1})
+    (fetch-and-modify :test_col {:key "123"} {:$inc {:value 2}})
+    (is (= 3 (:value (fetch-one :test_col :where {:key "123"}))))))
+
 (deftest test-server-eval
   (with-test-mongo
     (is (= (server-eval
@@ -514,3 +538,5 @@ function ()
  return square (25);
  }
 ") 625.0))))
+
+
