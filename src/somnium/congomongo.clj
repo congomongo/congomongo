@@ -515,7 +515,7 @@ releases.  Please use 'make-connection' in combination with
    :contentType -> defaults to nil
    :metadata    -> defaults to nil"
   {:arglists '([fs data {:filename nil :contentType nil :metadata nil}])}
-  [fs ^bytes data & {:keys [^String filename ^String contentType ^DBObject metadata]
+  [fs data & {:keys [^String filename ^String contentType ^DBObject metadata]
               :or {filename nil contentType nil metadata nil}}]
   (let [^com.mongodb.gridfs.GridFSInputFile f (.createFile (get-gridfs fs) data)]
     (if filename (.setFilename f filename))

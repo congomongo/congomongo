@@ -93,6 +93,13 @@
     (is (= 1 (-> (fetch :thingies :where {:foo 1} :options :notimeout) first :foo)))
     (is (= 1 (-> (fetch :thingies :where {:foo 1} :options [:notimeout]) first :foo)))))
 
+(deftest test-fetch-and-modify
+  (with-test-mongo
+    (insert! :test_col {:key "123"
+                        :value 1})
+    (fetch-and-modify :test_col {:key "123"} {:$inc {:value 2}})
+    (is (= 3 (:value (fetch-one :test_col :where {:key "123"}))))))
+
 (deftest collection-existence
   (with-test-mongo
     (insert! :notbogus {:foo "bar"})
@@ -392,6 +399,23 @@
           stream (stream-from :testfs f)
           data (slurp stream)]
       (is (= "plantain" data)))))
+
+(defn- gen-tempfile []
+  (let [tmp (doto
+                (java.io.File/createTempFile "test" ".data")
+              (.deleteOnExit))]
+    (with-open [w (java.io.FileOutputStream. tmp)]
+      (doseq [i (range 2048)]
+        (.write w (rem i 255))))
+    tmp))
+
+(deftest gridfs-test-insert-different-data-types
+  (with-test-mongo
+    (let [file (gen-tempfile)]
+      (insert-file! :filefs file)
+      (insert-file! :filefs (java.io.FileInputStream. file))
+      (insert-file! :filefs (.getBytes "data"))
+      (is (= 3 (count (fetch-files :filefs)))))))
 
 (deftest test-roundtrip-vector
   (with-test-mongo
