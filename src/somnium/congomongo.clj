@@ -172,7 +172,7 @@ releases.  Please use 'make-connection' in combination with
   [connection setting]
   (assert (connection? connection))
   (assert (contains? (set (keys write-concern-map)) setting))
-  (.setWriteConcern ^Mongo (:db connection)
+  (.setWriteConcern ^com.mongodb.DBApiLayer (:db connection)
                     ^com.mongodb.WriteConcern (get write-concern-map setting)))
 
 ;; add some convenience fns for manipulating object-ids
