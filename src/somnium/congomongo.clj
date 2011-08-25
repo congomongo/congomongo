@@ -163,17 +163,17 @@ releases.  Please use 'make-connection' in combination with
      (authenticate *mongo-config* username password)))
 
 (def write-concern-map
-  {:none com.mongodb.WriteConcern/NONE
-   :normal com.mongodb.WriteConcern/NORMAL
-   :strict com.mongodb.WriteConcern/SAFE})
+  {:none   WriteConcern/NONE
+   :normal WriteConcern/NORMAL
+   :strict WriteConcern/SAFE})
 
 (defn set-write-concern
   "Sets the write concern on the connection. Setting is one of :none, :normal, :strict"
   [connection setting]
   (assert (connection? connection))
   (assert (contains? (set (keys write-concern-map)) setting))
-  (.setWriteConcern ^com.mongodb.DBApiLayer (:db connection)
-                    ^com.mongodb.WriteConcern (get write-concern-map setting)))
+  (.setWriteConcern ^DB (:db connection)
+                    ^WriteConcern (get write-concern-map setting)))
 
 ;; add some convenience fns for manipulating object-ids
 (definline object-id ^ObjectId [^String s]
