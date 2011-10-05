@@ -127,6 +127,17 @@
       (is (= (map :x (fetch :points :sort {:x 1})) (sort unsorted)))
       (is (= (map :x (fetch :points :sort {:x -1})) (reverse (sort unsorted)))))))
 
+(deftest fetch-with-only
+  (with-test-mongo
+    (let [data {:_id 10 :foo "clever" :bar "filter"}
+          id (:_id data)]
+      (insert! :with-only data)
+      (are [data-keys select-clause] (= (select-keys data data-keys)
+                                        (fetch-one :with-only :only select-clause))
+           [:_id :foo] [:foo]
+           [:foo :bar] {:_id false}
+           [:_id :bar] {:foo false}))))
+
 (deftest fetch-by-id-of-any-type
   (with-test-mongo
     (insert! :by-id {:_id "Blarney" :val "Stone"})

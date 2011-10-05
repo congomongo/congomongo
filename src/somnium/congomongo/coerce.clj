@@ -110,7 +110,10 @@
 (defn ^DBObject coerce-fields
   "only used for creating argument object for :only"
   [fields]
-  (clojure->mongo ^IPersistentMap (zipmap fields (repeat 1))))
+  (clojure->mongo ^IPersistentMap (if (map? fields)
+                                    (into {} (for [[k v] fields]
+                                               [k (if v 1 0)]))
+                                    (zipmap fields (repeat 1)))))
 
 
 (defn ^DBObject coerce-index-fields
