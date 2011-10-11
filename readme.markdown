@@ -7,9 +7,15 @@ A toolkit for using MongoDB with Clojure.
 
 News
 --------------
-Version 0.1.7 (in progress) adds the ability to create MongoOptions
-and pass them into make-connection as the last argument, so that you
-can control autoConnectRetry and timeouts and so on.
+Version 0.1.7 adds the ability to create MongoOptions and pass them
+into make-connection as the last argument, so that you can control
+autoConnectRetry and timeouts and so on. This release also fixes a
+number of small bugs around type hints introduced in 0.1.6; corrects
+the upsert(?) parameter in fetch-and-modify; upgrades the Java driver
+to 2.6.5. The :only parameter can now be a map of field names and
+true / false values to allow fields to be included or excluded. The
+original vector of field names is still supported to include only
+the named fields.
 
 Version 0.1.6 removes (almost) all of the reflection warnings.
 
