@@ -47,10 +47,27 @@ Basics
 
 ### Setup
 
+#### import
+
     (ns my-mongo-app  
       (:use somnium.congomongo))  
-    (mongo!  
-      :db "mydb") 
+
+#### make a connection
+
+    (def conn mongo/make-connection :db "mydb"  
+                                    :host "127.0.0.1"  
+                                    :port 27017) => #'user/conn
+                                    
+    conn => {:mongo #<Mongo Mongo: 127.0.0.1:20717>, :db #<DBApiLayer mydb>}
+
+#### set the connection globally
+
+    (set-connection! conn)
+    
+#### or locally
+
+    (with-mongo conn 
+        (insert! :robots {:name "robby"}))
 
 ### Simple Tasks
 ------------------
@@ -109,6 +126,16 @@ Basics
 
     => {:x 12, :y 42, :z 504,  :_ns "points", :_id ... }
 
+#### authentication
+
+    (authenticate conn "myusername" "my password")
+    
+    => true
+    
+#### advanced initialization using mongo-options
+
+    ((make-connection :mydb :host "127.0.0.1" (mongo-options :auto-connect-retry true)" 
+
 #### easy json
 ------------------------------------------------------------------------
 
@@ -124,7 +151,7 @@ Install
 
 Leiningen is the recommended way to use congomongo.
 Just add 
-    [congomongo "0.1.4-SNAPSHOT"]
+    [congomongo "0.1.7"]
 to your project.clj and do
     $lein deps
 to get congomongo and all of its dependencies.    
