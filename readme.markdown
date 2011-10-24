@@ -54,7 +54,7 @@ Basics
 
 #### make a connection
 
-    (def conn mongo/make-connection :db "mydb"  
+    (def conn mongo/make-connection "mydb"  
                                     :host "127.0.0.1"  
                                     :port 27017) => #'user/conn
                                     
