@@ -78,9 +78,9 @@ conn => {:mongo #<Mongo Mongo: 127.0.0.1:20717>, :db #<DBApiLayer mydb>}
          {:name "robby"}
 ```
 #### read
-
-(def my-robot (fetch-one :robots)) => #'user/my-robot
 ```clojure
+(def my-robot (fetch-one :robots)) => #'user/my-robot
+
 my-robot => { :name "robby",
               :_id  #<ObjectId> "0c23396f7e53e34a4c8cf400">,
               :_ns  "robots"}
