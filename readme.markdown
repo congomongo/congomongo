@@ -150,11 +150,15 @@ Install
 -------
 
 Leiningen is the recommended way to use congomongo.
-Just add 
+Just add
+
     [congomongo "0.1.7"]
+
 to your project.clj and do
+
     $lein deps
-to get congomongo and all of its dependencies.    
+
+to get congomongo and all of its dependencies.
 
 ### Feedback
 
