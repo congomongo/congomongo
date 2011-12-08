@@ -104,6 +104,11 @@ object may be passed as the last argument."
        (:db x)
        (:mongo x)))
 
+(defn- ^DB get-db
+  ([conn]
+     (assert (connection? conn))
+     (:db conn)))
+
 (defn close-connection
   "Closes the connection, and unsets it as the active connection if necessary"
   [conn]
@@ -156,7 +161,7 @@ releases.  Please use 'make-connection' in combination with
   "Authenticate against either the current or a specified database connection.
    Note that authenticating twice against the same database will raise an error."
   ([conn username password]
-     (.authenticate ^DB (:db conn)
+     (.authenticate (get-db conn)
                     ^String username
                     (.toCharArray ^String password)))
   ([username password]
@@ -170,9 +175,8 @@ releases.  Please use 'make-connection' in combination with
 (defn set-write-concern
   "Sets the write concern on the connection. Setting is one of :none, :normal, :strict"
   [connection setting]
-  (assert (connection? connection))
   (assert (contains? (set (keys write-concern-map)) setting))
-  (.setWriteConcern ^DB (:db connection)
+  (.setWriteConcern (get-db connection)
                     ^WriteConcern (get write-concern-map setting)))
 
 ;; add some convenience fns for manipulating object-ids
@@ -190,12 +194,12 @@ releases.  Please use 'make-connection' in combination with
   (when-let [^ObjectId id (if (instance? ObjectId obj) obj (:_id obj))]
     (.getTime id)))
 
-(definline db-ref
+(defn db-ref
   "Convenience DBRef constructor."
   [ns id]
-  `(DBRef. ^DB (:db *mongo-config*)
-           ^String (named ~ns)
-           ^Object ~id))
+  (DBRef. (get-db *mongo-config*)
+          ^String (named ns)
+          ^Object id))
 
 (defn db-ref? [x]
   (instance? DBRef x))
@@ -203,7 +207,7 @@ releases.  Please use 'make-connection' in combination with
 (defn collection-exists?
   "Query whether the named collection has been created within the DB."
   [collection]
-  (.collectionExists ^DB (:db *mongo-config*)
+  (.collectionExists (get-db *mongo-config*)
                      ^String (named collection)))
 
 (defn create-collection!
@@ -220,14 +224,14 @@ releases.  Please use 'make-connection' in combination with
   {:arglists
    '([collection :capped :size :max])}
   ([collection & {:keys [capped size max] :as options}]
-     (.createCollection ^DB (:db *mongo-config*)
+     (.createCollection (get-db *mongo-config*)
                         ^String (named collection)
                         (coerce options [:clojure :mongo]))))
 
 (definline ^DBCollection get-coll
   "Returns a DBCollection object"
   [collection]
-  `(.getCollection ^DB (:db *mongo-config*)
+  `(.getCollection (get-db *mongo-config*)
                    ^String (named ~collection)))
 
 (def query-option-map
@@ -459,13 +463,12 @@ releases.  Please use 'make-connection' in combination with
   {:arglists '([cmd {:options nil :from :clojure :to :clojure}])}
   [cmd & {:keys [options from to]
           :or {options nil from :clojure to :clojure}}]
-  (coerce (if options
-            (.command ^DB (:db *mongo-config*)
-                      ^DBObject (coerce cmd [from :mongo])
-                      (int options))
-            (.command ^DB (:db *mongo-config*)
-                      ^DBObject (coerce cmd [from :mongo])))
-          [:mongo to]))
+  (let [db (get-db *mongo-config*)
+        coerced (coerce cmd [from :mongo])]
+    (coerce (if options
+              (.command db ^DBObject coerced (int options))
+              (.command db ^DBObject coerced))
+            [:mongo to])))
 
 (defn drop-database!
  "drops a database from the mongo server"
@@ -487,12 +490,12 @@ releases.  Please use 'make-connection' in combination with
 
 (defn collections
   "Returns the set of collections stored in the current database" []
-  (seq (.getCollectionNames ^DB (:db *mongo-config*))))
+  (seq (.getCollectionNames (get-db *mongo-config*))))
 
 (defn drop-coll!
   [collection]
   "Permanently deletes a collection. Use with care."
-  (.drop ^DBCollection (.getCollection ^DB (:db *mongo-config*)
+  (.drop ^DBCollection (.getCollection (get-db *mongo-config*)
                                        ^String (named collection))))
 
 ;;;; GridFS, contributed by Steve Purcell
@@ -501,7 +504,7 @@ releases.  Please use 'make-connection' in combination with
 (definline ^GridFS get-gridfs
   "Returns a GridFS object for the named bucket"
   [bucket]
-  `(GridFS. ^DB (:db *mongo-config*) ^String (named ~bucket)))
+  `(GridFS. (get-db *mongo-config*) ^String (named ~bucket)))
 
 ;; The naming of :contentType is ugly, but consistent with that
 ;; returned by GridFSFile
@@ -573,7 +576,7 @@ releases.  Please use 'make-connection' in combination with
 (defn server-eval
   "Sends javascript to the server to be evaluated. js should define a function that takes no arguments. The server will call the function."
   [js & args]
-  (let [db ^com.mongodb.DB (:db *mongo-config*)
+  (let [db (get-db *mongo-config*)
         m (.doEval db js (into-array Object args))]
     (let [result (coerce m [:mongo :clojure])]
       (if (= 1.0 (:ok result)) ;; In Clojure 1.3.0, 1 != 1.0 so we must compare against 1.0 instead (the JS stuff always returns floats)
