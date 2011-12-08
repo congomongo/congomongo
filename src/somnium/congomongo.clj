@@ -184,13 +184,11 @@ releases.  Please use 'make-connection' in combination with
 (defmethod print-dup ObjectId [^ObjectId x ^java.io.Writer w]
   (.write w (str "#=" `(object-id ~(.toString x)))))
 
-;; add convenience get-timestamp method
 (defn get-timestamp
-  "pulls the timestamp from an ObjectId or a map with a valid
-   ObjectId in :_id."
+  "Pulls the timestamp from an ObjectId or a map with a valid ObjectId in :_id."
   [obj]
-  (let [^ObjectId id (if (instance? ObjectId obj) obj (:_id obj))]
-    (when id (.getTime id))))
+  (when-let [^ObjectId id (if (instance? ObjectId obj) obj (:_id obj))]
+    (.getTime id)))
 
 (definline db-ref
   "Convenience DBRef constructor."
