@@ -301,6 +301,9 @@ releases.  Please use 'make-connection' in combination with
 (defn fetch-by-id [col id & options]
   (apply fetch col (concat options [:one? true :where {:_id id}])))
 
+(defn fetch-by-ids [col ids & options]
+  (apply fetch col (concat options [:where {:_id {:$in ids}}])))
+
 (defn with-ref-fetching
   "Returns a decorated fetcher fn which eagerly loads db-refs."
   [fetcher]
