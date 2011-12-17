@@ -110,7 +110,7 @@
 
 (deftest capped-collections
   (with-test-mongo
-    (create-collection! :cappedcoll :capped true :max 2 :size 100)
+    (create-collection! :cappedcoll :capped true :max 2 :size 1000)
     (is (collection-exists? :cappedcoll))
     (insert! :cappedcoll {:foo 1 :bar 1})
     (insert! :cappedcoll {:foo 1 :bar 2})
