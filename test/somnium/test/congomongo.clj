@@ -145,6 +145,12 @@
     (is (= "Stone" (:val (fetch-by-id :by-id "Blarney"))))
     (is (= "warriors" (:val (fetch-by-id :by-id 300))))))
 
+(deftest fetch-by-ids-of-any-type
+  (with-test-mongo
+    (insert! :by-ids {:_id "Blarney" :val "Stone"})
+    (insert! :by-ids {:_id 300 :val "warriors"})
+    (is (= #{"Stone" "warriors"} (set (map :val (fetch-by-ids :by-ids ["Blarney" 300])))))))
+
 (deftest eager-ref-fetching
   (let [fetch-eagerly       (with-ref-fetching fetch)
         fetch-eagerly-by-id (with-ref-fetching fetch-by-id)
