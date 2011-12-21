@@ -63,7 +63,7 @@ Basics
 (def conn 
   (make-connection "mydb"
                    :host "127.0.0.1"
-                   :port 27017) 
+                   :port 27017))
 => #'user/conn
 
 conn => {:mongo #<Mongo Mongo: 127.0.0.1:20717>, :db #<DBApiLayer mydb>}
