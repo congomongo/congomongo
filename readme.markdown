@@ -8,10 +8,11 @@ A toolkit for using MongoDB with Clojure.
 News
 --------------
 Version 0.1.8 (SNAPSHOT):
+
 * adds fetch-by-ids (#44)
 * improves erorr handling when connection not set up (#42)
 * updates clojure.data.json to 0.1.2 (for performance fixes)
-* numerous documentation fixes (#38, #39, #40, #41)
+* numerous documentation fixes (#38, #39, #40, #41, #45)
 
 Version 0.1.7 adds the ability to create MongoOptions and pass them
 into make-connection as the last argument, so that you can control
