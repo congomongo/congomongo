@@ -14,7 +14,7 @@ Version 0.1.9 (SNAPSHOT)
 Version 0.1.8:
 
 * adds fetch-by-ids (#44)
-* improves erorr handling when connection not set up (#42)
+* improves error handling when connection not set up (#42)
 * updates clojure.data.json to 0.1.2 (for performance fixes)
 * numerous documentation fixes (#38, #39, #40, #41, #45)
 * update to 2.7.3 driver (#46, #48)
