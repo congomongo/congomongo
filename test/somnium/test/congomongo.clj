@@ -30,11 +30,35 @@
                              expected)]]
       (is (= actual expected) [from to]))))
 
-(def test-db-host "127.0.0.1")
+;; MongoLab test setup courtesy of World Singles, intended for Travis
+;; CI testing...
+
+;; MongoLab Free test DB: ds029317.mongolab.com
+(def test-db-host (get (System/getenv) "MONGOHOST" "127.0.0.1"))
+;; MongoLab Free test DB: 29317
+(def test-db-port (Integer/parseInt (get (System/getenv) "MONGOPORT" "27017")))
+;; MongoLab Free test DB: congomongo/mongocongo
+(def test-db-user (get (System/getenv) "MONGOUSER" nil))
+(def test-db-pass (get (System/getenv) "MONGOPASS" nil))
 (def test-db "congomongotestdb")
-(defn setup! [] (mongo! :db test-db :host test-db-host))
+(defn- drop-test-collections!
+  "When we can't drop the test database (because it requires admin rights),
+   we just drop all the non-system connections."
+  []
+  (doseq [^String coll (collections)]
+    (when-not (.startsWith coll "system")
+      (drop-coll! coll))))
+(defn setup! []
+  (mongo! :db test-db :host test-db-host :port test-db-port)
+  (when (and test-db-user test-db-pass)
+    (authenticate test-db-user test-db-pass)
+    (drop-test-collections!)))
 (defn teardown! []
-  (drop-database! test-db))
+  (if (and test-db-user test-db-pass)
+    (try ; some tests don't authenticate so ignore failures here:
+      (drop-test-collections!)
+      (catch Exception _))
+    (drop-database! test-db)))
 
 (defmacro with-test-mongo [& body]
   `(do
@@ -45,7 +69,7 @@
 (deftest options-on-connections
   (with-test-mongo
     ;; set some non-default option values
-    (let [a (make-connection "congomongotest-db-a" :host test-db-host (mongo-options :auto-connect-retry true :w 1 :safe true))
+    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port (mongo-options :auto-connect-retry true :w 1 :safe true))
           m (:mongo a)
           opts (.getMongoOptions m)]
       ;; check non-default options attached to Mongo object
@@ -57,20 +81,20 @@
 
 (deftest with-mongo-interactions
   (with-test-mongo
-    (let [a (make-connection "congomongotest-db-a" :host test-db-host)
-          b (make-connection "congomongotest-db-b" :host test-db-host)]
+    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port)
+          b (make-connection "congomongotest-db-b" :host test-db-host :port test-db-port)]
       (with-mongo a
         (testing "with-mongo sets the mongo-config"
           (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))
         (testing "mongo! inside with-mongo stomps on current config"
-          (mongo! :db "congomongotest-db-b" :host test-db-host)
+          (mongo! :db "congomongotest-db-b" :host test-db-host :port test-db-port)
           (is (= "congomongotest-db-b" (.getName (*mongo-config* :db))))))
       (testing "and previous mongo! inside with-mongo is visible afterwards"
         (is (= "congomongotest-db-b" (.getName (*mongo-config* :db))))))))
 
 (deftest closing-with-mongo
   (with-test-mongo
-    (let [a (make-connection "congomongotest-db-a" :host test-db-host)]
+    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port)]
       (with-mongo a
         (testing "close-connection inside with-mongo sets mongo-config to nil"
           (close-connection a)
