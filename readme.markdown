@@ -7,6 +7,10 @@ A toolkit for using MongoDB with Clojure.
 
 News
 --------------
+Version 0.1.9 (SNAPSHOT)
+
+- no changes yet
+
 Version 0.1.8:
 
 * adds fetch-by-ids (#44)
