@@ -1,8 +1,15 @@
+;; common dependencies:
+(def deps '[[org.clojure/core.incubator "0.1.0"]
+            [org.clojure/data.json "0.1.2"]
+            [org.mongodb/mongo-java-driver "2.7.3"]])
+
+;; project definition for multi-version testing:
 (defproject congomongo
   "0.1.8-SNAPSHOT"
   :description "clojure-friendly api for MongoDB"
-  :dependencies [[org.clojure/clojure "[1.2.1,1.4.0-beta1]"]
-                 [org.clojure/core.incubator "0.1.0" :exclusions [org.clojure/clojure]]
-                 [org.clojure/data.json "0.1.2"]
-                 [org.mongodb/mongo-java-driver "2.7.3"]]
-  :dev-dependencies [[swank-clojure "1.3.1"]])
+  :dev-dependencies [[lein-multi "1.1.0"]
+                     [swank-clojure "1.4.0"]]
+  :dependencies ~(conj deps '[org.clojure/clojure "1.3.0"])
+  :multi-deps {"1.2" ~(conj deps '[org.clojure/clojure "1.2.1"])
+               "1.4B" ~(conj deps '[org.clojure/clojure "1.4.0-beta1"])}
+)
