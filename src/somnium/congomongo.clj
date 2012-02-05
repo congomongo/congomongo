@@ -522,7 +522,7 @@ releases.  Please use 'make-connection' in combination with
   [fs data & {:keys [^String filename ^String contentType ^DBObject metadata]
               :or {filename nil contentType nil metadata nil}}]
   (let [^com.mongodb.gridfs.GridFSInputFile f (.createFile (get-gridfs fs) data)]
-    (if filename (.setFilename f filename))
+    (if filename (.setFilename f ^String filename))
     (if contentType (.setContentType f contentType))
     (if metadata (.setMetaData f (coerce metadata [:clojure :mongo])))
     (.save f)
