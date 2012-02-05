@@ -7,12 +7,16 @@ A toolkit for using MongoDB with Clojure.
 
 News
 --------------
-Version 0.1.8 (SNAPSHOT):
+Version 0.1.8:
 
 * adds fetch-by-ids (#44)
 * improves erorr handling when connection not set up (#42)
 * updates clojure.data.json to 0.1.2 (for performance fixes)
 * numerous documentation fixes (#38, #39, #40, #41, #45)
+* update to 2.7.3 driver (#46, #48)
+* remove version ranges - make 1.3.0 the default Clojure version (#47 etc)
+* add multi-version testing
+* add Travis CI test hook
 
 Version 0.1.7 adds the ability to create MongoOptions and pass them
 into make-connection as the last argument, so that you can control
@@ -161,7 +165,7 @@ Install
 Leiningen is the recommended way to use congomongo.
 Just add
 
-    [congomongo "0.1.7"]
+    [congomongo "0.1.8"]
 
 to your project.clj and do
 
