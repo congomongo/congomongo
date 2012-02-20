@@ -122,7 +122,10 @@
     (insert! :test_col {:key "123"
                         :value 1})
     (fetch-and-modify :test_col {:key "123"} {:$inc {:value 2}})
-    (is (= 3 (:value (fetch-one :test_col :where {:key "123"}))))))
+    (is (= 3 (:value (fetch-one :test_col :where {:key "123"}))))
+    (let [res (fetch-and-modify :test_col {:key "123"} {:$inc {:value 1}} :only [:value] :return-new? true)]
+      (is (not (contains? res :key)))
+      (is (= 4 (:value res))))))
 
 (deftest collection-existence
   (with-test-mongo

@@ -392,7 +392,7 @@ releases.  Please use 'make-connection' in combination with
                              return-new? false upsert? false from :clojure as :clojure}}]
   (coerce (.findAndModify ^DBCollection (get-coll coll)
                           ^DBObject (coerce where [from :mongo])
-                          ^DBObject (coerce only [from :mongo])
+                          ^DBObject (coerce-fields only)
                           ^DBObject (coerce sort [from :mongo])
                           remove?
                           ^DBObject (coerce update [from :mongo])
