@@ -79,6 +79,16 @@
       ;; check a default option as well
       (is (not (.slaveOk opts))))))
 
+(deftest with-mongo-database
+  (with-test-mongo
+    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port)]
+      (with-mongo [a "congomongotest-db-b"]
+        (testing "with-mongo uses new database"
+                 (is (= "congomongotest-db-b" (.getName (*mongo-config* :db))))))
+      (with-mongo a
+        (testing "with-mongo uses connection db "
+                 (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))))))
+
 (deftest with-mongo-interactions
   (with-test-mongo
     (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port)
