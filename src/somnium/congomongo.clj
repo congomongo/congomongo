@@ -119,16 +119,24 @@ object may be passed as the last argument."
       (alter-var-root #'*mongo-config* (constantly nil))))
   (.close ^Mongo (:mongo conn)))
 
+(defn as-mongo-connection [x]
+  (let [[conn dbname] (if (connection? x) [x nil] x)]
+    (assert (connection? conn))
+    (if dbname
+      (assoc conn :db (.getDB (:mongo conn) (named dbname)))
+      conn)))
 (defmacro with-mongo
   "Makes conn the active connection in the enclosing scope.
 
+  If you didn't specify a database when creating the connection,
+  you can do it now by passing this macro a two-component vector,
+  containing the connection and the database name, as its first
+  argument.
+
   When with-mongo and set-connection! interact, last one wins"
   [conn & body]
-  `(do
-     (let [c# ~conn]
-       (assert (connection? c#))
-       (binding [*mongo-config* c#]
-         ~@body))))
+  `(binding [*mongo-config* (as-mongo-connection ~conn)]
+     ~@body))
 
 (defn set-connection!
   "Makes the connection active. Takes a connection created by make-connection.
