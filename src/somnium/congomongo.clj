@@ -130,6 +130,15 @@ object may be passed as the last argument."
        (binding [*mongo-config* c#]
          ~@body))))
 
+(defmacro with-db
+  "Make title the active database in the enclosing scope.
+
+  When with-db and set-database! interact, last one wins."
+  [title & body]
+  `(let [db# (.getDB (:mongo *mongo-config*) (name ~title))]
+     (binding [*mongo-config* (assoc *mongo-config* :db db#)]
+       ~@body)))
+
 (defn set-connection!
   "Makes the connection active. Takes a connection created by make-connection.
 
