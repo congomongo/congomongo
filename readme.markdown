@@ -9,7 +9,7 @@ News
 --------------
 Version 0.1.9 (SNAPSHOT)
 
-- no changes yet
+* adds with-db macro (#53, #54)
 
 Version 0.1.8:
 
