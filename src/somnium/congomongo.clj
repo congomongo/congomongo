@@ -131,11 +131,11 @@ object may be passed as the last argument."
          ~@body))))
 
 (defmacro with-db
-  "Make title the active database in the enclosing scope.
+  "Make dbname the active database in the enclosing scope.
 
   When with-db and set-database! interact, last one wins."
-  [title & body]
-  `(let [db# (.getDB (:mongo *mongo-config*) (name ~title))]
+  [dbname & body]
+  `(let [db# (.getDB (:mongo *mongo-config*) (name ~dbname))]
      (binding [*mongo-config* (assoc *mongo-config* :db db#)]
        ~@body)))
 
