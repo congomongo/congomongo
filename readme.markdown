@@ -9,7 +9,7 @@ News
 --------------
 Version 0.1.9 (SNAPSHOT)
 
-- no changes yet
+* adds with-db macro (#53, #54)
 
 Version 0.1.8:
 
@@ -34,20 +34,20 @@ the named fields.
 
 Version 0.1.6 removes (almost) all of the reflection warnings.
 
-Version 0.1.5 adds compatibility with both Clojure 1.3, in addition
+Version 0.1.5 adds compatibility with Clojure 1.3, in addition
 to 1.2.
 
-Congomongo 0.1.4 introduces support for the MongoDB 1.8's modified
+Congomongo 0.1.4 introduces support for MongoDB 1.8's modified
 map-reduce functionality, wherein the 'out' parameter is
 required. With this and future Congomongo releases, it will no longer
 be possible to access the map-reduce features of older MongoDB
 instances.
 
-As of congomongo 0.1.3, Clojure 1.2 and Clojure-contrib 1.2 are required.    
-If you need compatibility with Clojure 1.1,     
+As of congomongo 0.1.3, Clojure 1.2 and Clojure-contrib 1.2 are required.
+If you need compatibility with Clojure 1.1,
 please stick with congomongo 0.1.2.
 
-There is now a [Google Group](http://groups.google.com/group/congomongo-dev)    
+There is now a [Google Group](http://groups.google.com/group/congomongo-dev)
 Come help us make ponies for great good.
 
 Clojars group is congomongo.
@@ -69,7 +69,7 @@ Basics
 ```
 #### make a connection
 ```clojure
-(def conn 
+(def conn
   (make-connection "mydb"
                    :host "127.0.0.1"
                    :port 27017))
@@ -179,5 +179,5 @@ to get congomongo and all of its dependencies.
 
 ### Feedback
 
-CongoMongo is a work in progress. If you've used, improved, 
+CongoMongo is a work in progress. If you've used, improved,
 or abused it tell us about it at our [Google Group](http://groups.google.com/group/congomongo-dev).
