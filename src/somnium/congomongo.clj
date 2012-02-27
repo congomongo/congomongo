@@ -353,9 +353,7 @@ releases.  Please use 'make-connection' in combination with
   {:arglists '([coll obj {:many false :from :clojure :to :clojure}])}
   [coll obj & {:keys [from to many]
                :or {from :clojure to :clojure many false}}]
-  (let [coerced-obj (if many
-                       (coerce obj [from :mongo] :many many)
-                       (coerce obj [from :mongo] :many many))
+  (let [coerced-obj (coerce obj [from :mongo] :many many)
         ^com.mongodb.WriteConcern normal-concern (get write-concern-map :normal)
         res (if many
               (.insert ^DBCollection (get-coll coll) ^java.util.List coerced-obj)
