@@ -167,13 +167,13 @@ my-robot => { :name "robby",
 For example, use Joda types for dates:
 
 ```clojure
-(extend-protocol ConvertibleFromMongo
+(extend-protocol somnium.congomongo.coerce.ConvertibleFromMongo
   Date
-  (mongo->clojure [^Date d keywordize] (new DateTime d)))
+  (mongo->clojure [^java.util.Date d keywordize] (new org.joda.time.DateTime d)))
 
-(extend-protocol ConvertibleToMongo
-  DateTime
-  (clojure->mongo [^DateTime dt] (.toDate dt)))
+(extend-protocol somnium.congomongo.coerce.ConvertibleToMongo
+  org.joda.time.DateTime
+  (clojure->mongo [^org.joda.time.DateTime dt] (.toDate dt)))
 ```
 
 Install
