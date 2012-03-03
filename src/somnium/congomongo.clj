@@ -399,7 +399,7 @@ releases.  Please use 'make-connection' in combination with
                              return-new? false upsert? false from :clojure as :clojure}}]
   (coerce (.findAndModify ^DBCollection (get-coll coll)
                           ^DBObject (coerce where [from :mongo])
-                          ^DBObject (coerce only [from :mongo])
+                          ^DBObject (coerce-fields only)
                           ^DBObject (coerce sort [from :mongo])
                           remove?
                           ^DBObject (coerce update [from :mongo])
@@ -654,3 +654,31 @@ releases.  Please use 'make-connection' in combination with
       (-> (.getOutputCollection result)
             .getName
             keyword))))
+
+(defn group
+  "Performs group operation on given collection
+
+  Parameters:
+  coll         -> the collection
+  :reducefn    -> a javascript reduce function as a string
+  :where       -> query to match
+  :key         -> fields to group-by
+  :keyfn       -> string with javascript function returning a key object
+  :initial     -> initial value for reduce function
+  :finalizefn  -> string containing javascript function to be run on each item in result set just before return
+
+  See http://www.mongodb.org/display/DOCS/Aggregation for more information"
+  {:arglists '([coll {:key nil :keyfn nil :reducefn nil :where nil :finalizefn nil
+                      :initial nil :as :clojure}])}
+  [coll & {:keys [key keyfn reducefn where finalizefn initial as]
+           :or {key nil keyfn nil reducefn nil where nil finalizefn nil
+                initial nil as :clojure}}]
+  (coerce (.group ^DBCollection
+            (get-coll coll)
+            ^DBObject
+            (coerce (into {} (filter second {:key (when key (coerce-fields key))
+                     :$keyf keyfn
+                     :$reduce reducefn
+                     :finalize finalizefn
+                     :initial initial
+                     :cond where})) [:clojure :mongo ])) [:mongo as]))

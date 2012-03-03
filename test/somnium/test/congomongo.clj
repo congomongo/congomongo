@@ -132,7 +132,10 @@
     (insert! :test_col {:key "123"
                         :value 1})
     (fetch-and-modify :test_col {:key "123"} {:$inc {:value 2}})
-    (is (= 3 (:value (fetch-one :test_col :where {:key "123"}))))))
+    (is (= 3 (:value (fetch-one :test_col :where {:key "123"}))))
+    (let [res (fetch-and-modify :test_col {:key "123"} {:$inc {:value 1}} :only [:value] :return-new? true)]
+      (is (not (contains? res :key)))
+      (is (= 4 (:value res))))))
 
 (deftest collection-existence
   (with-test-mongo
@@ -589,3 +592,23 @@ function ()
  return square (25);
  }
 ") 625.0))))
+
+(deftest test-group-command
+  (with-test-mongo
+    (drop-coll! :test-group )
+    (insert! :test-group {:fruit "bananas" :count 1})
+    (insert! :test-group {:fruit "bananas" :count 2})
+    (insert! :test-group {:fruit "plantains" :count 3})
+    (insert! :test-group {:fruit "plantains" :count 2})
+    (insert! :test-group {:fruit "pineapples" :count 4})
+    (insert! :test-group {:fruit "pineapples" :count 2})
+    (let [reduce-count-fn "function(obj,prev){prev.count+=obj.count;}"
+          bananas-count (group :test-group :key [:fruit ] :initial {:count 0} :reducefn reduce-count-fn
+        :where {:fruit "bananas"})
+          all-count-keyf (group :test-group :keyfn "function(obj){return {'category':obj.fruit};}"
+        :initial {:count 0} :reducefn reduce-count-fn
+        :finalizefn "function(obj) {return {'items':obj.count,'fruit':obj.category};}")]
+      (is (= bananas-count
+            [{:fruit "bananas", :count 3.0}]))
+      (is (= all-count-keyf
+            [{:items 3.0, :fruit "bananas"} {:items 5.0, :fruit "plantains"} {:items 6.0, :fruit "pineapples"}])))))
