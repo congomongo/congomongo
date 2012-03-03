@@ -154,13 +154,26 @@ my-robot => { :name "robby",
 ((make-connection :mydb :host "127.0.0.1" (mongo-options :auto-connect-retry true)"
 ```
 #### easy json
-------------------------------------------------------------------------
 ```clojure
 (fetch-one :points
            :as :json)
 
 => "{ \"_id\" : \"0c23396ffe79e34a508cf400\" ,
       \"x\" : 0 , \"y\" : 0 , \"z\" : 0 , \"_ns\" : \"points\"}"
+```
+
+#### custom type conversions
+
+For example, use Joda types for dates:
+
+```clojure
+(extend-protocol ConvertibleFromMongo
+  Date
+  (mongo->clojure [^Date d keywordize] (new DateTime d)))
+
+(extend-protocol ConvertibleToMongo
+  DateTime
+  (clojure->mongo [^DateTime dt] (.toDate dt)))
 ```
 
 Install
