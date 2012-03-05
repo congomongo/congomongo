@@ -589,3 +589,15 @@ function ()
  return square (25);
  }
 ") 625.0))))
+
+(deftest test-parsing-connection-string-returns-map-of-data
+    (let [db (parse-connection "mongodb://user:pass@localhost:12345/dbname")]
+        (is (= "user" (:username db)))
+        (is (= "pass" (:password db)))
+        (is (= "localhost" (:host db)))
+        (is (= 12345 (:port db)))
+        (is (= "dbname" (:db db)))))
+
+(deftest test-parsring-invalid-connection-string-returns-nil
+    (is (nil? (parse-connection "ashdkah"))))
+
