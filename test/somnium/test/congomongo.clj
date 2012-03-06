@@ -598,6 +598,6 @@ function ()
         (is (= 12345 (:port db)))
         (is (= "dbname" (:db db)))))
 
-(deftest test-parsring-invalid-connection-string-returns-nil
+(deftest test-parsing-invalid-connection-string-returns-nil
     (is (nil? (parse-connection "ashdkah"))))
 
