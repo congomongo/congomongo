@@ -78,6 +78,14 @@
   [^String host ^Integer port]
   (ServerAddress. host port))
 
+(defn parse-connection
+    "Parse a connection string into a map"
+    [url]
+    (let [matcher (re-matcher #"^.*://(.*?):(.*?)@(.*?):(\d+)/(.*)$" url)]
+        (when (.find matcher)
+            (let [config (zipmap [:match :username :password :host :port :db] (re-groups matcher))]
+                (update-in config [:port] #(Integer/parseInt %1))))))
+
 (defn make-connection
   "Connects to one or more mongo instances, returning a connection
 that can be used with set-connection! and with-mongo. Each instance is
