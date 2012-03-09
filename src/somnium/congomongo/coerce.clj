@@ -70,7 +70,7 @@
                         dbo))
 
   Keyword
-  (clojure->mongo [^Keyword o] (.getName o))
+  (clojure->mongo [^Keyword o] (.substring (str o) 1))
 
   List
   (clojure->mongo [^List o] (map clojure->mongo o))
