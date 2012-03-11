@@ -10,6 +10,7 @@ News
 Version 0.1.9 (SNAPSHOT)
 
 * adds with-db macro (#53, #54)
+* Propagate error from insert!s (ie for duplicate keys with indexes)
 
 Version 0.1.8:
 
