@@ -1,2 +1,2 @@
 language: clojure
-script: MONGOHOST=ds029317.mongolab.com MONGOPORT=29317 MONGOUSER=congomongo MONGOPASS=mongocongo lein multi test
+script: lein multi test
