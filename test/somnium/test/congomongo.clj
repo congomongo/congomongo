@@ -589,3 +589,20 @@ function ()
  return square (25);
  }
 ") 625.0))))
+
+(deftest dup-key-exception-works
+  (add-index! :dup-key-coll [:unique-col] :unique true)
+  (let [obj {:unique-col "some string"}]
+
+    ;; first one, should succeed
+    (try
+      (insert! :dup-key-coll obj)
+      (is true)
+      (catch Exception e
+        (is false)))
+
+    (try
+      (insert! :dup-key-coll obj)
+      (is false)
+      (catch Exception e
+        (is true)))))

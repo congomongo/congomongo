@@ -358,6 +358,7 @@ releases.  Please use 'make-connection' in combination with
         res (if many
               (.insert ^DBCollection (get-coll coll) ^java.util.List coerced-obj)
               (.insert ^DBCollection (get-coll coll) ^DBObject coerced-obj normal-concern))]
+    (-> res .getLastError .throwOnError)
     (coerce coerced-obj [:mongo to] :many many)))
 
 (defn mass-insert!
