@@ -609,3 +609,4 @@ function ()
       (is false)
       (catch Exception e
         (is true)))))
+
