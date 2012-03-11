@@ -1,4 +1,4 @@
-CongoMongo
+CongoMongo <a href="http://travis-ci.org/#!/seancorfield/congomongo/builds"><img src="https://secure.travis-ci.org/seancorfield/congomongo.png" /></a>
 ===========
 
 What?
