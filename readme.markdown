@@ -93,7 +93,7 @@ conn => {:mongo #<Mongo Mongo: 127.0.0.1:20717>, :db #<DBApiLayer mydb>}
 #### create
 ```clojure
 (insert! :robots
-         {:name "robby"}
+         {:name "robby"})
 ```
 #### read
 ```clojure
