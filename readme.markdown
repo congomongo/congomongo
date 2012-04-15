@@ -9,6 +9,8 @@ News
 --------------
 Version 0.1.9 (SNAPSHOT)
 
+* Bump data.json => 0.1.3
+* Bump multi test to 1.4.0 & 1.5.0-SNAPSHOT for Clojure
 * adds with-db macro (#53, #54)
 * Propagate error from insert!s (ie for duplicate keys with indexes)
 
