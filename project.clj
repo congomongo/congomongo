@@ -13,4 +13,4 @@
   :dependencies ~(conj deps '[org.clojure/clojure "1.3.0"])
   :multi-deps {"1.2"  ~(conj deps '[org.clojure/clojure "1.2.1"])
                "1.4"  ~(conj deps '[org.clojure/clojure "1.4.0"])
-               "1.5S" ~(conj deps '[org.clojure/clojure "1.5.0-SNAPSHOT"])})
+               "1.5S" ~(conj deps '[org.clojure/clojure "1.5.0-master-SNAPSHOT"])})
