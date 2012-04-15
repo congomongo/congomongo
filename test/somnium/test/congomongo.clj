@@ -403,8 +403,8 @@
   (with-test-mongo
     (insert! :foos (Foo. 1 2))
     (let [found (fetch-one :foos)]
-      (are (= 1 (:a found))
-           (= 2 (:b found))))))
+      (is (= 1 (:a found)))
+      (is (= 2 (:b found))))))
 
 (deftest insert-returns-id
   (with-test-mongo
