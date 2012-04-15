@@ -93,7 +93,7 @@ conn => {:mongo #<Mongo Mongo: 127.0.0.1:20717>, :db #<DBApiLayer mydb>}
 #### create
 ```clojure
 (insert! :robots
-         {:name "robby"}
+         {:name "robby"})
 ```
 #### read
 ```clojure
@@ -195,3 +195,9 @@ to get congomongo and all of its dependencies.
 
 CongoMongo is a work in progress. If you've used, improved,
 or abused it tell us about it at our [Google Group](http://groups.google.com/group/congomongo-dev).
+
+### License and copyright
+
+Congomongo is made available under the terms of an MIT-style
+license. Please refer to the source code for the full text of this
+license and for copyright details.
