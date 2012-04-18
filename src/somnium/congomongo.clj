@@ -181,7 +181,8 @@ releases.  Please use 'make-connection' in combination with
    :normal WriteConcern/NORMAL
    :strict WriteConcern/SAFE ;; left for backwards compatibility
    :safe WriteConcern/SAFE
-   :fsync-safe WriteConcern/SAFE})
+   :fsync-safe WriteConcern/FSYNC_SAFE
+   :replica-safe WriteConcern/REPLICAS_SAFE})
 
 (defn set-write-concern
   "Sets the write concern on the connection. Setting is a key in the
