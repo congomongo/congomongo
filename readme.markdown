@@ -11,8 +11,13 @@ Version 0.1.9 (SNAPSHOT)
 
 * Bump data.json => 0.1.3
 * Bump multi test to 1.4.0 & 1.5.0-SNAPSHOT for Clojure
-* adds with-db macro (#53, #54)
-* Propagate error from insert!s (ie for duplicate keys with indexes)
+* Add with-db macro (#53, #54)
+* Support vector :only in fetch-and-modify (to match fetch) (#65)
+* Add group aggregation (#66)
+* Allow insert! to respect previous set-write-concern call (#72)
+* Add :safe, :fsync-safe, :replica-safe write concerns (#72)
+* In order to get throw on error behavior, you must call set-write-concern with :safe or stricter!
+* Deprecate :strict - use :safe instead
 
 Version 0.1.8:
 
@@ -88,6 +93,16 @@ conn => {:mongo #<Mongo Mongo: 127.0.0.1:20717>, :db #<DBApiLayer mydb>}
 ```clojure
 (with-mongo conn
     (insert! :robots {:name "robby"}))
+```
+#### specify a write concern (if you want errors reported)
+```clojure
+(set-write-concern conn :safe)
+;; :none will not report any errors
+;; :normal will report network errors
+;; :safe will report key constraint and other errors
+;; :fsync-safe waits until a write is sync'd to the filesystem
+;; :replica-safe waits until a write is sync'd to at least one replica as well
+;; :strict is a synonym for :safe but is deprecated (as of 0.1.9)
 ```
 ### Simple Tasks
 ------------------
