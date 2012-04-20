@@ -594,21 +594,30 @@ function ()
 ") 625.0))))
 
 (deftest dup-key-exception-works
-  (add-index! :dup-key-coll [:unique-col] :unique true)
-  (let [obj {:unique-col "some string"}]
-
-    ;; first one, should succeed
-    (try
-      (insert! :dup-key-coll obj)
-      (is true)
-      (catch Exception e
-        (is false)))
-
-    (try
-      (insert! :dup-key-coll obj)
-      (is false)
-      (catch Exception e
-        (is true)))))
+  (with-test-mongo
+    (println "unique index / write concern interaction")
+    (add-index! :dup-key-coll [:unique-col] :unique true)
+    (set-write-concern *mongo-config* :safe)
+    (let [obj {:unique-col "some string"}]
+      ;; first one, should succeed
+      (try
+        (insert! :dup-key-coll obj)
+        (is true)
+        (catch Exception e
+          (is false "Unable to insert first document")))
+      (try
+        (insert! :dup-key-coll obj)
+        (is false "Did not get a duplicate key error")
+       (catch Exception e
+         (is true)))
+      ;; after setting write concern back to :normal, this should succeed too
+      ;; because the error is not detected / thrown
+      (set-write-concern *mongo-config* :normal)
+      (try
+        (insert! :dup-key-coll obj)
+        (is true)
+        (catch Exception e
+          (is false "Unable to insert duplicate with :normal concern"))))))
 
 (deftest test-group-command
   (with-test-mongo
