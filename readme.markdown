@@ -7,7 +7,7 @@ A toolkit for using MongoDB with Clojure.
 
 News
 --------------
-Version 0.1.9 (SNAPSHOT)
+Version 0.1.9 - April 20th, 2012:
 
 * Bump data.json => 0.1.3
 * Bump multi test to 1.4.0 & 1.5.0-SNAPSHOT for Clojure
@@ -200,7 +200,7 @@ Install
 Leiningen is the recommended way to use congomongo.
 Just add
 
-    [congomongo "0.1.8"]
+    [congomongo "0.1.9"]
 
 to your project.clj and do
 
