@@ -5,7 +5,7 @@
 
 ;; project definition for multi-version testing:
 (defproject congomongo
-  "0.1.9"
+  "0.1.10-SNAPSHOT"
   :description "clojure-friendly api for MongoDB"
   :dev-dependencies [[lein-multi "1.1.0"]
                      [swank-clojure "1.4.2"]]
