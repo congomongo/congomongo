@@ -101,7 +101,7 @@ object may be passed as the last argument."
 
 (defn connection? [x]
   (and (map? x)
-       (:db x)
+       (contains? x :db)
        (:mongo x)))
 
 (defn- ^DB get-db
