@@ -179,10 +179,14 @@ releases.  Please use 'make-connection' in combination with
 (def write-concern-map
   {:none   WriteConcern/NONE
    :normal WriteConcern/NORMAL
-   :strict WriteConcern/SAFE})
+   :strict WriteConcern/SAFE ;; left for backwards compatibility
+   :safe WriteConcern/SAFE
+   :fsync-safe WriteConcern/FSYNC_SAFE
+   :replica-safe WriteConcern/REPLICAS_SAFE})
 
 (defn set-write-concern
-  "Sets the write concern on the connection. Setting is one of :none, :normal, :strict"
+  "Sets the write concern on the connection. Setting is a key in the
+  write-concern-map: :none, :normal, :strict, :safe, :fsync-safe"
   [connection setting]
   (assert (contains? (set (keys write-concern-map)) setting))
   (.setWriteConcern (get-db connection)
@@ -354,11 +358,9 @@ releases.  Please use 'make-connection' in combination with
   [coll obj & {:keys [from to many]
                :or {from :clojure to :clojure many false}}]
   (let [coerced-obj (coerce obj [from :mongo] :many many)
-        ^com.mongodb.WriteConcern normal-concern (get write-concern-map :normal)
         res (if many
               (.insert ^DBCollection (get-coll coll) ^java.util.List coerced-obj)
-              (.insert ^DBCollection (get-coll coll) ^DBObject coerced-obj normal-concern))]
-    (-> res .getLastError .throwOnError)
+              (.insert ^DBCollection (get-coll coll) ^java.util.List (list coerced-obj)))]
     (coerce coerced-obj [:mongo to] :many many)))
 
 (defn mass-insert!
