@@ -7,6 +7,10 @@ A toolkit for using MongoDB with Clojure.
 
 News
 --------------
+Version 0.1.10 (SNAPSHOT)
+
+* Fix with-connection / with-db interaction (#75)
+
 Version 0.1.9 - April 20th, 2012:
 
 * Bump data.json => 0.1.3
