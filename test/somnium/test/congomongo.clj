@@ -79,6 +79,20 @@
       ;; check a default option as well
       (is (not (.slaveOk opts))))))
 
+(deftest uri-for-connection
+  (with-test-mongo
+    (let [userpass (if (and test-db-user test-db-pass) (str test-db-user ":" test-db-pass "@") "")
+          uri (str "mongodb://" userpass test-db-host ":" test-db-port "/congomongotest-db-a?autoconnectretry=true&w=1&safe=true")
+          a (make-connection uri)
+          m (:mongo a)
+          opts (.getMongoOptions m)]
+      (testing "make-connection parses options from URI"
+        (is (.safe opts))
+        (is (= 1 (.w opts))))
+      (with-mongo a
+        (testing "make-connection accepts Mongo URI"
+                (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))))))
+
 (deftest with-mongo-database
   (with-test-mongo
     (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port)]

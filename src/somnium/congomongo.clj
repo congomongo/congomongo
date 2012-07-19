@@ -26,7 +26,8 @@
   (:use     [clojure.walk :only (postwalk)]
             [somnium.congomongo.config :only [*mongo-config*]]
             [somnium.congomongo.coerce :only [coerce coerce-fields coerce-index-fields]])
-  (:import  [com.mongodb Mongo MongoOptions DB DBCollection DBObject DBRef ServerAddress WriteConcern Bytes]
+  (:import  [com.mongodb Mongo MongoOptions DB DBCollection DBObject DBRef ServerAddress
+             WriteConcern Bytes MongoURI]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
@@ -78,14 +79,9 @@
   [^String host ^Integer port]
   (ServerAddress. host port))
 
-(defn make-connection
-  "Connects to one or more mongo instances, returning a connection
-that can be used with set-connection! and with-mongo. Each instance is
-a map containing values for :host and/or :port. Optionally a MongoOptions
-object may be passed as the last argument."
-  ([db]
-    (make-connection db {}))
-  ([db & args]
+(defn- make-connection-args
+  "Makes a connection with passed database name, host, port and MongoOptions"
+  [db args]
     (let [instances (take-while #(not (instance? MongoOptions %)) args)
           addresses (->> (if (keyword? (first instances))
                            (list (apply array-map instances)) ; Handle legacy connect args
@@ -97,7 +93,36 @@ object may be passed as the last argument."
                   (Mongo. ^java.util.List addresses options)
                   (Mongo. ^ServerAddress (first addresses) options))
           n-db (if db (.getDB mongo (named db)) nil)]
-      {:mongo mongo :db n-db})))
+      {:mongo mongo :db n-db}))
+
+(defn- make-connection-uri
+  "Makes a connection with a Mongo URI, authenticating if username and password are passed"
+  [db]
+  (let [^MongoURI mongouri (MongoURI. db)
+        conn {:mongo (.connect mongouri) :db (.connectDB mongouri)}
+        username (.getUsername mongouri)
+        password (.getPassword mongouri)]
+    (when (and username password)
+      (.authenticate (conn :db) username password))
+    conn))
+
+(defn make-connection
+  "Connects to one or more mongo instances, returning a connection
+that can be used with set-connection! and with-mongo. Each instance is
+a map containing values for :host and/or :port.
+  May be called with database name and optionally:
+    host (default: 127.0.0.1)
+    port (default: 27017)
+    A MongoOptions object
+  A MongoURI string is also supported and must be prefixed with mongodb://
+  If username and password are specified, authenticate will be immediately
+  called on the connection."
+  ([db]
+    (make-connection db {}))
+  ([db & args]
+    (if (.startsWith db "mongodb://")
+      (make-connection-uri db)
+      (make-connection-args db args))))
 
 (defn connection? [x]
   (and (map? x)
@@ -167,12 +192,13 @@ releases.  Please use 'make-connection' in combination with
   true)
 
 (defn authenticate
-  "Authenticate against either the current or a specified database connection.
-   Note that authenticating twice against the same database will raise an error."
+  "Authenticate against either the current or a specified database connection."
   ([conn username password]
-     (.authenticate (get-db conn)
-                    ^String username
-                    (.toCharArray ^String password)))
+     (let [db (get-db conn)]
+       (when-not (.isAuthenticated db)
+         (.authenticate db
+                        ^String username
+                        (.toCharArray ^String password)))))
   ([username password]
      (authenticate *mongo-config* username password)))
 
