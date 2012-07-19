@@ -17,13 +17,19 @@
 (defprotocol ConvertibleFromMongo
   (mongo->clojure [o keywordize]))
 
+(def ^{:private true} dot-replacement "_DOT_")
+
+(defn- to-keyword [s]
+  (let [s (.replaceAll s dot-replacement ".")]
+    (keyword s)))
+
 (defn- assocs->clojure [kvs keywordize]
   ;; Taking the keywordize test out of the fn reduces derefs
   ;; dramatically, which was the main barrier to matching pure-Java
   ;; performance for this marshalling
   (reduce (if keywordize
             (fn [m [^String k v]]
-              (assoc m (keyword k) (mongo->clojure v true)))
+              (assoc m (to-keyword k) (mongo->clojure v true)))
             (fn [m [^String k v]]
               (assoc m k (mongo->clojure v false))))
           {} (reverse kvs)))
@@ -65,12 +71,16 @@
   (clojure->mongo [m] (let [dbo (BasicDBObject.)]
                         (doseq [[k v] m]
                           (.put dbo
-                                (clojure->mongo k)
+                                (if (keyword? k)
+                                  (if-let [n (namespace k)]
+                                    (str (.replaceAll n "\\." dot-replacement) "/" (name k))
+                                    (name k))
+                                  (clojure->mongo k))
                                 (clojure->mongo v)))
                         dbo))
 
   Keyword
-  (clojure->mongo [^Keyword o] (.getName o))
+  (clojure->mongo [^Keyword o] (.substring (str o) 1))
 
   List
   (clojure->mongo [^List o] (map clojure->mongo o))
