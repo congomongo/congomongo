@@ -173,7 +173,12 @@ my-robot => { :name "robby",
 ```
 #### advanced initialization using mongo-options
 ```clojure
-((make-connection :mydb :host "127.0.0.1" (mongo-options :auto-connect-retry true)"
+(make-connection :mydb :host "127.0.0.1" (mongo-options :auto-connect-retry true))
+```
+#### initialization using a Mongo URI
+```clojure
+(make-connection "mongodb://user:pass@host:27071/databasename")
+;note that authentication is handled when given a user:pass@ section
 ```
 #### easy json
 ```clojure
