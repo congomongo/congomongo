@@ -7,8 +7,11 @@ A toolkit for using MongoDB with Clojure.
 
 News
 --------------
-Version 0.1.10 (SNAPSHOT)
+Version 0.1.11 (SNAPSHOT)
 
+Version 0.1.10 - July 31st, 2012:
+
+* Add support for MongoDB URI string in make-connection (#79)
 * Fix with-connection / with-db interaction (#75)
 
 Version 0.1.9 - April 20th, 2012:
