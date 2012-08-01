@@ -92,7 +92,7 @@
           mongo (if (> (count addresses) 1)
                   (Mongo. ^java.util.List addresses options)
                   (Mongo. ^ServerAddress (first addresses) options))
-          n-db (if db (.getDB mongo (named db)) nil)]
+          n-db (if db (.getDB mongo db) nil)]
       {:mongo mongo :db n-db}))
 
 (defn- make-connection-uri
@@ -120,9 +120,10 @@ a map containing values for :host and/or :port.
   ([db]
     (make-connection db {}))
   ([db & args]
-    (if (.startsWith db "mongodb://")
-      (make-connection-uri db)
-      (make-connection-args db args))))
+    (let [dbname (named db)]
+      (if (.startsWith dbname "mongodb://")
+        (make-connection-uri dbname)
+        (make-connection-args dbname args)))))
 
 (defn connection? [x]
   (and (map? x)
