@@ -106,7 +106,7 @@
 (deftest with-mongo-interactions
   (with-test-mongo
     (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port)
-          b (make-connection "congomongotest-db-b" :host test-db-host :port test-db-port)]
+          b (make-connection :congomongotest-db-b :host test-db-host :port test-db-port)]
       (with-mongo a
         (testing "with-mongo sets the mongo-config"
           (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))
