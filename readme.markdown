@@ -9,6 +9,10 @@ News
 --------------
 Version 0.1.11 (SNAPSHOT)
 
+* Added URL / license / mailing list information to project.clj so it will show up in Clojars and provide a better user experience
+* Allow make-connection to accept symbols again (#80, fixes issue introduced in #79)
+* Prevent fetch one / sort being used together (#81)
+
 Version 0.1.10 - July 31st, 2012:
 
 * Add support for MongoDB URI string in make-connection (#79)
