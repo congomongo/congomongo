@@ -11,3 +11,4 @@ classes/*
 pom.xml
 /.lein-failures
 /.lein-deps-sum
+/target/stale/dependencies
