@@ -308,6 +308,9 @@ releases.  Please use 'make-connection' in combination with
   [coll & {:keys [where only as from one? count? limit skip sort options]
            :or {where {} only [] as :clojure from :clojure
                 one? false count? false limit 0 skip 0 sort nil options []}}]
+  (when (and one? sort)
+    (throw (IllegalArgumentException. "Fetch :one? (or fetch-one) can't be used with :sort.
+You should use fetch with :limit 1 instead."))); one? and sort should NEVER be called together
   (let [n-where (coerce where [from :mongo])
         n-only  (coerce-fields only)
         n-col   (get-coll coll)
