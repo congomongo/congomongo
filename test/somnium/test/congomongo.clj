@@ -178,6 +178,13 @@
       (is (= (map :x (fetch :points :sort {:x 1})) (sort unsorted)))
       (is (= (map :x (fetch :points :sort {:x -1})) (reverse (sort unsorted)))))))
 
+(deftest fetch-one-sort-not-allowed
+  (with-test-mongo
+    (is (thrown? IllegalArgumentException
+                 (fetch :stuff :sort {:a 1} :one? true)))
+    (is (thrown? IllegalArgumentException
+                 (fetch-one :stuff :sort {:a 1})))))
+
 (deftest fetch-with-only
   (with-test-mongo
     (let [data {:_id 10 :foo "clever" :bar "filter"}
