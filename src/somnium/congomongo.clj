@@ -465,13 +465,12 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
 
     Options include:
     :name   -> defaults to the system-generated default
-    :unique -> defaults to false
-    :force  -> defaults to true"
-   {:arglists '([collection fields {:name nil :unique false :force true}])}
-   [c f & {:keys [name unique force]
-           :or {name nil unique false force true}}]
+    :unique -> defaults to false"
+   {:arglists '([collection fields {:name nil :unique false}])}
+   [c f & {:keys [name unique]
+           :or {name nil unique false}}]
    (-> (get-coll c)
-       (.ensureIndex (coerce-index-fields f) ^DBObject (coerce (merge {:force force :unique unique}
+       (.ensureIndex (coerce-index-fields f) ^DBObject (coerce (merge {:unique unique}
                                                                        (if name {:name name}))
                                                                 [:clojure :mongo]))))
 
