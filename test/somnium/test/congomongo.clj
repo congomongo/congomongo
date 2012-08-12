@@ -5,7 +5,7 @@
         somnium.congomongo.coerce
         clojure.pprint)
   (:use [clojure.data.json :only (read-json json-str)])
-  (:import [com.mongodb BasicDBObject BasicDBObjectBuilder]))
+  (:import [com.mongodb BasicDBObject BasicDBObjectBuilder MongoException$DuplicateKey]))
 
 (deftest coercions
   (let [clojure      {:a {:b "c" :d 1 :f ["a" "b" "c"] :g {:h ["i" "j" -42.42]}}}
@@ -389,6 +389,21 @@
                            (.put "b" -1)
                            (.put "c" 1))]
       (is (= (.toString actual-index) (.toString expected-index))))))
+
+(deftest sparse-indexing
+  (with-test-mongo
+    (add-index! :sparse-index-coll [:a] :unique true :sparse true)
+    (set-write-concern *mongo-config* :safe)
+    (insert! :sparse-index-coll {:a "foo"})
+    (insert! :sparse-index-coll {})
+    (try
+      (insert! :sparse-index-coll {})
+      (is true)
+      (catch MongoException$DuplicateKey e
+        (is false "Unable to insert second document without the sparse index key")))
+    (is (thrown? MongoException$DuplicateKey
+                 (insert! :sparse-index-coll {:a "foo"})))
+    (set-write-concern *mongo-config* :normal)))
 
 (deftest index-name
   (with-test-mongo
