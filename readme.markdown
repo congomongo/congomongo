@@ -12,7 +12,9 @@ Version 0.1.11 (SNAPSHOT)
 * Added URL / license / mailing list information to project.clj so it will show up in Clojars and provide a better user experience
 * Allow make-connection to accept symbols again (#80, fixes issue introduced in #79)
 * Prevent fetch one / sort being used together (#81)
-* Remove :force option from add-index! since it is no longer effective (#82)
+* Remove :force option from add-index! since it is no longer effective (#82, #83)
+* Add :sparse option to add-index! (#84)
+* Upgrade to 2.8.0 Java driver (#85)
 
 Version 0.1.10 - July 31st, 2012:
 

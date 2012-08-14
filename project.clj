@@ -1,7 +1,7 @@
 ;; common dependencies:
 (def deps '[[org.clojure/core.incubator "0.1.0"]
             [org.clojure/data.json "0.1.3"]
-            [org.mongodb/mongo-java-driver "2.7.3"]])
+            [org.mongodb/mongo-java-driver "2.8.0"]])
 
 ;; project definition for multi-version testing:
 (defproject congomongo
