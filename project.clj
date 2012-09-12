@@ -12,7 +12,7 @@
   :plugins [[lein-swank "1.4.4"]]
   :dependencies [[org.clojure/core.incubator "0.1.0"]
                  [org.clojure/data.json "0.1.3"]
-                 [org.mongodb/mongo-java-driver "2.8.0"]
+                 [org.mongodb/mongo-java-driver "2.9.1"]
                  [org.clojure/clojure "1.4.0"]]
   ;; if a :dev profile is added, remember to update :aliases below to
   ;; use it in each with-profile group!
