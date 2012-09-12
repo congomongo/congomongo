@@ -178,6 +178,23 @@ my-robot => { :name "robby",
 
 => {:x 12, :y 42, :z 504,  :_ns "points", :_id ... }
 ```
+
+#### aggregation (requires mongodb 2.2)
+```clojure
+(aggregate
+  :expenses
+  {:$match {:type "airfare"}}
+  {:$project {:department 1, :amount 1}}
+  {:$group {:_id "$department", :average {:$avg "$amount"}}})
+
+=> {:serverUsed "...", :result [{:_id ... :average ...} {:_id ... :average ...} ...], :ok 1.0}
+```
+This pipeline of operations selects expenses with type = 'airfare', passes just the department and amount fields thru, and groups by department with an average for each.
+
+Based on (10gen's Java Driver example of aggregation)[http://www.mongodb.org/display/DOCS/Using+The+Aggregation+Framework+with+The+Java+Driver].
+
+The aggregate function accepts any number of pipeline operations.
+
 #### authentication
 ```clojure
 (authenticate conn "myusername" "my password")
