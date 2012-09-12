@@ -503,6 +503,23 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
             :or {as :clojure}}]
    (map #(into {} %) (.getIndexInfo (get-coll coll))))
 
+(defn aggregate
+  "Executes a pipeline of operations using the Aggregation Framework.
+   Returns map {:serverUsed ... :result ... :ok ...}
+   :serverUsed - string representing server address
+   :result     - the result of the aggregation (if successful)
+   :ok         - 1.0 for success
+   Requires MongoDB 2.2!"
+  {:arglists '([coll op & ops {:from :clojure :to :clojure}])}
+  [coll op & ops-and-from-to]
+  (let [ops (take-while (complement keyword?) ops-and-from-to)
+        from-and-to (drop-while (complement keyword?) ops-and-from-to)
+        {:keys [from to] :or {from :clojure to :clojure}} from-and-to]
+    (coerce (.getCommandResult (.aggregate (get-coll coll)
+                                           (coerce op [from :mongo])
+                                           (into-array DBObject (map #(coerce % [from :mongo]) ops))))
+            [:mongo to])))
+
 (defn command
   "Executes a database command."
   {:arglists '([cmd {:options nil :from :clojure :to :clojure}])}
