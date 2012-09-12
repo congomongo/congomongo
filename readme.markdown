@@ -14,7 +14,10 @@ Version 0.1.11 (SNAPSHOT)
 * Prevent fetch one / sort being used together (#81)
 * Remove :force option from add-index! since it is no longer effective (#82, #83)
 * Add :sparse option to add-index! (#84)
-* Upgrade to 2.8.0 Java driver (#85)
+* Upgrade to 2.9.1 Java driver (#85, #89)
+* Upgrade project to use Clojure 1.4.0 as base version (#86, #88)
+* Upgrade project to use Leiningen 2 (#87)
+* Add aggregate function to leverage MongoDB 2.2 aggregation framework (#90)
 
 Version 0.1.10 - July 31st, 2012:
 
@@ -219,7 +222,7 @@ Install
 Leiningen is the recommended way to use congomongo.
 Just add
 
-    [congomongo "0.1.9"]
+    [congomongo "0.1.10"]
 
 to your project.clj and do
 
