@@ -125,15 +125,18 @@ a map containing values for :host and/or :port.
         (make-connection-uri dbname)
         (make-connection-args dbname args)))))
 
-(defn connection? [x]
+(defn connection?
+  "Returns truth if the argument is a map specifying an active connection."
+  [x]
   (and (map? x)
        (contains? x :db)
        (:mongo x)))
 
-(defn- ^DB get-db
-  ([conn]
-     (assert (connection? conn))
-     (:db conn)))
+(defn ^DB get-db
+  "Returns the current connection. Throws exception if there isn't one."
+  [conn]
+  (assert (connection? conn))
+  (:db conn))
 
 (defn close-connection
   "Closes the connection, and unsets it as the active connection if necessary"
