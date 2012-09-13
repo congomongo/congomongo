@@ -191,7 +191,7 @@ my-robot => { :name "robby",
 ```
 This pipeline of operations selects expenses with type = 'airfare', passes just the department and amount fields thru, and groups by department with an average for each.
 
-Based on (10gen's Java Driver example of aggregation)[http://www.mongodb.org/display/DOCS/Using+The+Aggregation+Framework+with+The+Java+Driver].
+Based on [10gen's Java Driver example of aggregation](http://www.mongodb.org/display/DOCS/Using+The+Aggregation+Framework+with+The+Java+Driver).
 
 The aggregate function accepts any number of pipeline operations.
 
