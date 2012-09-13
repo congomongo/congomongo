@@ -20,4 +20,4 @@
              :1.3  {:dependencies [[org.clojure/clojure "1.3.0"]]}
              :1.5S {:repositories [["sonatype-snapshots" "https://oss.sonatype.org/content/repositories/snapshots/"]]
                     :dependencies [[org.clojure/clojure "1.5.0-master-SNAPSHOT"]]}}
-  :aliases {"test-all" ["with-profile" "default:1.2,default:1.4,default:1.5S,default" "test"]})
+  :aliases {"test-all" ["with-profile" "default:1.2,default:1.3,default:1.5S,default" "test"]})
