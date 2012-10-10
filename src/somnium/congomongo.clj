@@ -289,20 +289,23 @@ releases.  Please use 'make-connection' in combination with
         n-options (calculate-query-options options)]
     (cond
       count? (.getCount n-col n-where n-only)
-      one?   (if-let [m (.findOne
-                         ^DBCollection n-col
-                         ^DBObject n-where
-                         ^DBObject n-only)]
-               (coerce m [:mongo as]) nil)
-      :else  (when-let [m (.find ^DBCollection n-col
-                                 ^DBObject n-where
-                                 ^DBObject n-only
-                                 (int skip)
-                                 (int n-limit)
-                                 (int n-options))]
-               (coerce (if n-sort
-                         (.sort m n-sort)
-                         m) [:mongo as] :many true)))))
+      one?   (if-let [cursor (.findOne
+                              ^DBCollection n-col
+                              ^DBObject n-where
+                              ^DBObject n-only)]
+               (coerce cursor [:mongo as]) nil)
+      :else  (when-let [cursor (.find ^DBCollection n-col
+                                      ^DBObject n-where
+                                      ^DBObject n-only)]
+               (when n-options
+                 (.setOptions cursor n-options))
+               (when n-sort
+                 (.sort cursor n-sort))
+               (when skip
+                 (.skip cursor skip))
+               (when n-limit
+                 (.limit cursor n-limit))
+               (coerce cursor [:mongo as] :many true)))))
 
 (defn fetch-one [col & options]
   (apply fetch col (concat options '[:one? true])))
