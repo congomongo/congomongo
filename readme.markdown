@@ -7,7 +7,7 @@ A toolkit for using MongoDB with Clojure.
 
 News
 --------------
-Version 0.1.11 (SNAPSHOT)
+Version 0.2.0 - October 10th, 2012:
 
 * Added URL / license / mailing list information to project.clj so it will show up in Clojars and provide a better user experience
 * Allow make-connection to accept symbols again (#80, fixes issue introduced in #79)
@@ -239,7 +239,7 @@ Install
 Leiningen is the recommended way to use congomongo.
 Just add
 
-    [congomongo "0.1.10"]
+    [congomongo "0.2.0"]
 
 to your project.clj and do
 
