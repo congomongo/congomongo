@@ -7,6 +7,11 @@ A toolkit for using MongoDB with Clojure.
 
 News
 --------------
+Version 0.2.1 - SNAPSHOT
+
+* Support insertion of sets (#94, #95)
+* Declare MongoDB service for Travis CI (#96)
+
 Version 0.2.0 - October 10th, 2012:
 
 * Added URL / license / mailing list information to project.clj so it will show up in Clojars and provide a better user experience
