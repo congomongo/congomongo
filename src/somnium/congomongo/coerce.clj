@@ -2,7 +2,7 @@
   (:use [clojure.data.json :only [json-str read-json]]
         [clojure.core.incubator :only [seqable?]])
   (:import [clojure.lang IPersistentMap IPersistentVector Keyword]
-           [java.util Map List]
+           [java.util Map List Set]
            [com.mongodb DBObject BasicDBObject BasicDBList]
            [com.mongodb.gridfs GridFSFile]
            [com.mongodb.util JSON]))
@@ -74,6 +74,9 @@
 
   List
   (clojure->mongo [^List o] (map clojure->mongo o))
+
+  Set
+  (clojure->mongo [^Set o] (set (map clojure->mongo o)))
 
   Object
   (clojure->mongo [o] o)
