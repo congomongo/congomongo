@@ -9,6 +9,10 @@ For Clojure 1.2.1 and earlier, use CongoMongo 0.2.1 or earlier. CongoMongo 0.2.1
 
 News
 --------------
+Version 0.3.1 - October 23rd, 2012
+
+* Update Java driver to 2.9.2 for CRITICAL update (#98)
+
 Version 0.3.0 - October 23rd, 2012
 
 * DROP SUPPORT FOR CLOJURE 1.2.1 AND EARLIER!
