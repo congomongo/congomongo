@@ -4,7 +4,7 @@
         somnium.congomongo.config
         somnium.congomongo.coerce
         clojure.pprint)
-  (:use [clojure.data.json :only (read-json json-str)])
+  (:use [clojure.data.json :only (read-str write-str)])
   (:import [com.mongodb BasicDBObject BasicDBObjectBuilder MongoException$DuplicateKey]))
 
 (deftest coercions
@@ -17,7 +17,7 @@
                          (push "g")
                          (add "h" ["i" "j" -42.42])
                          get)
-        clojure-json (json-str clojure) ; no padding
+        clojure-json (write-str clojure) ; no padding
         mongo-json   (str mongo)        ; contains whitespace padding
         from    {:clojure clojure
                  :mongo   mongo
@@ -331,8 +331,8 @@
     (let [json (distinct-values :distinct "genus" :as :json)]
       ;; I don't think you can influence the order in which distinct results are returned,
       ;; so just check both possibilities
-      (is (or (= (read-json json) ["Pan", "Homo"])
-              (= (read-json json) ["Homo", "Pan"]))))))
+      (is (or (= (read-str json) ["Pan", "Homo"])
+              (= (read-str json) ["Homo", "Pan"]))))))
 
 
 ;; ;; mass insert chokes on excessively large inserts

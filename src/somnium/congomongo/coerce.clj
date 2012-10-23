@@ -1,5 +1,5 @@
 (ns somnium.congomongo.coerce
-  (:use [clojure.data.json :only [json-str read-json]]
+  (:use [clojure.data.json :only [write-str read-str]]
         [clojure.core.incubator :only [seqable?]])
   (:import [clojure.lang IPersistentMap IPersistentVector Keyword]
            [java.util Map List Set]
@@ -87,10 +87,12 @@
 
 
 (let [translations {[:clojure :mongo  ] clojure->mongo
-                    [:clojure :json   ] json-str
+                    [:clojure :json   ] write-str
                     [:mongo   :clojure] #(mongo->clojure ^DBObject % ^Boolean/TYPE *keywordize*)
                     [:mongo   :json   ] #(.toString ^DBObject %)
-                    [:json    :clojure] #(read-json % *keywordize*)
+                    [:json    :clojure] #(read-str % :key-fn (if *keywordize*
+                                                               keyword
+                                                               identity))
                     [:json    :mongo  ] #(JSON/parse %)}]
   (defn coerce
     "takes an object, a vector of keywords:
