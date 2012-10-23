@@ -5,9 +5,11 @@ What?
 ------
 A toolkit for using MongoDB with Clojure.
 
+For Clojure 1.2.1 and earlier, use CongoMongo 0.2.1 or earlier. CongoMongo 0.2.1 is the last release that will support Clojure 1.2.x.
+
 News
 --------------
-Version 0.2.1 - SNAPSHOT
+Version 0.2.1 - October 23rd, 2012
 
 * Support insertion of sets (#94, #95)
 * Declare MongoDB service for Travis CI (#96)
