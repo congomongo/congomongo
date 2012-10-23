@@ -5,11 +5,17 @@ What?
 ------
 A toolkit for using MongoDB with Clojure.
 
-For Clojure 1.2.1 and earlier, use CongoMongo 0.2.1 or earlier. CongoMongo 0.2.1 is the last release that will support Clojure 1.2.x.
+For Clojure 1.2.1 and earlier, use CongoMongo 0.2.1 or earlier. CongoMongo 0.2.1 is the last release that will support Clojure 1.2.x. CongoMongo 0.3.0 onward no longer supports Clojure 1.2.x.
 
 News
 --------------
-Version 0.2.1 - October 23rd, 2012
+Version 0.3.0 - October 23rd, 2012
+
+* DROP SUPPORT FOR CLOJURE 1.2.1 AND EARLIER!
+* Update clojure.data.json to 0.2.0 (#97)
+* Update clojure.core.incubator to 0.1.2
+
+Version 0.2.1 - October 23rd, 2012 - last release to support Clojure 1.2.x!
 
 * Support insertion of sets (#94, #95)
 * Declare MongoDB service for Travis CI (#96)
