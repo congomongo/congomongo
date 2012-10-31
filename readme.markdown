@@ -9,6 +9,10 @@ For Clojure 1.2.1 and earlier, use CongoMongo 0.2.2 or earlier. CongoMongo 0.2.2
 
 News
 --------------
+Version 0.2.3 - October 30th, 2012
+
+* Recommended Java driver update (#99)
+
 Version 0.2.2 - October 23rd, 2012
 
 * Critical Java driver update (#98)
@@ -248,15 +252,17 @@ Install
 -------
 
 Leiningen is the recommended way to use congomongo.
-Just add
+If you are using Clojure 1.2.x, just add
 
-    [congomongo "0.2.0"]
+    [congomongo "0.2.3"]
 
 to your project.clj and do
 
     $lein deps
 
 to get congomongo and all of its dependencies.
+
+If you are on Clojure 1.3.0 or later, use a more recent version of congomongo (0.3.x or later).
 
 ### Feedback
 
