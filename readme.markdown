@@ -288,3 +288,4 @@ or abused it tell us about it at our [Google Group](http://groups.google.com/gro
 Congomongo is made available under the terms of an MIT-style
 license. Please refer to the source code for the full text of this
 license and for copyright details.
+
