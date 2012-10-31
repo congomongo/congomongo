@@ -5,7 +5,7 @@ What?
 ------
 A toolkit for using MongoDB with Clojure.
 
-For Clojure 1.2.1 and earlier, use CongoMongo 0.2.2 or earlier. CongoMongo 0.2.2 is the last release that will support Clojure 1.2.x. CongoMongo 0.3.0 onward no longer supports Clojure 1.2.x.
+For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3 is the last release that will support Clojure 1.2.x. CongoMongo 0.3.0 onward no longer supports Clojure 1.2.x.
 
 News
 --------------
