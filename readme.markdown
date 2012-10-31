@@ -23,7 +23,7 @@ Version 0.3.0 - October 23rd, 2012
 * Update clojure.data.json to 0.2.0 (#97)
 * Update clojure.core.incubator to 0.1.2
 
-Version 0.2.3 - October 10th, 2012 - last release to support Clojure 1.2.x!
+Version 0.2.3 - October 30th, 2012 - last release to support Clojure 1.2.x!
 
 * Update Java driver to 2.9.3 for recommended update (#99)
 
