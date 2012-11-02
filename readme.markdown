@@ -9,6 +9,10 @@ For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3
 
 News
 --------------
+Version 0.3.3-SNAPSHOT
+
+* Add dbobject function to support multi-column sorting (#100)
+
 Version 0.3.2 - October 30th, 2012
 
 * Update Java driver to 2.9.3 for recommended update (#99)
