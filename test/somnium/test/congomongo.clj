@@ -185,6 +185,21 @@
       (is (= (map :x (fetch :points :sort {:x 1})) (sort unsorted)))
       (is (= (map :x (fetch :points :sort {:x -1})) (reverse (sort unsorted)))))))
 
+(deftest fetch-sort-multiple
+  (with-test-mongo
+    (let [unsorted [3 10 7 0 2]]
+      (mass-insert! :points
+                  (for [i unsorted j unsorted]
+                    {:x i :y j}))
+      (is (= (map :x (fetch :points :sort (coerce-ordered-fields [:x :y]))) (mapcat (partial repeat (count unsorted)) (sort unsorted))))
+      (is (= (map :y (fetch :points :sort (coerce-ordered-fields [:x :y]))) (apply concat (repeat (count unsorted) (sort unsorted)))))
+      (is (= (map :x (fetch :points :sort (coerce-ordered-fields [:x [:y -1]]))) (mapcat (partial repeat (count unsorted)) (sort unsorted))))
+      (is (= (map :y (fetch :points :sort (coerce-ordered-fields [:x [:y -1]]))) (apply concat (repeat (count unsorted) (reverse (sort unsorted))))))
+      (is (= (map :x (fetch :points :sort (dbobject :x 1 :y 1))) (mapcat (partial repeat (count unsorted)) (sort unsorted))))
+      (is (= (map :y (fetch :points :sort (dbobject :x 1 :y 1))) (apply concat (repeat (count unsorted) (sort unsorted)))))
+      (is (= (map :x (fetch :points :sort (dbobject :x 1 :y -1))) (mapcat (partial repeat (count unsorted)) (sort unsorted))))
+      (is (= (map :y (fetch :points :sort (dbobject :x 1 :y -1))) (apply concat (repeat (count unsorted) (reverse (sort unsorted)))))))))
+
 (deftest fetch-one-sort-not-allowed
   (with-test-mongo
     (is (thrown? IllegalArgumentException
