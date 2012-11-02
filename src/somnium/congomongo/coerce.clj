@@ -112,7 +112,7 @@
                             (f obj))
                           (throw (RuntimeException. "unsupported keyword pair")))))))
 
-(defn ^BDObject dbobject [& args]
+(defn ^DBObject dbobject [& args]
   "Create a DBObject from a sequence of key/value pairs, in order."
   (let [dbo (BasicDBObject.)]
     (doseq [[k v] (partition 2 args)]
