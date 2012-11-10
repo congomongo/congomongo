@@ -278,7 +278,7 @@ releases.  Please use 'make-connection' in combination with
    :options -> query options [:tailable :slaveok :oplogreplay :notimeout :awaitdata]"
   {:arglists
    '([collection :where :only :limit :skip :as :from :one? :count? :sort :options])}
-  [coll & {:keys [where only as from one? count? limit skip sort options]
+  [coll & {:keys [where only as from one? count? limit skip sort options explain]
            :or {where {} only [] as :clojure from :clojure
                 one? false count? false limit 0 skip 0 sort nil options []}}]
   (let [n-where (coerce where [from :mongo])
@@ -305,7 +305,9 @@ releases.  Please use 'make-connection' in combination with
                  (.skip cursor skip))
                (when n-limit
                  (.limit cursor n-limit))
-               (coerce cursor [:mongo as] :many true)))))
+               (if explain
+                 (coerce (.explain cursor) [:mongo as] :many false)
+                 (coerce cursor [:mongo as] :many true))))))
 
 (defn fetch-one [col & options]
   (apply fetch col (concat options '[:one? true])))
