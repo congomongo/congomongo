@@ -322,11 +322,11 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
         n-options (calculate-query-options options)]
     (cond
       count? (.getCount n-col n-where n-only)
-      one?   (if-let [cursor (.findOne
+      one?   (if-let [m (.findOne
                               ^DBCollection n-col
                               ^DBObject n-where
                               ^DBObject n-only)]
-               (coerce cursor [:mongo as]) nil)
+               (coerce m [:mongo as]) nil)
       :else  (when-let [cursor (.find ^DBCollection n-col
                                       ^DBObject n-where
                                       ^DBObject n-only)]
