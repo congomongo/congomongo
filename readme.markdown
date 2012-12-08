@@ -299,7 +299,7 @@ Install
 Leiningen is the recommended way to use congomongo.
 If you are using Clojure 1.3.0 or later, just add
 
-    [congomongo "0.3.2"]
+    [congomongo "0.3.3"]
 
 to your project.clj and do
 
