@@ -268,10 +268,10 @@ For example, use Joda types for dates:
 ```
 
 #### explain
-Use :explain on fetch to get performance information about a query. Returns a map of statistics about the query, not rows:
+Use :explain? on fetch to get performance information about a query. Returns a map of statistics about the query, not rows:
 
 ```clojure
-(fetch :users :where {:login "alice"} :explain true)
+(fetch :users :where {:login "alice"} :explain? true)
 {:nscannedObjects 2281,
  :nYields 0,
  :nscanned 2281,
