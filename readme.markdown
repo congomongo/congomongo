@@ -9,6 +9,12 @@ For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3
 
 News
 --------------
+Version 0.3.4-SNAPSHOT (ongoing)
+
+* Add :replicas-safe write concern
+* Add support for :explain? (#102, #103 arohner)
+* Switch fetch to use non-deprecated APIs (#101 arohner)
+
 Version 0.3.3 - November 2nd, 2012
 
 * Add dbobject and coerce-ordered-fields to support multi-column sorting (#100)
@@ -152,8 +158,9 @@ conn => {:mongo #<Mongo Mongo: 127.0.0.1:20717>, :db #<DBApiLayer mydb>}
 ;; :normal will report network errors
 ;; :safe will report key constraint and other errors
 ;; :fsync-safe waits until a write is sync'd to the filesystem
-;; :replica-safe waits until a write is sync'd to at least one replica as well
+;; :replicas-safe waits until a write is sync'd to at least one replica as well
 ;; :strict is a synonym for :safe but is deprecated (as of 0.1.9)
+;; :replica-safe is a synonym for :replicas-safe but is deprecataed (as of 0.3.4)
 ```
 ### Simple Tasks
 ------------------
