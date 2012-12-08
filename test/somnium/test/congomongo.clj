@@ -225,6 +225,13 @@
     (is (= "Stone" (:val (fetch-by-id :by-id "Blarney"))))
     (is (= "warriors" (:val (fetch-by-id :by-id 300))))))
 
+(deftest explain-works
+  (with-test-mongo
+    (insert! :users {:name "Alice"})
+    (insert! :users {:name "Bob"})
+    (insert! :users {:name "Carol"})
+    (is (map? (fetch :users :where {:name "Bob"} :explain? true)))))
+
 (deftest fetch-by-ids-of-any-type
   (with-test-mongo
     (insert! :by-ids {:_id "Blarney" :val "Stone"})

@@ -267,6 +267,25 @@ For example, use Joda types for dates:
   (clojure->mongo [^org.joda.time.DateTime dt] (.toDate dt)))
 ```
 
+#### explain
+Use :explain on fetch to get performance information about a query. Returns a map of statistics about the query, not rows:
+
+```clojure
+(fetch :users :where {:login "alice"} :explain true)
+{:nscannedObjects 2281,
+ :nYields 0,
+ :nscanned 2281,
+ :millis 2,
+ :isMultiKey false,
+ :cursor "BasicCursor",
+ :n 1,
+ :indexOnly false,
+ :allPlans [{:cursor "BasicCursor", :indexBounds {}}],
+ :nChunkSkips 0,
+ :indexBounds {},
+ :oldPlan {:cursor "BasicCursor", :indexBounds {}}}
+```
+
 Install
 -------
 
@@ -293,4 +312,3 @@ or abused it tell us about it at our [Google Group](http://groups.google.com/gro
 Congomongo is made available under the terms of an MIT-style
 license. Please refer to the source code for the full text of this
 license and for copyright details.
-

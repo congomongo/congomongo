@@ -296,21 +296,22 @@ releases.  Please use 'make-connection' in combination with
    Note that MongoDB always adds the _id and _ns
    fields to objects returned from the database.
    Optional arguments include
-   :where   -> takes a query map
-   :only    -> takes an array of keys to retrieve
-   :as      -> what to return, defaults to :clojure, can also be :json or :mongo
-   :from    -> argument type, same options as above
-   :skip    -> number of records to skip
-   :limit   -> number of records to return
-   :one?    -> defaults to false, use fetch-one as a shortcut
-   :count?  -> defaults to false, use fetch-count as a shortcut
-   :sort    -> sort the results by a specific key
-   :options -> query options [:tailable :slaveok :oplogreplay :notimeout :awaitdata]"
+   :where    -> takes a query map
+   :only     -> takes an array of keys to retrieve
+   :as       -> what to return, defaults to :clojure, can also be :json or :mongo
+   :from     -> argument type, same options as above
+   :skip     -> number of records to skip
+   :limit    -> number of records to return
+   :one?     -> defaults to false, use fetch-one as a shortcut
+   :count?   -> defaults to false, use fetch-count as a shortcut
+   :explain? -> returns performance information on the query, instead of rows
+   :sort     -> sort the results by a specific key
+   :options  -> query options [:tailable :slaveok :oplogreplay :notimeout :awaitdata]"
   {:arglists
-   '([collection :where :only :limit :skip :as :from :one? :count? :sort :options])}
-  [coll & {:keys [where only as from one? count? limit skip sort options]
+   '([collection :where :only :limit :skip :as :from :one? :count? :sort :explain? :options])}
+  [coll & {:keys [where only as from one? count? limit skip sort options explain?]
            :or {where {} only [] as :clojure from :clojure
-                one? false count? false limit 0 skip 0 sort nil options []}}]
+                one? false count? false limit 0 skip 0 sort nil options [] explain? false}}]
   (when (and one? sort)
     (throw (IllegalArgumentException. "Fetch :one? (or fetch-one) can't be used with :sort.
 You should use fetch with :limit 1 instead."))); one? and sort should NEVER be called together
@@ -338,7 +339,9 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
                  (.skip cursor skip))
                (when n-limit
                  (.limit cursor n-limit))
-               (coerce cursor [:mongo as] :many true)))))
+               (if explain?
+                 (coerce (.explain cursor) [:mongo as] :many false)
+                 (coerce cursor [:mongo as] :many true))))))
 
 (defn fetch-one [col & options]
   (apply fetch col (concat options '[:one? true])))
