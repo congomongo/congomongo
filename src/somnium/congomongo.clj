@@ -325,9 +325,9 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
     (cond
       count? (.getCount n-col n-where n-only)
       one?   (if-let [m (.findOne
-                              ^DBCollection n-col
-                              ^DBObject n-where
-                              ^DBObject n-only)]
+                         ^DBCollection n-col
+                         ^DBObject n-where
+                         ^DBObject n-only)]
                (coerce m [:mongo as]) nil)
       :else  (when-let [cursor (.find ^DBCollection n-col
                                       ^DBObject n-where
