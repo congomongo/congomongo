@@ -246,6 +246,10 @@ releases.  Please use 'make-connection' in combination with
   (.setWriteConcern (get-db connection)
                     ^WriteConcern (get write-concern-map setting)))
 
+(defn- illegal-write-concern
+  [write-concern]
+  (throw (IllegalArgumentException. (str write-concern " is not a valid WriteConcern alias"))))
+
 ;; add some convenience fns for manipulating object-ids
 (definline object-id ^ObjectId [^String s]
   `(ObjectId. ~s))
@@ -417,13 +421,16 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
   "Inserts a map into collection. Will not overwrite existing maps.
    Takes optional from and to keyword arguments. To insert
    as a side-effect only specify :to as nil."
-  {:arglists '([coll obj {:many false :from :clojure :to :clojure}])}
-  [coll obj & {:keys [from to many]
+  {:arglists '([coll obj {:many false :from :clojure :to :clojure :write-concern nil}])}
+  [coll obj & {:keys [from to many write-concern]
                :or {from :clojure to :clojure many false}}]
   (let [coerced-obj (coerce obj [from :mongo] :many many)
-        res (if many
-              (.insert ^DBCollection (get-coll coll) ^java.util.List coerced-obj)
-              (.insert ^DBCollection (get-coll coll) ^java.util.List (list coerced-obj)))]
+        list-obj (if many coerced-obj (list coerced-obj))
+        res (if write-concern
+              (if-let [wc (write-concern write-concern-map)]
+                (.insert ^DBCollection (get-coll coll) ^java.util.List list-obj ^WriteConcern wc)
+                (illegal-write-concern write-concern))
+              (.insert ^DBCollection (get-coll coll) ^java.util.List list-obj))]
     (coerce coerced-obj [:mongo to] :many many)))
 
 (defn mass-insert!
@@ -437,13 +444,19 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
    "Alters/inserts a map in a collection. Overwrites existing objects.
    The shortcut forms need a map with valid :_id and :_ns fields or
    a collection and a map with a valid :_id field."
-   {:arglists '([collection old new {:upsert true :multiple false :as :clojure :from :clojure}])}
-   [coll old new & {:keys [upsert multiple as from]
+   {:arglists '([collection old new {:upsert true :multiple false :as :clojure :from :clojure :write-concern nil}])}
+   [coll old new & {:keys [upsert multiple as from write-concern]
                     :or {upsert true multiple false as :clojure from :clojure}}]
-   (coerce (.update ^DBCollection  (get-coll coll)
-                    ^DBObject (coerce old [from :mongo])
-                    ^DBObject (coerce new [from :mongo])
-              upsert multiple) [:mongo as]))
+   (coerce (if write-concern
+             (if-let [wc (write-concern write-concern-map)]
+               (.update ^DBCollection  (get-coll coll)
+                        ^DBObject (coerce old [from :mongo])
+                        ^DBObject (coerce new [from :mongo])
+                        upsert multiple ^WriteConcern wc))
+             (.update ^DBCollection  (get-coll coll)
+                      ^DBObject (coerce old [from :mongo])
+                      ^DBObject (coerce new [from :mongo])
+                      upsert multiple)) [:mongo as]))
 
 (defn fetch-and-modify
   "Finds the first document in the query and updates it.
@@ -475,11 +488,14 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
 (defn destroy!
    "Removes map from collection. Takes a collection name and
     a query map"
-   {:arglists '([collection where {:from :clojure}])}
-   [c q & {:keys [from]
+   {:arglists '([collection where {:from :clojure :write-concern nil}])}
+   [c q & {:keys [from write-concern]
            :or {from :clojure}}]
-   (.remove (get-coll c)
-            ^DBObject (coerce q [from :mongo])))
+   (if write-concern
+     (if-let [wc (write-concern write-concern-map)]
+       (.remove (get-coll c) ^DBObject (coerce q [from :mongo]) ^WriteConcern wc)
+       (illegal-write-concern write-concern))
+     (.remove (get-coll c) ^DBObject (coerce q [from :mongo]))))
 
 (defn add-index!
   "Adds an index on the collection for the specified fields if it does not exist.  Ordering of fields is

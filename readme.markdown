@@ -15,6 +15,7 @@ BREAKING CHANGES IN THIS RELEASE!
 
 10gen have updated all their drivers to be more consistent in naming. They have also changed the default write concern (from :none to :normal, effectively). The new classes introduced have different APIs to the classes they replace so there are some knock on changes to CongoMongo as well. The biggest changes are that *opt!* has been removed and the actual keyword arguments for *MongoOptions* have changed to match *MongoClientOptions$Builder* instead. An *IllegalArgumentException* is thrown for unknown arguments now.
 
+* You can now pass *:write-concern* to *destroy!*, *insert!* and *update!* #74
 * Upgrade to 2.10.1 Java driver (#104)
   * Switches from Mongo to MongoClient
   * Switches from MongoURI to MongoClientURI
