@@ -9,10 +9,9 @@
             :url "http://www.opensource.org/licenses/mit-license.php"
             :distribution :repo}
   :min-lein-version "2.0.0"
-  :plugins [[lein-swank "1.4.4"]]
   :dependencies [[org.clojure/core.incubator "0.1.2"]
-                 [org.clojure/data.json "0.2.0"]
-                 [org.mongodb/mongo-java-driver "2.9.3"]
+                 [org.clojure/data.json "0.2.1"]
+                 [org.mongodb/mongo-java-driver "2.10.1"]
                  [org.clojure/clojure "1.4.0"]]
   ;; if a :dev profile is added, remember to update :aliases below to
   ;; use it in each with-profile group!
