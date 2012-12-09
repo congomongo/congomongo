@@ -219,17 +219,28 @@ releases.  Please use 'make-connection' in combination with
      (authenticate *mongo-config* username password)))
 
 (def write-concern-map
-  {:none   WriteConcern/NONE
-   :normal WriteConcern/NORMAL
-   :strict WriteConcern/SAFE ;; left for backwards compatibility
-   :safe WriteConcern/SAFE
-   :fsync-safe WriteConcern/FSYNC_SAFE
-   :replica-safe WriteConcern/REPLICAS_SAFE ;; left for backwards compatibility
-   :replicas-safe WriteConcern/REPLICAS_SAFE})
+  {:acknowledged         WriteConcern/ACKNOWLEDGED
+   :errors-ignored       WriteConcern/ERRORS_IGNORED
+   :fsynced              WriteConcern/FSYNCED
+   :journaled            WriteConcern/JOURNALED
+   :majority             WriteConcern/MAJORITY
+   :replica-acknowledged WriteConcern/REPLICA_ACKNOWLEDGED
+   :unacknowledged       WriteConcern/UNACKNOWLEDGED
+   ;; these are pre-2.10.x names for write concern:
+   :fsync-safe    WriteConcern/FSYNC_SAFE  ;; deprecated - use :fsynced
+   :journal-safe  WriteConcern/JOURNAL_SAFE ;; deprecated - use :journaled
+   :none          WriteConcern/NONE ;; deprecated - use :errors-ignored
+   :normal        WriteConcern/NORMAL ;; deprecated - use :unacknowledged
+   :replicas-safe WriteConcern/REPLICAS_SAFE ;; deprecated - use :replica-acknowledged
+   :safe          WriteConcern/SAFE ;; deprecated - use :acknowledged
+   ;; these are left for backward compatibility but are deprecated:
+   :replica-safe WriteConcern/REPLICAS_SAFE
+   :strict       WriteConcern/SAFE
+   })
 
 (defn set-write-concern
   "Sets the write concern on the connection. Setting is a key in the
-  write-concern-map: :none, :normal, :strict, :safe, :fsync-safe"
+  write-concern-map above."
   [connection setting]
   (assert (contains? (set (keys write-concern-map)) setting))
   (.setWriteConcern (get-db connection)

@@ -71,12 +71,12 @@
     ;; set some non-default option values
     (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port
                              (mongo-options :auto-connect-retry true
-                                            :write-concern (:safe write-concern-map)))
+                                            :write-concern (:acknowledged write-concern-map)))
           m (:mongo a)
           opts (.getMongoOptions m)]
       ;; check non-default options attached to Mongo object
       (is (.isAutoConnectRetry opts))
-      (is (= WriteConcern/SAFE (.getWriteConcern opts)))
+      (is (= WriteConcern/ACKNOWLEDGED (.getWriteConcern opts)))
       ;; check a default option as well
       (is (not (.slaveOk opts))))))
 
@@ -89,7 +89,7 @@
           opts (.getMongoOptions m)]
       (testing "make-connection parses options from URI"
         (is (= 123 (.getConnectionsPerHost opts)))
-        (is (= WriteConcern/SAFE (.getWriteConcern opts))))
+        (is (= WriteConcern/ACKNOWLEDGED (.getWriteConcern opts))))
       (with-mongo a
         (testing "make-connection accepts Mongo URI"
                 (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))))))
@@ -423,7 +423,7 @@
 (deftest sparse-indexing
   (with-test-mongo
     (add-index! :sparse-index-coll [:a] :unique true :sparse true)
-    (set-write-concern *mongo-config* :safe)
+    (set-write-concern *mongo-config* :acknowledged)
     (insert! :sparse-index-coll {:a "foo"})
     (insert! :sparse-index-coll {})
     (try
@@ -433,7 +433,7 @@
         (is false "Unable to insert second document without the sparse index key")))
     (is (thrown? MongoException$DuplicateKey
                  (insert! :sparse-index-coll {:a "foo"})))
-    (set-write-concern *mongo-config* :normal)))
+    (set-write-concern *mongo-config* :unacknowledged)))
 
 (deftest index-name
   (with-test-mongo
@@ -663,7 +663,7 @@ function ()
   (with-test-mongo
     (println "unique index / write concern interaction")
     (add-index! :dup-key-coll [:unique-col] :unique true)
-    (set-write-concern *mongo-config* :safe)
+    (set-write-concern *mongo-config* :acknowledged)
     (let [obj {:unique-col "some string"}]
       ;; first one, should succeed
       (try
@@ -676,14 +676,14 @@ function ()
         (is false "Did not get a duplicate key error")
        (catch Exception e
          (is true)))
-      ;; after setting write concern back to :normal, this should succeed too
+      ;; after setting write concern back to :unacknowledged, this should succeed too
       ;; because the error is not detected / thrown
-      (set-write-concern *mongo-config* :normal)
+      (set-write-concern *mongo-config* :unacknowledged)
       (try
         (insert! :dup-key-coll obj)
         (is true)
         (catch Exception e
-          (is false "Unable to insert duplicate with :normal concern"))))))
+          (is false "Unable to insert duplicate with :acknowledged concern"))))))
 
 (deftest test-group-command
   (with-test-mongo
