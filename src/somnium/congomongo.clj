@@ -1,4 +1,4 @@
-; Copyright (c) 2009 Andrew Boekhoff
+; Copyright (c) 2009-2012 Andrew Boekhoff, Sean Corfield
 
 ; Permission is hereby granted, free of charge, to any person obtaining a copy
 ; of this software and associated documentation files (the "Software"), to deal
@@ -19,15 +19,15 @@
 ; THE SOFTWARE.
 
 (ns
-  ^{:author "Andrew Boekhoff",
+  ^{:author "Andrew Boekhoff, Sean Corfield",
     :doc "Various wrappers and utilities for the mongodb-java-driver"}
   somnium.congomongo
   (:require [clojure.string])
   (:use     [clojure.walk :only (postwalk)]
             [somnium.congomongo.config :only [*mongo-config*]]
             [somnium.congomongo.coerce :only [coerce coerce-fields coerce-index-fields]])
-  (:import  [com.mongodb Mongo MongoOptions DB DBCollection DBObject DBRef ServerAddress
-             WriteConcern Bytes MongoURI]
+  (:import  [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder MongoClientURI
+             DB DBCollection DBObject DBRef ServerAddress WriteConcern Bytes]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
