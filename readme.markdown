@@ -9,8 +9,18 @@ For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3
 
 News
 --------------
-Version 0.3.4-SNAPSHOT (ongoing)
+Version 0.4.0-SNAPSHOT (ongoing)
 
+BREAKING CHANGES IN THIS RELEASE!
+
+10gen have updated all their drivers to be more consistent in naming. They have also changed the default write concern (from :none to :normal, effectively). The new classes introduced have different APIs to the classes they replace so there are some knock on changes to CongoMongo as well. The biggest changes are that *opt!* has been removed and the actual keyword arguments for *MongoOptions* have changed to match *MongoClientOptions$Builder* instead. An *IllegalArgumentException* is thrown for unknown arguments now.
+
+* You can now pass *:write-concern* to *destroy!*, *insert!* and *update!* #74
+* Upgrade to 2.10.1 Java driver (#104)
+  * Switches from Mongo to MongoClient
+  * Switches from MongoURI to MongoClientURI
+  * Switches from MongoOptions to MongoClientOptions
+* Update clojure.data.json to 0.2.1 (as part of #104)
 * Add :replicas-safe write concern
 * Add support for :explain? (#102, #103 arohner)
 * Switch fetch to use non-deprecated APIs (#101 arohner)
@@ -246,11 +256,15 @@ The aggregate function accepts any number of pipeline operations.
 ```clojure
 (make-connection :mydb :host "127.0.0.1" (mongo-options :auto-connect-retry true))
 ```
+
+The available options are hyphen-separated lowercase keyword versions of the camelCase options supported by the Java driver. Prior to CongoMongo 0.4.0, the options matched the fields in the *MongoOptions* class. As of CongoMongo 0.4.0, the options match the method names in the *MongoClientOptions* class instead (and an *IllegalArgumentException* will be thrown if you use an illegal option).
 #### initialization using a Mongo URI
 ```clojure
 (make-connection "mongodb://user:pass@host:27071/databasename")
 ;note that authentication is handled when given a user:pass@ section
 ```
+
+A query string may also be specified containing the options supported by the *MongoClientURI* class (as of CongoMongo 0.4.0; previously the *MongoURI* class was used).
 #### easy json
 ```clojure
 (fetch-one :points
@@ -301,7 +315,7 @@ If you are using Clojure 1.3.0 or later, just add
 
     [congomongo "0.3.3"]
 
-to your project.clj and do
+to your project.clj (for the latest stable version) and do
 
     $lein deps
 
