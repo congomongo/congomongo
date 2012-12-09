@@ -43,36 +43,46 @@
 
 (def ^{:private true
        :doc "To avoid yet another level of indirection via reflection, use
-             wrapper functions for field setters for each type. MongoOptions
+             wrapper functions for field setters for each type. MongoClientOptions
              only has int and boolean fields."}
       type-to-setter
-  {:int (fn [^java.lang.reflect.Field field ^MongoOptions options value] (.setInt field options value))
-   :boolean (fn [^java.lang.reflect.Field field ^MongoOptions options value] (.setBoolean field options value))})
+  {:int (fn [^java.lang.reflect.Field field ^MongoClientOptions options value] (.setInt field options value))
+   :boolean (fn [^java.lang.reflect.Field field ^MongoClientOptions options value] (.setBoolean field options value))})
 
-(defn- ->field-name
-  "Convert hyphenated keyword to camelCased string."
-  [s]
-  (clojure.string/replace (named s) #"-." #(str (Character/toUpperCase ^Character (second %)))))
+(defn- field->kw
+  "Convert camelCase identifier string to hyphen-separated keyword."
+  [id]
+  (keyword (clojure.string/replace id #"[A-Z]" #(str "-" (Character/toLowerCase ^Character (first %))))))
 
-(defn opt!
-  "Set option by name (keyword). Returns options object."
-  [^MongoOptions o k v]
-  (let [^String field-name (->field-name k)
-        ^java.lang.reflect.Field field (-> o .getClass (.getField field-name))
-        type-as-keyword (keyword (.getName (.getType field)))
-        setter (type-as-keyword type-to-setter)]
-    (setter field o v)
-    o))
+(def ^:private builder-map
+  "A map from keywords to builder invocation functions."
+  (let [is-builder-method? (fn [f]
+                             (let [m (.getModifiers f)]
+                               (and (java.lang.reflect.Modifier/isPublic m)
+                                    (not (java.lang.reflect.Modifier/isStatic m))
+                                    (= MongoClientOptions$Builder (.getReturnType f)))))
+        method-name (fn [f] (.getName f))
+        builder-call (fn [m]
+                       (eval (list 'fn '[o v]
+                                   (list (symbol (str "." m)) 'o 'v))))
+        kw-fn-pair (fn [m] [(field->kw m) (builder-call m)])
+        method-lookups (->> (.getDeclaredMethods MongoClientOptions$Builder)
+                            (filter is-builder-method?)
+                            (map method-name)
+                            (map kw-fn-pair))]
+    (into {} method-lookups)))
 
 (defn mongo-options
-  "Return MongoOptions, populated by any specified options. e.g.,
+  "Return MongoClientOptions, populated by any specified options. e.g.,
      (mongo-options :auto-connect-retry true)"
   [& options]
   (let [option-map (apply hash-map options)
-        m-options (MongoOptions.)]
-    (doseq [[k v] option-map]
-      (opt! m-options k v))
-    m-options))
+        builder-call (fn [b [k v]]
+                       (if-let [f (k builder-map)]
+                         (f b v)
+                         (throw (IllegalArgumentException.
+                                 (str k " is not a valid MongoClientOptions$Builder argument")))))]
+    (.build (reduce builder-call (MongoClientOptions$Builder.) option-map))))
 
 (defn- make-server-address
   "Convenience to make a ServerAddress without reflection warnings."
@@ -80,26 +90,28 @@
   (ServerAddress. host port))
 
 (defn- make-connection-args
-  "Makes a connection with passed database name, host, port and MongoOptions"
+  "Makes a connection with passed database name, host, port and MongoClientOptions"
   [db args]
-    (let [instances (take-while #(not (instance? MongoOptions %)) args)
+    (let [instances (take-while #(not (instance? MongoClientOptions %)) args)
           addresses (->> (if (keyword? (first instances))
                            (list (apply array-map instances)) ; Handle legacy connect args
                            instances)
                       (map (fn [{:keys [host port] :or {host "127.0.0.1" port 27017}}]
                              (make-server-address host port))))
-          ^MongoOptions options (or (first (filter #(instance? MongoOptions %) args)) (mongo-options))
+          ^MongoClientOptions options (or (first (filter #(instance? MongoClientOptions %) args)) (mongo-options))
           mongo (if (> (count addresses) 1)
-                  (Mongo. ^java.util.List addresses options)
-                  (Mongo. ^ServerAddress (first addresses) options))
+                  (MongoClient. ^java.util.List addresses options)
+                  (MongoClient. ^ServerAddress (first addresses) options))
           n-db (if db (.getDB mongo db) nil)]
       {:mongo mongo :db n-db}))
 
 (defn- make-connection-uri
   "Makes a connection with a Mongo URI, authenticating if username and password are passed"
   [db]
-  (let [^MongoURI mongouri (MongoURI. db)
-        conn {:mongo (.connect mongouri) :db (.connectDB mongouri)}
+  (let [^MongoClientURI mongouri (MongoClientURI. db)
+        ^MongoClient client (MongoClient. mongouri)
+        ^String db (.getDatabase mongouri)
+        conn {:mongo client :db (.getDB client db)}
         username (.getUsername mongouri)
         password (.getPassword mongouri)]
     (when (and username password)
@@ -113,8 +125,8 @@ a map containing values for :host and/or :port.
   May be called with database name and optionally:
     host (default: 127.0.0.1)
     port (default: 27017)
-    A MongoOptions object
-  A MongoURI string is also supported and must be prefixed with mongodb://
+    A MongoClientOptions object
+  A MongoClientURI string is also supported and must be prefixed with mongodb://
   If username and password are specified, authenticate will be immediately
   called on the connection."
   ([db]
@@ -146,7 +158,7 @@ a map containing values for :host and/or :port.
     (if (thread-bound? #'*mongo-config*)
       (set! *mongo-config* nil)
       (alter-var-root #'*mongo-config* (constantly nil))))
-  (.close ^Mongo (:mongo conn)))
+  (.close ^MongoClient (:mongo conn)))
 
 (defmacro with-mongo
   "Makes conn the active connection in the enclosing scope.
@@ -542,12 +554,12 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
 (defn drop-database!
  "drops a database from the mongo server"
  [title]
- (.dropDatabase ^Mongo (:mongo *mongo-config*) ^String (named title)))
+ (.dropDatabase ^MongoClient (:mongo *mongo-config*) ^String (named title)))
 
 (defn set-database!
   "atomically alters the current database"
   [title]
-  (if-let [db (.getDB ^Mongo (:mongo *mongo-config*) ^String (named title))]
+  (if-let [db (.getDB ^MongoClient (:mongo *mongo-config*) ^String (named title))]
     (alter-var-root #'*mongo-config* merge {:db db})
     (throw (RuntimeException. (str "database with title " title " does not exist.")))))
 
@@ -555,7 +567,7 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
 
 (defn databases
   "List databases on the mongo server" []
-  (seq (.getDatabaseNames ^Mongo (:mongo *mongo-config*))))
+  (seq (.getDatabaseNames ^MongoClient (:mongo *mongo-config*))))
 
 (defn collections
   "Returns the set of collections stored in the current database" []
