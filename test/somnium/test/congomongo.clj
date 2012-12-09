@@ -5,7 +5,7 @@
         somnium.congomongo.coerce
         clojure.pprint)
   (:use [clojure.data.json :only (read-str write-str)])
-  (:import [com.mongodb BasicDBObject BasicDBObjectBuilder MongoException$DuplicateKey]))
+  (:import [com.mongodb BasicDBObject BasicDBObjectBuilder MongoException$DuplicateKey WriteConcern]))
 
 (deftest coercions
   (let [clojure      {:a {:b "c" :d 1 :f ["a" "b" "c"] :g {:h ["i" "j" -42.42]}}}
@@ -69,26 +69,27 @@
 (deftest options-on-connections
   (with-test-mongo
     ;; set some non-default option values
-    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port (mongo-options :auto-connect-retry true :w 1 :safe true))
+    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port
+                             (mongo-options :auto-connect-retry true
+                                            :write-concern (:acknowledged write-concern-map)))
           m (:mongo a)
           opts (.getMongoOptions m)]
       ;; check non-default options attached to Mongo object
-      (is (.autoConnectRetry opts))
-      (is (.safe opts))
-      (is (= 1 (.w opts)))
+      (is (.isAutoConnectRetry opts))
+      (is (= WriteConcern/ACKNOWLEDGED (.getWriteConcern opts)))
       ;; check a default option as well
       (is (not (.slaveOk opts))))))
 
 (deftest uri-for-connection
   (with-test-mongo
     (let [userpass (if (and test-db-user test-db-pass) (str test-db-user ":" test-db-pass "@") "")
-          uri (str "mongodb://" userpass test-db-host ":" test-db-port "/congomongotest-db-a?autoconnectretry=true&w=1&safe=true")
+          uri (str "mongodb://" userpass test-db-host ":" test-db-port "/congomongotest-db-a?maxpoolsize=123&w=1&safe=true")
           a (make-connection uri)
           m (:mongo a)
           opts (.getMongoOptions m)]
       (testing "make-connection parses options from URI"
-        (is (.safe opts))
-        (is (= 1 (.w opts))))
+        (is (= 123 (.getConnectionsPerHost opts)))
+        (is (= WriteConcern/ACKNOWLEDGED (.getWriteConcern opts))))
       (with-mongo a
         (testing "make-connection accepts Mongo URI"
                 (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))))))
@@ -422,7 +423,7 @@
 (deftest sparse-indexing
   (with-test-mongo
     (add-index! :sparse-index-coll [:a] :unique true :sparse true)
-    (set-write-concern *mongo-config* :safe)
+    (set-write-concern *mongo-config* :acknowledged)
     (insert! :sparse-index-coll {:a "foo"})
     (insert! :sparse-index-coll {})
     (try
@@ -432,7 +433,7 @@
         (is false "Unable to insert second document without the sparse index key")))
     (is (thrown? MongoException$DuplicateKey
                  (insert! :sparse-index-coll {:a "foo"})))
-    (set-write-concern *mongo-config* :normal)))
+    (set-write-concern *mongo-config* :unacknowledged)))
 
 (deftest index-name
   (with-test-mongo
@@ -662,27 +663,25 @@ function ()
   (with-test-mongo
     (println "unique index / write concern interaction")
     (add-index! :dup-key-coll [:unique-col] :unique true)
-    (set-write-concern *mongo-config* :safe)
     (let [obj {:unique-col "some string"}]
       ;; first one, should succeed
       (try
-        (insert! :dup-key-coll obj)
+        (insert! :dup-key-coll obj :write-concern :acknowledged)
         (is true)
         (catch Exception e
           (is false "Unable to insert first document")))
       (try
-        (insert! :dup-key-coll obj)
+        (insert! :dup-key-coll obj :write-concern :acknowledged)
         (is false "Did not get a duplicate key error")
        (catch Exception e
          (is true)))
-      ;; after setting write concern back to :normal, this should succeed too
+      ;; with write concern of :unacknowledged, this should succeed too
       ;; because the error is not detected / thrown
-      (set-write-concern *mongo-config* :normal)
       (try
-        (insert! :dup-key-coll obj)
+        (insert! :dup-key-coll obj :write-concern :unacknowledged)
         (is true)
         (catch Exception e
-          (is false "Unable to insert duplicate with :normal concern"))))))
+          (is false "Unable to insert duplicate with :acknowledged concern"))))))
 
 (deftest test-group-command
   (with-test-mongo
