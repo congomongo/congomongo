@@ -9,6 +9,10 @@ For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3
 
 News
 --------------
+Version 0.4.1-SNAPSHOT (ongoing)
+
+* No changes so far
+
 Version 0.4.0 - January 4th, 2012
 
 BREAKING CHANGES IN THIS RELEASE!

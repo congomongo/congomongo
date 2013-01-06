@@ -1,5 +1,5 @@
 (defproject congomongo
-  "0.4.0"
+  "0.4.1-SNAPSHOT"
   :description "Clojure-friendly API for MongoDB"
   :url "https://github.com/aboekhoff/congomongo"
   :mailing-list {:name "CongoMongo mailing list"
