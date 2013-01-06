@@ -1,8 +1,8 @@
 (defproject congomongo
-  "0.4.0-SNAPSHOT"
-  :description "clojure-friendly api for MongoDB"
+  "0.4.0"
+  :description "Clojure-friendly API for MongoDB"
   :url "https://github.com/aboekhoff/congomongo"
-  :mailing-list {:name "congomongo mailing list"
+  :mailing-list {:name "CongoMongo mailing list"
                  :archive "https://groups.google.com/forum/?fromgroups#!forum/congomongo-dev"
                  :post "congomongo-dev@googlegroups.com"}
   :license {:name "MIT License"

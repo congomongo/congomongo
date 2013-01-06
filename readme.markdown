@@ -9,7 +9,7 @@ For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3
 
 News
 --------------
-Version 0.4.0-SNAPSHOT (ongoing)
+Version 0.4.0 - January 4th, 2012
 
 BREAKING CHANGES IN THIS RELEASE!
 
@@ -331,13 +331,9 @@ Install
 Leiningen is the recommended way to use congomongo.
 If you are using Clojure 1.3.0 or later, just add
 
-    [congomongo "0.3.3"]
+    [congomongo "0.4.0"]
 
-to your project.clj (for the latest stable version) or
-
-    [congomongo "0.4.0-SNAPSHOT"]
-
-for the current development version.
+to your project.clj (for the latest stable version).
 
 If you are still on Clojure 1.2.x, use congomongo version 0.2.3 instead.
 
