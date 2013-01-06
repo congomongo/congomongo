@@ -152,7 +152,7 @@ Basics
                      :port 27017))
 => #'user/conn
 
-conn => {:mongo #<MongoClent Mongo: /127.0.0.1:20717>, :db #<DBApiLayer mydb>}
+conn => {:mongo #<MongoClient Mongo: /127.0.0.1:20717>, :db #<DBApiLayer mydb>}
 ```
 #### set the connection globally
 ```clojure
@@ -166,17 +166,18 @@ conn => {:mongo #<MongoClent Mongo: /127.0.0.1:20717>, :db #<DBApiLayer mydb>}
 #### specify a write concern
 ```clojure
 (m/set-write-concern conn :journaled)
-;; These are the new, official write concerns as of release 0.4.0, using the 2.10 Java
-;; driver. The earlier write concerns are shown in parentheses and are deprecated as
-;; of the 0.4.0 release.
-;; :errors-ignored will not report any errors - fire and forget (:none)
-;; :unacknowledged will report network errors - but does not wait for the write to be acknowledged (:normal - this was the default prior to 0.4.0)
-;; :acknowledged will report key constraint and other errors - this is the default (:safe, :strict was deprecated in 0.1.9)
-;; :journaled waits until the primary has sync'd the write to the journal (:journal-safe)
-;; :fsynced waits until a write is sync'd to the filesystem (:fsync-safe)
-;; :replica-acknowledged waits until a write is sync'd to at least one replica as well (:replicas-safe, :replica-safe)
-;; :majority waits until a write is sync'd to a majority of replica nodes (no previous equivalent)
 ```
+These are the new, official write concerns as of release 0.4.0, using the 2.10 Java
+driver. The earlier write concerns are shown in parentheses and are deprecated as
+of the 0.4.0 release.
+* :errors-ignored will not report any errors - fire and forget (:none)
+* :unacknowledged will report network errors - but does not wait for the write to be acknowledged (:normal - this was the default prior to 0.4.0)
+* :acknowledged will report key constraint and other errors - this is the default (:safe, :strict was deprecated in 0.1.9)
+* :journaled waits until the primary has sync'd the write to the journal (:journal-safe)
+* :fsynced waits until a write is sync'd to the filesystem (:fsync-safe)
+* :replica-acknowledged waits until a write is sync'd to at least one replica as well (:replicas-safe, :replica-safe)
+* :majority waits until a write is sync'd to a majority of replica nodes (no previous equivalent)
+
 ### Simple Tasks
 ------------------
 
@@ -217,14 +218,14 @@ my-robot => {:name "robby",
 
 #### mass inserts
 ```clojure
-(m/mass-insert!
-  :points
-  (for [x (range 100) y (range 100)]
-    {:x x
-     :y y
-     :z (* x y)}))
+(dorun (m/mass-insert!
+         :points
+         (for [x (range 100) y (range 100)]
+           {:x x
+            :y y
+            :z (* x y)}))
 
- =>  ... a very large WriteResult object! ...
+=> nil ;; without dorun this would produce a WriteResult with 10,000 maps in it!
 
 (m/fetch-count :points)
 => 10000
@@ -241,7 +242,7 @@ my-robot => {:name "robby",
 => {:x 12, :y 42, :z 504, :_id ... }
 ```
 
-#### aggregation (requires mongodb 2.2)
+#### aggregation (requires mongodb 2.2 or later)
 ```clojure
 (m/aggregate
   :expenses
@@ -278,7 +279,7 @@ The available options are hyphen-separated lowercase keyword versions of the cam
 #### initialization using a Mongo URI
 ```clojure
 (m/make-connection "mongodb://user:pass@host:27071/databasename")
-;note that authentication is handled when given a user:pass@ section
+;; note that authentication is handled when given a user:pass@ section
 ```
 
 A query string may also be specified containing the options supported by the *MongoClientURI* class (as of CongoMongo 0.4.0; previously the *MongoURI* class was used).
@@ -332,11 +333,11 @@ If you are using Clojure 1.3.0 or later, just add
 
     [congomongo "0.3.3"]
 
-to your project.clj (for the latest stable version) and do
+to your project.clj (for the latest stable version) or
 
-    $lein deps
+    [congomongo "0.4.0-SNAPSHOT"]
 
-to get congomongo and all of its dependencies.
+for the current development version.
 
 If you are still on Clojure 1.2.x, use congomongo version 0.2.3 instead.
 
