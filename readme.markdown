@@ -13,7 +13,7 @@ Version 0.4.1-SNAPSHOT (ongoing)
 
 * No changes so far
 
-Version 0.4.0 - January 4th, 2012
+Version 0.4.0 - January 4th, 2013
 
 BREAKING CHANGES IN THIS RELEASE!
 
