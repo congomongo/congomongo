@@ -27,7 +27,7 @@
             [somnium.congomongo.config :only [*mongo-config*]]
             [somnium.congomongo.coerce :only [coerce coerce-fields coerce-index-fields]])
   (:import  [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder MongoClientURI
-             DB DBCollection DBObject DBRef ServerAddress WriteConcern Bytes]
+             DB DBCollection DBObject DBCursor DBRef ServerAddress WriteConcern Bytes ReadPreference]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
@@ -218,6 +218,12 @@ releases.  Please use 'make-connection' in combination with
   ([username password]
      (authenticate *mongo-config* username password)))
 
+(definline ^DBCollection get-coll
+  "Returns a DBCollection object"
+  [collection]
+  `(.getCollection (get-db *mongo-config*)
+     ^String (named ~collection)))
+
 (def write-concern-map
   {:acknowledged         WriteConcern/ACKNOWLEDGED
    :errors-ignored       WriteConcern/ERRORS_IGNORED
@@ -249,6 +255,20 @@ releases.  Please use 'make-connection' in combination with
 (defn- illegal-write-concern
   [write-concern]
   (throw (IllegalArgumentException. (str write-concern " is not a valid WriteConcern alias"))))
+
+(defn get-collection-read-preference
+  "Gets the write concern set as default for a collection."
+  [collection]
+  (when collection (.getWriteConcern (get-coll collection))))
+
+(defn set-collection-write-concern!
+  "Sets the write concern as default for a collection."
+  [collection setting]
+  (if-let [concern (get write-concern-map setting)]
+    (do
+      (.setWriteConcern (get-coll collection) concern)
+      concern)
+    (illegal-write-concern setting)))
 
 ;; add some convenience fns for manipulating object-ids
 (definline object-id ^ObjectId [^String s]
@@ -299,25 +319,73 @@ releases.  Please use 'make-connection' in combination with
                         ^String (named collection)
                         (coerce options [:clojure :mongo]))))
 
-(definline ^DBCollection get-coll
-  "Returns a DBCollection object"
-  [collection]
-  `(.getCollection (get-db *mongo-config*)
-                   ^String (named ~collection)))
 
 (def query-option-map
   {:tailable    Bytes/QUERYOPTION_TAILABLE
-   :slaveok     Bytes/QUERYOPTION_SLAVEOK
    :oplogreplay Bytes/QUERYOPTION_OPLOGREPLAY
    :notimeout   Bytes/QUERYOPTION_NOTIMEOUT
    :awaitdata   Bytes/QUERYOPTION_AWAITDATA})
 
+
 (defn calculate-query-options
   "Calculates the cursor's query option from a list of options"
-   [options]
-   (reduce bit-or 0 (map query-option-map (if (keyword? options)
-                                            (list options)
-                                            options))))
+  [options]
+  (reduce bit-or 0 (map query-option-map (if (keyword? options)
+                                           (list options)
+                                           options))))
+
+(def ^:private read-preference-map
+  "Private map of facory functions of ReadPreferences to aliases."
+  {:nearest (fn nearest
+              ([] (ReadPreference/nearest))
+              ([tag-set] (ReadPreference/nearest (first tag-set) (into-array DBObject (rest tag-set)))))
+   :primary (fn primary
+              ([] (ReadPreference/primary))
+              ([_] (throw (IllegalArgumentException. "Read preference :primary does not accept tag sets."))))
+   :primary-preferred (fn primary-preferred
+                        ([] (ReadPreference/primaryPreferred))
+                        ([tag-set] (ReadPreference/primaryPreferred (first tag-set)
+                                     (into-array DBObject (rest tag-set)))))
+   :secondary (fn secondary
+                ([] (ReadPreference/secondary))
+                ([tag-set] (ReadPreference/secondary (first tag-set) (into-array DBObject (rest tag-set)))))
+   :secondary-preferred (fn secondary-preferred
+                          ([] (ReadPreference/secondaryPreferred))
+                          ([tag-set] (ReadPreference/secondaryPreferred (first tag-set)
+                                       (into-array DBObject (rest tag-set)))))})
+
+   (defn read-preference
+     "Creates a ReadPreference from an alias and and optional tag sets."
+  {:arglists '([preference {:a-tag "value"} {:other-tag "other-value"}])}
+  [preference & tag-set]
+  (when preference
+    (if (instance? ReadPreference preference)
+      (if (empty? tag-set)
+        preference
+        (let [ts (coerce tag-set [:clojure :mongo ] :many true)]
+          (ReadPreference/valueOf (.getName preference) (first ts) (rest ts))))
+      (if-let [pref-factory (get read-preference-map preference)]
+        (if (empty? tag-set)
+          (pref-factory)
+          (pref-factory (coerce tag-set [:clojure :mongo ] :many true))
+          )
+        (throw (IllegalArgumentException. (str preference " is not a valid ReadPreference alias.")))))))
+
+
+(defn get-collection-read-preference
+  "Gets the read perference set as default for a collection."
+  [collection]
+  (when collection (.getReadPreference (get-coll collection))))
+
+(defn set-collection-read-preference!
+  "Sets the read perference as default for a collection and returns the ReadPreference object."
+  [collection preference & opts]
+  (if-not (and collection preference)
+    (throw (IllegalAccessException. "You have to specify a collection and a read preference."))
+    (let [pref (apply read-preference preference opts)]
+      (.setReadPreference (get-coll collection) pref)
+      pref)))
+
 
 (defn fetch
   "Fetches objects from a collection.
@@ -336,29 +404,31 @@ releases.  Please use 'make-connection' in combination with
    :sort     -> sort the results by a specific key
    :options  -> query options [:tailable :slaveok :oplogreplay :notimeout :awaitdata]"
   {:arglists
-   '([collection :where :only :limit :skip :as :from :one? :count? :sort :explain? :options])}
-  [coll & {:keys [where only as from one? count? limit skip sort options explain?]
+   '([collection :where :only :limit :skip :as :from :one? :count? :sort :explain? :options :read-preference])}
+  [coll & {:keys [where only as from one? count? limit skip sort options explain? read-preference]
            :or {where {} only [] as :clojure from :clojure
                 one? false count? false limit 0 skip 0 sort nil options [] explain? false}}]
-  (when (and one? sort)
-    (throw (IllegalArgumentException. "Fetch :one? (or fetch-one) can't be used with :sort.
-You should use fetch with :limit 1 instead."))); one? and sort should NEVER be called together
   (let [n-where (coerce where [from :mongo])
         n-only  (coerce-fields only)
         n-col   (get-coll coll)
         n-limit (if limit (- 0 (Math/abs (long limit))) 0)
         n-sort (when sort (coerce sort [from :mongo]))
-        n-options (calculate-query-options options)]
+        n-options (calculate-query-options options)
+        n-read-preference (somnium.congomongo/read-preference read-preference)]
     (cond
-      count? (.getCount n-col n-where n-only)
+      count? (.getCount n-col n-where n-only n-read-preference)
       one?   (if-let [m (.findOne
                          ^DBCollection n-col
                          ^DBObject n-where
-                         ^DBObject n-only)]
+                         ^DBObject n-only
+                         ^DBObject n-sort
+                         ^ReadPreference n-read-preference)]
                (coerce m [:mongo as]) nil)
-      :else  (when-let [cursor (.find ^DBCollection n-col
-                                      ^DBObject n-where
-                                      ^DBObject n-only)]
+      :else  (when-let [cursor (DBCursor.
+                                 ^DBCollection n-col
+                                 ^DBObject n-where
+                                 ^DBObject n-only
+                                 ^ReadPreference n-read-preference)]
                (when n-options
                  (.setOptions cursor n-options))
                (when n-sort
