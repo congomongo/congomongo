@@ -70,7 +70,8 @@
                         dbo))
 
   Keyword
-  (clojure->mongo [^Keyword o] (.getName o))
+  (clojure->mongo [^Keyword o] (let [o-ns (namespace o)]
+                                 (str o-ns (when o-ns "/") (name o))))
 
   List
   (clojure->mongo [^List o] (map clojure->mongo o))

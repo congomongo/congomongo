@@ -543,6 +543,15 @@
     (let [return (fetch-one :stuff :where {:name "name"})]
       (is (vector? (:vector return))))))
 
+
+(deftest test-roundtrip-keywords
+  (with-test-mongo
+    (insert! :stuff {:name "name" :some-map {:myns/this 1
+                                             :thatns/this 4}})
+    (let [return (fetch-one :stuff :where {:name "name"})]
+      (is (= 1 (get-in return [:some-map :myns/this]))
+          (= 4 (get-in return [:some-map :thatns/this])) ))))
+
 ;; Note: with Clojure 1.3.0, 1.0 != 1 and the JS stuff returns floating point numbers instead
 ;; of integers so I've changed the tests to use floats in the expected values - except for the
 ;; 1000000 value which _does_ come back as an integer! -- Sean Corfield
