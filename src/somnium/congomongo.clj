@@ -518,8 +518,8 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
     :sparse -> defaults to false
     :background -> defaults to false"
    {:arglists '([collection fields {:name nil :unique false :sparse false}])}
-   [c f & {:keys [name unique sparse]
-           :or {name nil unique false sparse false}}]
+   [c f & {:keys [name unique sparse background]
+           :or {name nil unique false sparse false background false}}]
    (-> (get-coll c)
        (.ensureIndex (coerce-index-fields f) ^DBObject (coerce (merge {:unique unique :sparse sparse :background background}
                                                                        (if name {:name name}))
