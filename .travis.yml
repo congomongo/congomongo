@@ -1,2 +1,8 @@
 language: clojure
-script: lein multi deps, multi test
+services: mongodb
+lein: lein2
+script: lein2 test-all
+jdk:
+  - openjdk6
+  - openjdk7
+  - oraclejdk7

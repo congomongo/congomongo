@@ -4,8 +4,8 @@
         somnium.congomongo.config
         somnium.congomongo.coerce
         clojure.pprint)
-  (:use [clojure.data.json :only (read-json json-str)])
-  (:import [com.mongodb BasicDBObject BasicDBObjectBuilder]))
+  (:use [clojure.data.json :only (read-str write-str)])
+  (:import [com.mongodb BasicDBObject BasicDBObjectBuilder MongoException$DuplicateKey WriteConcern]))
 
 (deftest coercions
   (let [clojure      {:a {:b "c" :d 1 :f ["a" "b" "c"] :g {:h ["i" "j" -42.42]}}}
@@ -17,7 +17,7 @@
                          (push "g")
                          (add "h" ["i" "j" -42.42])
                          get)
-        clojure-json (json-str clojure) ; no padding
+        clojure-json (write-str clojure) ; no padding
         mongo-json   (str mongo)        ; contains whitespace padding
         from    {:clojure clojure
                  :mongo   mongo
@@ -69,15 +69,30 @@
 (deftest options-on-connections
   (with-test-mongo
     ;; set some non-default option values
-    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port (mongo-options :auto-connect-retry true :w 1 :safe true))
+    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port
+                             (mongo-options :auto-connect-retry true
+                                            :write-concern (:acknowledged write-concern-map)))
           m (:mongo a)
           opts (.getMongoOptions m)]
       ;; check non-default options attached to Mongo object
-      (is (.autoConnectRetry opts))
-      (is (.safe opts))
-      (is (= 1 (.w opts)))
+      (is (.isAutoConnectRetry opts))
+      (is (= WriteConcern/ACKNOWLEDGED (.getWriteConcern opts)))
       ;; check a default option as well
       (is (not (.slaveOk opts))))))
+
+(deftest uri-for-connection
+  (with-test-mongo
+    (let [userpass (if (and test-db-user test-db-pass) (str test-db-user ":" test-db-pass "@") "")
+          uri (str "mongodb://" userpass test-db-host ":" test-db-port "/congomongotest-db-a?maxpoolsize=123&w=1&safe=true")
+          a (make-connection uri)
+          m (:mongo a)
+          opts (.getMongoOptions m)]
+      (testing "make-connection parses options from URI"
+        (is (= 123 (.getConnectionsPerHost opts)))
+        (is (= WriteConcern/ACKNOWLEDGED (.getWriteConcern opts))))
+      (with-mongo a
+        (testing "make-connection accepts Mongo URI"
+                (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))))))
 
 (deftest with-mongo-database
   (with-test-mongo
@@ -92,7 +107,7 @@
 (deftest with-mongo-interactions
   (with-test-mongo
     (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port)
-          b (make-connection "congomongotest-db-b" :host test-db-host :port test-db-port)]
+          b (make-connection :congomongotest-db-b :host test-db-host :port test-db-port)]
       (with-mongo a
         (testing "with-mongo sets the mongo-config"
           (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))
@@ -137,6 +152,13 @@
       (is (not (contains? res :key)))
       (is (= 4 (:value res))))))
 
+(deftest can-insert-sets
+  (with-test-mongo
+    (insert! :test_col {:num-set #{1 2 3}
+                        :kw-set #{:key1 :key2}})
+    (is (= [1 2 3] (:num-set (fetch-one :test_col))))
+    (is (= ["key1" "key2"] (:kw-set (fetch-one :test_col))))))
+
 (deftest collection-existence
   (with-test-mongo
     (insert! :notbogus {:foo "bar"})
@@ -164,6 +186,28 @@
       (is (= (map :x (fetch :points :sort {:x 1})) (sort unsorted)))
       (is (= (map :x (fetch :points :sort {:x -1})) (reverse (sort unsorted)))))))
 
+(deftest fetch-sort-multiple
+  (with-test-mongo
+    (let [unsorted [3 10 7 0 2]]
+      (mass-insert! :points
+                  (for [i unsorted j unsorted]
+                    {:x i :y j}))
+      (is (= (map :x (fetch :points :sort (coerce-ordered-fields [:x :y]))) (mapcat (partial repeat (count unsorted)) (sort unsorted))))
+      (is (= (map :y (fetch :points :sort (coerce-ordered-fields [:x :y]))) (apply concat (repeat (count unsorted) (sort unsorted)))))
+      (is (= (map :x (fetch :points :sort (coerce-ordered-fields [:x [:y -1]]))) (mapcat (partial repeat (count unsorted)) (sort unsorted))))
+      (is (= (map :y (fetch :points :sort (coerce-ordered-fields [:x [:y -1]]))) (apply concat (repeat (count unsorted) (reverse (sort unsorted))))))
+      (is (= (map :x (fetch :points :sort (dbobject :x 1 :y 1))) (mapcat (partial repeat (count unsorted)) (sort unsorted))))
+      (is (= (map :y (fetch :points :sort (dbobject :x 1 :y 1))) (apply concat (repeat (count unsorted) (sort unsorted)))))
+      (is (= (map :x (fetch :points :sort (dbobject :x 1 :y -1))) (mapcat (partial repeat (count unsorted)) (sort unsorted))))
+      (is (= (map :y (fetch :points :sort (dbobject :x 1 :y -1))) (apply concat (repeat (count unsorted) (reverse (sort unsorted)))))))))
+
+(deftest fetch-one-sort-not-allowed
+  (with-test-mongo
+    (is (thrown? IllegalArgumentException
+                 (fetch :stuff :sort {:a 1} :one? true)))
+    (is (thrown? IllegalArgumentException
+                 (fetch-one :stuff :sort {:a 1})))))
+
 (deftest fetch-with-only
   (with-test-mongo
     (let [data {:_id 10 :foo "clever" :bar "filter"}
@@ -181,6 +225,13 @@
     (insert! :by-id {:_id 300 :val "warriors"})
     (is (= "Stone" (:val (fetch-by-id :by-id "Blarney"))))
     (is (= "warriors" (:val (fetch-by-id :by-id 300))))))
+
+(deftest explain-works
+  (with-test-mongo
+    (insert! :users {:name "Alice"})
+    (insert! :users {:name "Bob"})
+    (insert! :users {:name "Carol"})
+    (is (map? (fetch :users :where {:name "Bob"} :explain? true)))))
 
 (deftest fetch-by-ids-of-any-type
   (with-test-mongo
@@ -303,8 +354,8 @@
     (let [json (distinct-values :distinct "genus" :as :json)]
       ;; I don't think you can influence the order in which distinct results are returned,
       ;; so just check both possibilities
-      (is (or (= (read-json json) ["Pan", "Homo"])
-              (= (read-json json) ["Homo", "Pan"]))))))
+      (is (or (= (read-str json) ["Pan", "Homo"])
+              (= (read-str json) ["Homo", "Pan"]))))))
 
 
 ;; ;; mass insert chokes on excessively large inserts
@@ -368,6 +419,21 @@
                            (.put "b" -1)
                            (.put "c" 1))]
       (is (= (.toString actual-index) (.toString expected-index))))))
+
+(deftest sparse-indexing
+  (with-test-mongo
+    (add-index! :sparse-index-coll [:a] :unique true :sparse true)
+    (set-write-concern *mongo-config* :acknowledged)
+    (insert! :sparse-index-coll {:a "foo"})
+    (insert! :sparse-index-coll {})
+    (try
+      (insert! :sparse-index-coll {})
+      (is true)
+      (catch MongoException$DuplicateKey e
+        (is false "Unable to insert second document without the sparse index key")))
+    (is (thrown? MongoException$DuplicateKey
+                 (insert! :sparse-index-coll {:a "foo"})))
+    (set-write-concern *mongo-config* :unacknowledged)))
 
 (deftest index-name
   (with-test-mongo
@@ -476,6 +542,15 @@
     (insert! :stuff {:name "name" :vector [ "foo" "bar"]})
     (let [return (fetch-one :stuff :where {:name "name"})]
       (is (vector? (:vector return))))))
+
+
+(deftest test-roundtrip-keywords
+  (with-test-mongo
+    (insert! :stuff {:name "name" :some-map {:myns/this 1
+                                             :thatns/this 4}})
+    (let [return (fetch-one :stuff :where {:name "name"})]
+      (is (= 1 (get-in return [:some-map :myns/this]))
+          (= 4 (get-in return [:some-map :thatns/this])) ))))
 
 ;; Note: with Clojure 1.3.0, 1.0 != 1 and the JS stuff returns floating point numbers instead
 ;; of integers so I've changed the tests to use floats in the expected values - except for the
@@ -594,21 +669,28 @@ function ()
 ") 625.0))))
 
 (deftest dup-key-exception-works
-  (add-index! :dup-key-coll [:unique-col] :unique true)
-  (let [obj {:unique-col "some string"}]
-
-    ;; first one, should succeed
-    (try
-      (insert! :dup-key-coll obj)
-      (is true)
-      (catch Exception e
-        (is false)))
-
-    (try
-      (insert! :dup-key-coll obj)
-      (is false)
-      (catch Exception e
-        (is true)))))
+  (with-test-mongo
+    (println "unique index / write concern interaction")
+    (add-index! :dup-key-coll [:unique-col] :unique true)
+    (let [obj {:unique-col "some string"}]
+      ;; first one, should succeed
+      (try
+        (insert! :dup-key-coll obj :write-concern :acknowledged)
+        (is true)
+        (catch Exception e
+          (is false "Unable to insert first document")))
+      (try
+        (insert! :dup-key-coll obj :write-concern :acknowledged)
+        (is false "Did not get a duplicate key error")
+       (catch Exception e
+         (is true)))
+      ;; with write concern of :unacknowledged, this should succeed too
+      ;; because the error is not detected / thrown
+      (try
+        (insert! :dup-key-coll obj :write-concern :unacknowledged)
+        (is true)
+        (catch Exception e
+          (is false "Unable to insert duplicate with :acknowledged concern"))))))
 
 (deftest test-group-command
   (with-test-mongo

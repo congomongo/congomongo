@@ -1,8 +1,8 @@
 (ns somnium.congomongo.coerce
-  (:use [clojure.data.json :only [json-str read-json]]
+  (:use [clojure.data.json :only [write-str read-str]]
         [clojure.core.incubator :only [seqable?]])
   (:import [clojure.lang IPersistentMap IPersistentVector Keyword]
-           [java.util Map List]
+           [java.util Map List Set]
            [com.mongodb DBObject BasicDBObject BasicDBList]
            [com.mongodb.gridfs GridFSFile]
            [com.mongodb.util JSON]))
@@ -70,10 +70,14 @@
                         dbo))
 
   Keyword
-  (clojure->mongo [^Keyword o] (.getName o))
+  (clojure->mongo [^Keyword o] (let [o-ns (namespace o)]
+                                 (str o-ns (when o-ns "/") (name o))))
 
   List
   (clojure->mongo [^List o] (map clojure->mongo o))
+
+  Set
+  (clojure->mongo [^Set o] (set (map clojure->mongo o)))
 
   Object
   (clojure->mongo [o] o)
@@ -84,10 +88,12 @@
 
 
 (let [translations {[:clojure :mongo  ] clojure->mongo
-                    [:clojure :json   ] json-str
+                    [:clojure :json   ] write-str
                     [:mongo   :clojure] #(mongo->clojure ^DBObject % ^Boolean/TYPE *keywordize*)
                     [:mongo   :json   ] #(.toString ^DBObject %)
-                    [:json    :clojure] #(read-json % *keywordize*)
+                    [:json    :clojure] #(read-str % :key-fn (if *keywordize*
+                                                               keyword
+                                                               identity))
                     [:json    :mongo  ] #(JSON/parse %)}]
   (defn coerce
     "takes an object, a vector of keywords:
@@ -107,26 +113,42 @@
                             (f obj))
                           (throw (RuntimeException. "unsupported keyword pair")))))))
 
+(defn ^DBObject dbobject [& args]
+  "Create a DBObject from a sequence of key/value pairs, in order."
+  (let [dbo (BasicDBObject.)]
+    (doseq [[k v] (partition 2 args)]
+      (.put dbo
+            (clojure->mongo k)
+            (clojure->mongo v)))
+    dbo))
+
 (defn ^DBObject coerce-fields
-  "only used for creating argument object for :only"
+  "Used for creating argument object for :only - unordered,
+   maps truthy to 1 and falsey to 0, default 1."
   [fields]
   (clojure->mongo ^IPersistentMap (if (map? fields)
                                     (into {} (for [[k v] fields]
                                                [k (if v 1 0)]))
                                     (zipmap fields (repeat 1)))))
 
+(defn ^DBObject coerce-ordered-fields
+  "Used for creating index specifications and sort specifications.
+   Accepts a vector of fields or field/value pairs. Produces an
+   ordered object of field/value pairs - default 1."
+  [fields]
+  (clojure->mongo ^IPersistentMap (apply array-map
+                                         (flatten
+                                          (for [f fields]
+                                            (if (vector? f)
+                                              f
+                                              [f 1]))))))
 
 (defn ^DBObject coerce-index-fields
   "Used for creating index specifications.
+   Deprecated as of 0.3.3.
+   [:a :b :c] => (array-map :a 1 :b 1 :c 1)
+   [:a [:b 1] :c] => (array-map :a 1 :b -1 :c 1)
 
-  [:a :b :c] => (sorted-map :a 1 :b 1 :c 1)
-  [:a [:b 1] :c] => (sorted-map :a 1 :b -1 :c 1)
-
-  See also somnium.congomongo/add-index!"
+   See also somnium.congomongo/add-index!"
   [fields]
-  (clojure->mongo ^IPersistentMap (apply array-map
-                                          (flatten
-                                           (for [f fields]
-                                             (if (vector? f)
-                                               f
-                                               [f 1]))))))
+  (coerce-ordered-fields fields))
