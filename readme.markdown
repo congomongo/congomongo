@@ -11,7 +11,9 @@ News
 --------------
 Version 0.4.1-SNAPSHOT (ongoing)
 
-* No changes so far
+* read preference supported (per-connection, per-collection, per-fetch (#122 niclasmeier)
+* add-index! supports :background true/false (#121 dwwoelfel)
+* namespaced keyword keys in maps are roundtripped correctly (#120 AdamClements)
 
 Version 0.4.0 - January 4th, 2013
 
