@@ -9,7 +9,7 @@ For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3
 
 News
 --------------
-Version 0.4.1-SNAPSHOT (ongoing)
+Version 0.4.1 - March 14th, 2013
 
 * read preference supported (per-connection, per-collection, per-fetch (#122 niclasmeier)
 * add-index! supports :background true/false (#121 dwwoelfel)
@@ -359,7 +359,7 @@ Install
 Leiningen is the recommended way to use congomongo.
 If you are using Clojure 1.3.0 or later, just add
 
-    [congomongo "0.4.0"]
+    [congomongo "0.4.1"]
 
 to your project.clj (for the latest stable version).
 
