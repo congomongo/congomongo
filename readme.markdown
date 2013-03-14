@@ -9,6 +9,10 @@ For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3
 
 News
 --------------
+Version 0.4.2-SNAPSHOT (ongoing)
+
+* no changes yet
+
 Version 0.4.1 - March 14th, 2013
 
 * read preference supported (per-connection, per-collection, per-fetch (#122 niclasmeier)
