@@ -15,7 +15,6 @@
                  [org.clojure/clojure "1.4.0"]]
   ;; if a :dev profile is added, remember to update :aliases below to
   ;; use it in each with-profile group!
-  :profiles {:1.3  {:dependencies [[org.clojure/clojure "1.3.0"]]}
-             :1.5S {:repositories [["sonatype-snapshots" "https://oss.sonatype.org/content/repositories/snapshots/"]]
-                    :dependencies [[org.clojure/clojure "1.5.0-master-SNAPSHOT"]]}}
-  :aliases {"test-all" ["with-profile" "default:1.3,default:1.5S,default" "test"]})
+  :profiles {:1.3 {:dependencies [[org.clojure/clojure "1.3.0"]]}
+             :1.5 {:dependencies [[org.clojure/clojure "1.5.1"]]}}
+  :aliases {"test-all" ["with-profile" "default:1.3,default:1.5,default" "test"]})
