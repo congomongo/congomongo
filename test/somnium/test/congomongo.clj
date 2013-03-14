@@ -5,7 +5,8 @@
         somnium.congomongo.coerce
         clojure.pprint)
   (:use [clojure.data.json :only (read-str write-str)])
-  (:import [com.mongodb BasicDBObject BasicDBObjectBuilder MongoException$DuplicateKey WriteConcern]))
+  (:import [com.mongodb DBObject BasicDBObject BasicDBObjectBuilder MongoException$DuplicateKey ReadPreference
+            WriteConcern]))
 
 (deftest coercions
   (let [clojure      {:a {:b "c" :d 1 :f ["a" "b" "c"] :g {:h ["i" "j" -42.42]}}}
@@ -141,6 +142,14 @@
     (is (= 1 (-> (fetch :thingies :where {:foo 1} :options []) first :foo)))
     (is (= 1 (-> (fetch :thingies :where {:foo 1} :options :notimeout) first :foo)))
     (is (= 1 (-> (fetch :thingies :where {:foo 1} :options [:notimeout]) first :foo)))))
+
+(deftest fetch-with-read-preferences
+  (with-test-mongo
+    (insert! :thingies {:foo 1})
+    (is (= 1 (-> (fetch :thingies :where {:foo 1} :read-preference nil) first :foo)))
+    (is (= 1 (-> (fetch :thingies :where {:foo 1} :read-preference :primary) first :foo)))
+    (is (= 1 (-> (fetch :thingies :where {:foo 1} :read-preference :nearest) first :foo)))))
+
 
 (deftest test-fetch-and-modify
   (with-test-mongo
@@ -711,3 +720,34 @@ function ()
             [{:fruit "bananas", :count 3.0}]))
       (is (= all-count-keyf
             [{:items 3.0, :fruit "bananas"} {:items 5.0, :fruit "plantains"} {:items 6.0, :fruit "pineapples"}])))))
+
+
+(deftest test-read-preference
+  (let [^DBObject f-tag (BasicDBObject. "location" "nearby")
+        r-tags (into-array DBObject [(BasicDBObject. "rack" "bottom")])
+        empty-tags (into-array DBObject [])]
+    (are [expected type tags] (= expected (apply read-preference (cons type tags)))
+      (ReadPreference/nearest) :nearest nil
+      (ReadPreference/nearest f-tag empty-tags) :nearest [{:location "nearby"}]
+      (ReadPreference/nearest f-tag r-tags) :nearest [{:location "nearby"} {:rack :bottom}]
+      (ReadPreference/primary) :primary nil
+      (ReadPreference/primaryPreferred) :primary-preferred nil
+      (ReadPreference/primaryPreferred f-tag empty-tags) :primary-preferred [{:location "nearby"}]
+      (ReadPreference/primaryPreferred f-tag r-tags) :primary-preferred [{:location "nearby"} {:rack :bottom}]
+      (ReadPreference/secondary) :secondary nil
+      (ReadPreference/secondary f-tag empty-tags) :secondary [{:location "nearby"}]
+      (ReadPreference/secondary f-tag r-tags) :secondary [{:location "nearby"} {:rack :bottom}]
+      (ReadPreference/secondaryPreferred) :secondary-preferred nil
+      )))
+
+(deftest get-and-set-collection-read-preference
+  (with-test-mongo
+    (create-collection! :with-preferences )
+    (set-collection-read-preference! :with-preferences :nearest )
+    (is (= (ReadPreference/nearest) (get-collection-read-preference :with-preferences )))))
+
+(deftest get-and-set-collection-write-concern
+  (with-test-mongo
+    (create-collection! :with-write-concern )
+    (set-collection-write-concern! :with-write-concern :unacknowledged )
+    (is (= WriteConcern/UNACKNOWLEDGED (get-collection-write-concern :with-write-concern )))))

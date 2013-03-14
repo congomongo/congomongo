@@ -182,6 +182,28 @@ of the 0.4.0 release.
 * :replica-acknowledged waits until a write is sync'd to at least one replica as well (:replicas-safe, :replica-safe)
 * :majority waits until a write is sync'd to a majority of replica nodes (no previous equivalent)
 
+#### specify a read preference
+You can pass a simple read preference (without tags) to each function accepting read preferences. This may look like:
+
+```clojure
+(m/fetch :fruit :read-preference :nearest)
+```
+
+to get the fruit from the nearest server. You may create more advances read preferences using the `read-preference` function.
+
+```clojure
+(let [p (m/read-preference :nearest {:location "Europe"})]
+   (fetch :fruit :read-preference p)
+)
+```
+to be more specific to get the nearest fruit. You may also set a default `ReadPreference` on a per collection or connection basis using `set-read-preference` or `set-collection-read-preference!`.
+
+```clojure
+(m/set-read-preference conn :primary-preferred)
+(m/set-collection-read-preference! :news :secondary)
+```
+
+
 ### Simple Tasks
 ------------------
 
