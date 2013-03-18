@@ -56,13 +56,14 @@
 
 (def ^:private builder-map
   "A map from keywords to builder invocation functions."
-  (let [is-builder-method? (fn [f]
+  ;; Be aware that using refelction directly here will also issue Clojure reflection warnings.
+  (let [is-builder-method? (fn [^java.lang.reflect.Method f]
                              (let [m (.getModifiers f)]
                                (and (java.lang.reflect.Modifier/isPublic m)
                                     (not (java.lang.reflect.Modifier/isStatic m))
                                     (= MongoClientOptions$Builder (.getReturnType f)))))
-        method-name (fn [f] (.getName f))
-        builder-call (fn [m]
+        method-name (fn [^java.lang.reflect.Method f] (.getName f))
+        builder-call (fn [^MongoClientOptions$Builder m]
                        (eval (list 'fn '[o v]
                                    (list (symbol (str "." m)) 'o 'v))))
         kw-fn-pair (fn [m] [(field->kw m) (builder-call m)])
@@ -82,7 +83,7 @@
                          (f b v)
                          (throw (IllegalArgumentException.
                                  (str k " is not a valid MongoClientOptions$Builder argument")))))]
-    (.build (reduce builder-call (MongoClientOptions$Builder.) option-map))))
+    (.build ^MongoClientOptions$Builder (reduce builder-call (MongoClientOptions$Builder.) option-map))))
 
 (defn- make-server-address
   "Convenience to make a ServerAddress without reflection warnings."
@@ -112,10 +113,11 @@
         ^MongoClient client (MongoClient. mongouri)
         ^String db (.getDatabase mongouri)
         conn {:mongo client :db (.getDB client db)}
-        username (.getUsername mongouri)
-        password (.getPassword mongouri)]
+        ^DB db (conn :db)
+        ^String username (.getUsername mongouri)
+        ^chars password (.getPassword mongouri)]
     (when (and username password)
-      (.authenticate (conn :db) username password))
+      (.authenticate db username password))
     conn))
 
 (defn make-connection
@@ -132,7 +134,7 @@ a map containing values for :host and/or :port.
   ([db]
     (make-connection db {}))
   ([db & args]
-    (let [dbname (named db)]
+    (let [^String dbname (named db)]
       (if (.startsWith dbname "mongodb://")
         (make-connection-uri dbname)
         (make-connection-args dbname args)))))
@@ -176,7 +178,7 @@ a map containing values for :host and/or :port.
 
   When with-db and set-database! interact, last one wins."
   [dbname & body]
-  `(let [db# (.getDB (:mongo *mongo-config*) (name ~dbname))]
+  `(let [^DB db# (.getDB ^MongoClient (:mongo *mongo-config*) (name ~dbname))]
      (binding [*mongo-config* (assoc *mongo-config* :db db#)]
        ~@body)))
 
@@ -471,10 +473,10 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
    :as     -> results format (:clojure, :json, or :mongo).  Defaults to :clojure."
   {:arglists
    '([collection key :where :from :as])}
-  [coll k & {:keys [where from as]
+  [coll ^String k & {:keys [where from as]
              :or {where {} from :clojure as :clojure}}]
-  (let [query (coerce where [from :mongo])]
-    (coerce (.distinct (get-coll coll) k query)
+  (let [^DBObject query (coerce where [from :mongo])]
+    (coerce (.distinct ^DBCollection (get-coll coll) k query)
             [:mongo as])))
 
 (defn insert!
@@ -687,7 +689,7 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
   {:arglists '([fs data {:filename nil :contentType nil :metadata nil}])}
   [fs data & {:keys [^String filename ^String contentType ^DBObject metadata]
               :or {filename nil contentType nil metadata nil}}]
-  (let [^com.mongodb.gridfs.GridFSInputFile f (.createFile (get-gridfs fs) data)]
+  (let [^com.mongodb.gridfs.GridFSInputFile f (.createFile ^GridFS (get-gridfs fs) data)]
     (if filename (.setFilename f ^String filename))
     (if contentType (.setContentType f contentType))
     (if metadata (.setMetaData f (coerce metadata [:clojure :mongo])))
@@ -731,7 +733,7 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
    should be either an OutputStream, File, or the String path for a file."
   [fs file out]
   ;; since .findOne is overloaded and coerce returns different types, we cannot remove the reflection warning:
-  (if-let [^com.mongodb.gridfs.GridFSDBFile f (.findOne (get-gridfs fs) (coerce file [:clojure :mongo]))]
+  (if-let [^com.mongodb.gridfs.GridFSDBFile f (.findOne ^GridFS (get-gridfs fs) (coerce file [:clojure :mongo]))]
     ;; since .writeTo is overloaded and we can pass different types, we cannot remove the reflection warning:
     (.writeTo f out)))
 
@@ -739,7 +741,7 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
   "Returns an InputStream from the GridFS file specified"
   [fs file]
   ;; since .findOne is overloaded and coerce returns different types, we cannot remove the reflection warning:
-  (if-let [^com.mongodb.gridfs.GridFSDBFile f (.findOne (get-gridfs fs) (coerce file [:clojure :mongo]))]
+  (if-let [^com.mongodb.gridfs.GridFSDBFile f (.findOne ^GridFS (get-gridfs fs) (coerce file [:clojure :mongo]))]
     (.getInputStream f)))
 
 (defn server-eval

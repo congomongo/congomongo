@@ -5,7 +5,8 @@
         somnium.congomongo.coerce
         clojure.pprint)
   (:use [clojure.data.json :only (read-str write-str)])
-  (:import [com.mongodb DBObject BasicDBObject BasicDBObjectBuilder MongoException$DuplicateKey ReadPreference
+  (:import [com.mongodb MongoClient DB DBObject BasicDBObject BasicDBObjectBuilder MongoException$DuplicateKey
+            ReadPreference
             WriteConcern]))
 
 (deftest coercions
@@ -73,7 +74,7 @@
     (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port
                              (mongo-options :auto-connect-retry true
                                             :write-concern (:acknowledged write-concern-map)))
-          m (:mongo a)
+         ^MongoClient m (:mongo a)
           opts (.getMongoOptions m)]
       ;; check non-default options attached to Mongo object
       (is (.isAutoConnectRetry opts))
@@ -86,14 +87,14 @@
     (let [userpass (if (and test-db-user test-db-pass) (str test-db-user ":" test-db-pass "@") "")
           uri (str "mongodb://" userpass test-db-host ":" test-db-port "/congomongotest-db-a?maxpoolsize=123&w=1&safe=true")
           a (make-connection uri)
-          m (:mongo a)
+          ^MongoClient m (:mongo a)
           opts (.getMongoOptions m)]
       (testing "make-connection parses options from URI"
         (is (= 123 (.getConnectionsPerHost opts)))
         (is (= WriteConcern/ACKNOWLEDGED (.getWriteConcern opts))))
       (with-mongo a
         (testing "make-connection accepts Mongo URI"
-                (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))))))
+                (is (= "congomongotest-db-a" (.getName ^DB (*mongo-config* :db)))))))))
 
 (deftest with-mongo-database
   (with-test-mongo
@@ -101,9 +102,9 @@
       (with-mongo a
         (with-db "congomongotest-db-b"
           (testing "with-mongo uses new database"
-                   (is (= "congomongotest-db-b" (.getName (*mongo-config* :db))))))
+                   (is (= "congomongotest-db-b" (.getName ^DB (*mongo-config* :db))))))
         (testing "with-mongo uses connection db "
-                 (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))))))
+                 (is (= "congomongotest-db-a" (.getName ^DB (*mongo-config* :db)))))))))
 
 (deftest with-mongo-interactions
   (with-test-mongo
@@ -111,12 +112,12 @@
           b (make-connection :congomongotest-db-b :host test-db-host :port test-db-port)]
       (with-mongo a
         (testing "with-mongo sets the mongo-config"
-          (is (= "congomongotest-db-a" (.getName (*mongo-config* :db)))))
+          (is (= "congomongotest-db-a" (.getName ^DB (*mongo-config* :db)))))
         (testing "mongo! inside with-mongo stomps on current config"
           (mongo! :db "congomongotest-db-b" :host test-db-host :port test-db-port)
-          (is (= "congomongotest-db-b" (.getName (*mongo-config* :db))))))
+          (is (= "congomongotest-db-b" (.getName ^DB (*mongo-config* :db))))))
       (testing "and previous mongo! inside with-mongo is visible afterwards"
-        (is (= "congomongotest-db-b" (.getName (*mongo-config* :db))))))))
+        (is (= "congomongotest-db-b" (.getName ^DB (*mongo-config* :db))))))))
 
 (deftest closing-with-mongo
   (with-test-mongo
@@ -535,12 +536,12 @@
               (.deleteOnExit))]
     (with-open [w (java.io.FileOutputStream. tmp)]
       (doseq [i (range 2048)]
-        (.write w (rem i 255))))
+        (.write w (int (rem i 255)))))
     tmp))
 
 (deftest gridfs-test-insert-different-data-types
   (with-test-mongo
-    (let [file (gen-tempfile)]
+    (let [^java.io.File file (gen-tempfile)]
       (insert-file! :filefs file)
       (insert-file! :filefs (java.io.FileInputStream. file))
       (insert-file! :filefs (.getBytes "data"))

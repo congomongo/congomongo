@@ -47,8 +47,8 @@
                          (.put "a" -1))))
 
 (deftest test-dbobject
-  (are [fields bdo] (is (= (.toString (apply dbobject fields))
-                           (.toString bdo)))
+  (are [fields bdo] (let [^BasicDBObject exo (apply dbobject fields)]
+                      (is (= (.toString exo ) (.toString bdo))))
        [:a 1 :b 1 :c 1] (doto (BasicDBObject.)
                           (.put "a" 1)
                           (.put "b" 1)
