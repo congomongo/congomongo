@@ -391,7 +391,7 @@ releases.  Please use 'make-connection' in combination with
    :explain? -> returns performance information on the query, instead of rows
    :sort     -> sort the results by a specific key
    :options  -> query options [:tailable :slaveok :oplogreplay :notimeout :awaitdata]
-   :read-preference -> read preferences (e.g. :primary or ReadPreference instance)"
+   :read-preferences -> read preferences (e.g. :primary or ReadPreference instance)"
   {:arglists
    '([collection :where :only :limit :skip :as :from :one? :count? :sort :explain? :options :read-preferences])}
   [coll & {:keys [where only as from one? count? limit skip sort options explain? read-preferences]
