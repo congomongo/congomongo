@@ -166,8 +166,8 @@
   (with-test-mongo
     (insert! :test_col {:num-set #{1 2 3}
                         :kw-set #{:key1 :key2}})
-    (is (= [1 2 3] (:num-set (fetch-one :test_col))))
-    (is (= ["key1" "key2"] (:kw-set (fetch-one :test_col))))))
+    (is (= #{1 2 3} (set (:num-set (fetch-one :test_col)))))
+    (is (= #{"key1" "key2"} (set (:kw-set (fetch-one :test_col)))))))
 
 (deftest collection-existence
   (with-test-mongo
