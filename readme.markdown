@@ -9,9 +9,12 @@ For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3
 
 News
 --------------
-Version 0.4.2-SNAPSHOT (ongoing)
+Version 0.4.2 - February 25th, 2014
 
-* no changes yet
+* change default Clojure version from 1.4 to 1.5.1 and add test coverage for 1.6.0-beta1
+* fix set insertion test for Clojure 1.6
+* fix docstring (#130 dwwoelfel)
+* fix reflection warnings (#123 niclasmeier)
 
 Version 0.4.1 - March 14th, 2013
 
