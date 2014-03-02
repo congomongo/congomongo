@@ -17,5 +17,5 @@
   ;; use it in each with-profile group!
   :profiles {:1.3 {:dependencies [[org.clojure/clojure "1.3.0"]]}
              :1.4 {:dependencies [[org.clojure/clojure "1.4.0"]]}
-             :1.6 {:dependencies [[org.clojure/clojure "1.6.0-beta1"]]}}
+             :1.6 {:dependencies [[org.clojure/clojure "1.6.0-beta2"]]}}
   :aliases {"test-all" ["with-profile" "default:1.3,default:1.4,default,default:1.6" "test"]})
