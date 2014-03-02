@@ -497,9 +497,9 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
 
 (defn mass-insert!
   {:arglists '([coll objs {:from :clojure :to :clojure}])}
-  [coll objs & {:keys [from to]
+  [coll objs & {:keys [from to write-concern]
                 :or {from :clojure to :clojure}}]
-  (insert! coll objs :from from :to to :many true))
+  (insert! coll objs :from from :to to :many true :write-concern write-concern))
 
 ;; should this raise an exception if _ns and _id aren't present?
 (defn update!
