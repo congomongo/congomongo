@@ -10,7 +10,9 @@
             WriteConcern]))
 
 (deftest coercions
-  (let [clojure      {:a {:b "c" :d 1 :f ["a" "b" "c"] :g {:h ["i" "j" -42.42]}}}
+  (let [clojure      (array-map :a
+                                (array-map :b "c" :d 1 :f ["a" "b" "c"] :g
+                                           (array-map :h ["i" "j" -42.42])))
         mongo        (.. (BasicDBObjectBuilder/start)
                          (push "a")
                          (add "b" "c")
@@ -19,27 +21,24 @@
                          (push "g")
                          (add "h" ["i" "j" -42.42])
                          get)
-        clojure-json (write-str clojure) ; no padding
+        clojure-json (write-str clojure); no padding
         mongo-json   (str mongo)        ; contains whitespace padding
-        from    {:clojure clojure
-                 :mongo   mongo
-                 :json    clojure-json}
-        to      (assoc from nil nil)]
+        from         {:clojure clojure
+                      :mongo   mongo
+                      :json    clojure-json}
+        to           (assoc from nil nil)]
     (doseq [[from original] from, [to expected] to
-            :let [actual   (coerce original [from to])
-                  expected (if (= [from to] [:mongo :json]) ; padding diff
-                             mongo-json
-                             expected)]]
-      (is (= actual expected) [from to]))))
+            :let [actual    (coerce original [from to])]]
+      (cond (= [from to] [:json :mongo]); BasicDBObject not =
+                                        ; changed in 2.12.0 driver
+            (is (= (.toString actual) (.toString expected)) [from to])
+            (= [from to] [:mongo :json]); padding difference
+            (is (= actual mongo-json) [from to])
+            :else
+            (is (= actual expected) [from to])))))
 
-;; MongoLab test setup courtesy of World Singles, intended for Travis
-;; CI testing...
-
-;; MongoLab Free test DB: ds029317.mongolab.com
 (def test-db-host (get (System/getenv) "MONGOHOST" "127.0.0.1"))
-;; MongoLab Free test DB: 29317
 (def test-db-port (Integer/parseInt (get (System/getenv) "MONGOPORT" "27017")))
-;; MongoLab Free test DB: congomongo/mongocongo
 (def test-db-user (get (System/getenv) "MONGOUSER" nil))
 (def test-db-pass (get (System/getenv) "MONGOPASS" nil))
 (def test-db "congomongotestdb")
