@@ -9,6 +9,12 @@ For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3
 
 News
 --------------
+Version 0.4.3 - April 8th, 2014
+
+* change default Clojure version from 1.5.1 to 1.6.0 (we still support back to 1.3.0)
+* update Java driver to 2.12.0 to support MongoDB 2.6.0
+* support `:write-concern` on `mass-insert!`
+
 Version 0.4.2 - February 25th, 2014
 
 * change default Clojure version from 1.4 to 1.5.1 and add test coverage for 1.6.0-beta1
