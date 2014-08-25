@@ -86,32 +86,34 @@
   (clojure->mongo [o] o))
 
 
+(def ^{:dynamic true
+       :doc "Mapping of [from to] pairs to translation functions for coerce."}
+     *translations* {[:clojure :mongo  ] #'clojure->mongo
+                     [:clojure :json   ] #'write-str
+                     [:mongo   :clojure] #(mongo->clojure ^DBObject % ^Boolean/TYPE *keywordize*)
+                     [:mongo   :json   ] #(.toString ^DBObject %)
+                     [:json    :clojure] #(read-str % :key-fn (if *keywordize*
+                                                                keyword
+                                                                identity))
+                     [:json    :mongo  ] #(JSON/parse %)})
 
-(let [translations {[:clojure :mongo  ] clojure->mongo
-                    [:clojure :json   ] write-str
-                    [:mongo   :clojure] #(mongo->clojure ^DBObject % ^Boolean/TYPE *keywordize*)
-                    [:mongo   :json   ] #(.toString ^DBObject %)
-                    [:json    :clojure] #(read-str % :key-fn (if *keywordize*
-                                                               keyword
-                                                               identity))
-                    [:json    :mongo  ] #(JSON/parse %)}]
-  (defn coerce
-    "takes an object, a vector of keywords:
-     from [ :clojure :mongo :json ]
-     to   [ :clojure :mongo :json ],
-     and an an optional :many keyword parameter which defaults to false"
-    {:arglists '([obj [:from :to] {:many false}])}
-    [obj from-and-to & {:keys [many] :or {many false}}]
-    (let [[from to] from-and-to]
-      (cond (= from to) obj
-            (nil?   to) nil
-            :else       (if-let [f (translations from-and-to)]
-                          (if many
-                            (map f (if (seqable? obj)
-                                     obj
-                                     (iterator-seq obj)))
-                            (f obj))
-                          (throw (RuntimeException. "unsupported keyword pair")))))))
+(defn coerce
+  "takes an object, a vector of keywords:
+   from [ :clojure :mongo :json ]
+   to   [ :clojure :mongo :json ],
+   and an an optional :many keyword parameter which defaults to false"
+  {:arglists '([obj [:from :to] {:many false}])}
+  [obj from-and-to & {:keys [many] :or {many false}}]
+  (let [[from to] from-and-to]
+    (cond (= from to) obj
+          (nil?   to) nil
+          :else       (if-let [f (*translations* from-and-to)]
+                        (if many
+                          (map f (if (seqable? obj)
+                                   obj
+                                   (iterator-seq obj)))
+                          (f obj))
+                        (throw (RuntimeException. "unsupported keyword pair"))))))
 
 (defn ^DBObject dbobject [& args]
   "Create a DBObject from a sequence of key/value pairs, in order."
