@@ -1,4 +1,4 @@
-(defproject congomongo
+(defproject circleci/congomongo
   "0.4.6"
   :description "Clojure-friendly API for MongoDB"
   :url "https://github.com/aboekhoff/congomongo"
