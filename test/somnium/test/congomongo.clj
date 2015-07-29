@@ -217,10 +217,30 @@
     (is (thrown? IllegalArgumentException
                  (fetch-one :stuff :sort {:a 1})))))
 
+(deftest fetch-one-with-read-preferences-fails
+  (with-test-mongo
+    (is (thrown? IllegalArgumentException
+                 (fetch-one :test_col :read-preferences :secondary)))))
+
 (deftest fetch-one-with-hint-fails
   (with-test-mongo
     (is (thrown? IllegalArgumentException
                  (fetch-one :test_col :hint "key_1")))))
+
+(deftest fetch-one-with-explain-fails
+  (with-test-mongo
+    (is (thrown? IllegalArgumentException
+                 (fetch-one :test_col :explain? true)))))
+
+(deftest fetch-one-with-limit-fails
+  (with-test-mongo
+    (is (thrown? IllegalArgumentException
+                 (fetch-one :test_col :limit 1)))))
+
+(deftest fetch-one-with-options-fails
+  (with-test-mongo
+    (is (thrown? IllegalArgumentException
+                 (fetch-one :test_col :options [:notimeout])))))
 
 (deftest fetch-with-only
   (with-test-mongo

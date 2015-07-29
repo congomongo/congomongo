@@ -401,8 +401,8 @@ releases.  Please use 'make-connection' in combination with
   (when (and one? sort)
     (throw (IllegalArgumentException. "Fetch :one? (or fetch-one) can't be used with :sort.
 You should use fetch with :limit 1 instead."))); one? and sort should NEVER be called together
-  (when (and one? hint)
-    (throw (IllegalArgumentException. "At the moment, fetch-one doesn't support hint"))) ;; this is allowed but not implemented here
+  (when (and one? (or read-preferences (not= [] options) (not= 0 limit) hint explain?))
+    (throw (IllegalArgumentException. "At the moment, fetch-one doesn't support read-preferences, options, limit or hint"))) ;; these are allowed but not implemented here
   (when-not (or (nil? hint)
                 (string? hint)
                 (and (instance? clojure.lang.Sequential hint)
