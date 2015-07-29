@@ -391,21 +391,37 @@ releases.  Please use 'make-connection' in combination with
    :explain? -> returns performance information on the query, instead of rows
    :sort     -> sort the results by a specific key
    :options  -> query options [:tailable :slaveok :oplogreplay :notimeout :awaitdata]
+   :hint     -> tell the query which index to use (name (string) or [:compound :index] (seq of keys))
    :read-preferences -> read preferences (e.g. :primary or ReadPreference instance)"
   {:arglists
-   '([collection :where :only :limit :skip :as :from :one? :count? :sort :explain? :options :read-preferences])}
-  [coll & {:keys [where only as from one? count? limit skip sort options explain? read-preferences]
+   '([collection :where :only :limit :skip :as :from :one? :count? :sort :hint :explain? :options :read-preferences])}
+  [coll & {:keys [where only as from one? count? limit skip sort hint options explain? read-preferences]
            :or {where {} only [] as :clojure from :clojure
-                one? false count? false limit 0 skip 0 sort nil options [] explain? false}}]
+                one? false count? false limit 0 skip 0 sort nil hint nil options [] explain? false}}]
   (when (and one? sort)
     (throw (IllegalArgumentException. "Fetch :one? (or fetch-one) can't be used with :sort.
 You should use fetch with :limit 1 instead."))); one? and sort should NEVER be called together
+  (when (and one? hint)
+    (throw (IllegalArgumentException. "At the moment, fetch-one doesn't support hint"))) ;; this is allowed but not implemented here
+  (when-not (or (nil? hint)
+                (string? hint)
+                (and (instance? clojure.lang.Sequential hint)
+                     (every? #(or (keyword? %)
+                                  (and (instance? clojure.lang.Sequential %)
+                                       (= 2 (count %))
+                                       (-> % first keyword?)
+                                       (-> % second #{1 -1})))
+                             hint)))
+    (throw (IllegalArgumentException. ":hint requires a string name of the index, or a seq of keywords that is the index definition")))
   (let [n-where (coerce where [from :mongo])
         n-only  (coerce-fields only)
         n-col   (get-coll coll)
         n-limit (if limit (- 0 (Math/abs (long limit))) 0)
         n-sort (when sort (coerce sort [from :mongo]))
         n-options (calculate-query-options options)
+        n-hint (cond (string? hint) hint
+                     (nil? hint) nil
+                     :else (coerce-index-fields hint))
         n-preferences (cond
                         (nil? read-preferences) nil
                         (instance? ReadPreference read-preferences) read-preferences
@@ -421,6 +437,8 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
                                       ^DBObject n-where
                                       ^DBObject n-only
                                       ^ReadPreference n-preferences)]
+               (when n-hint
+                 (.hint cursor n-hint))
                (when n-options
                  (.setOptions cursor n-options))
                (when n-sort
