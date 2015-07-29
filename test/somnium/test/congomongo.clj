@@ -217,6 +217,31 @@
     (is (thrown? IllegalArgumentException
                  (fetch-one :stuff :sort {:a 1})))))
 
+(deftest fetch-one-with-read-preferences-fails
+  (with-test-mongo
+    (is (thrown? IllegalArgumentException
+                 (fetch-one :test_col :read-preferences :secondary)))))
+
+(deftest fetch-one-with-hint-fails
+  (with-test-mongo
+    (is (thrown? IllegalArgumentException
+                 (fetch-one :test_col :hint "key_1")))))
+
+(deftest fetch-one-with-explain-fails
+  (with-test-mongo
+    (is (thrown? IllegalArgumentException
+                 (fetch-one :test_col :explain? true)))))
+
+(deftest fetch-one-with-limit-fails
+  (with-test-mongo
+    (is (thrown? IllegalArgumentException
+                 (fetch-one :test_col :limit 1)))))
+
+(deftest fetch-one-with-options-fails
+  (with-test-mongo
+    (is (thrown? IllegalArgumentException
+                 (fetch-one :test_col :options [:notimeout])))))
+
 (deftest fetch-with-only
   (with-test-mongo
     (let [data {:_id 10 :foo "clever" :bar "filter"}
@@ -227,6 +252,105 @@
            [:_id :foo] [:foo]
            [:foo :bar] {:_id false}
            [:_id :bar] {:foo false}))))
+
+(deftest fetch-with-hint-fails-correctly-on-bad-args
+  (with-test-mongo
+    (testing "vector has wrong types"
+      (is (thrown? IllegalArgumentException
+                   (fetch :t :where {:id 10} :hint ["key1" "key2"])))
+      (is (thrown? IllegalArgumentException
+                   (fetch :t :where {:id 10} :hint [["key1" 2] "key2"]))))
+    (testing "invalid type"
+      (is (thrown? IllegalArgumentException
+                   (fetch :t :where {:id 10} :hint 5))))))
+
+(deftest fetch-with-hint-works-on-valid-type
+  (with-test-mongo
+    (add-index! :t [:key1 :key2])
+    (add-index! :t [:key1 [:key2 -1]])
+    (add-index! :t [:key1 [:key2 1]])
+    (insert! :t {:key1 1})
+
+    (is (fetch :t :where {:key1 1} :hint [:key1 :key2]))
+    (is (fetch :t :where {:key1 1} :hint [:key1 [:key2 -1]]))
+    (is (fetch :t :where {:key1 1} :hint [:key1 [:key2 1]]))))
+
+(deftest fetch-with-hint-changes-index
+  (with-test-mongo
+    (let [version (-> *mongo-config*
+                      :mongo
+                      (.getDB test-db)
+                      (.command "buildInfo")
+                      (.getString "version"))
+          mongo2? (-> version (.startsWith "2"))
+          mongo3? (-> version (.startsWith "3"))]
+
+      ;; only 1 versions
+      (is (or mongo2? mongo3?))
+      (is (not (and mongo2? mongo3?)))
+      (insert! :test_col {:key1 1 :key2 2})
+
+      (add-index! :test_col [:key1]) ;; index1
+      (add-index! :test_col [:key1 :key2]) ;; index 2
+      (add-index! :test_col [[:key1 -1]]) ;; index3
+      (add-index! :test_col [:key1 [:key2 -1]]) ;; index 4
+
+      (testing "index1"
+        (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_1"))]
+          (when mongo2?
+            (is (= "BtreeCursor key1_1" (-> plan :cursor))))
+          (when mongo3?  ;; TODO
+            (is false))))
+
+      (testing "index1 seq"
+        (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [:key1]))]
+          (when mongo2?
+            (is (= "BtreeCursor key1_1" (-> plan :cursor))))
+          (when mongo3?  ;; TODO
+            (is false))))
+
+      (testing "index2"
+        (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_1_key2_1"))]
+          (when mongo2?
+            (is (= "BtreeCursor key1_1_key2_1" (-> plan :cursor))))
+          (when mongo3?  ;; TODO
+            (is false))))
+
+      (testing "index2 seq"
+        (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [:key1 :key2]))]
+          (when mongo2?
+            (is (= "BtreeCursor key1_1_key2_1" (-> plan :cursor))))
+          (when mongo3?  ;; TODO
+            (is false))))
+
+      (testing "index3"
+        (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_-1"))]
+          (when mongo2?
+            (is (= "BtreeCursor key1_-1" (-> plan :cursor))))
+          (when mongo3?  ;; TODO
+            (is false))))
+
+      (testing "index3 seq"
+        (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [[:key1 -1]]))]
+          (when mongo2?
+            (is (= "BtreeCursor key1_-1" (-> plan :cursor))))
+          (when mongo3?  ;; TODO
+            (is false))))
+
+      (testing "index4"
+        (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_1_key2_-1"))]
+          (when mongo2?
+            (is (= "BtreeCursor key1_1_key2_-1" (-> plan :cursor))))
+          (when mongo3?  ;; TODO
+            (is false))))
+
+      (testing "index4 seq"
+        (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [:key1 [:key2 -1]]))]
+          (when mongo2?
+            (is (= "BtreeCursor key1_1_key2_-1" (-> plan :cursor))))
+          (when mongo3?  ;; TODO
+            (is false)))))))
+
 
 (deftest fetch-by-id-of-any-type
   (with-test-mongo
