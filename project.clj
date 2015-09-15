@@ -10,7 +10,7 @@
             :distribution :repo}
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/data.json "0.2.6"]
-                 [org.mongodb/mongo-java-driver "2.14.3"]
+                 [org.mongodb/mongo-java-driver "3.0.4"]
                  [org.clojure/clojure "1.9.0" :scope "provided"]]
   ;; if a :dev profile is added, remember to update :aliases below to
   ;; use it in each with-profile group!
