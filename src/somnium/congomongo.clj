@@ -229,7 +229,6 @@ releases.  Please use 'make-connection' in combination with
 
 (def write-concern-map
   {:acknowledged         WriteConcern/ACKNOWLEDGED
-   :errors-ignored       WriteConcern/ERRORS_IGNORED
    :fsynced              WriteConcern/FSYNCED
    :journaled            WriteConcern/JOURNALED
    :majority             WriteConcern/MAJORITY
@@ -238,7 +237,6 @@ releases.  Please use 'make-connection' in combination with
    ;; these are pre-2.10.x names for write concern:
    :fsync-safe    WriteConcern/FSYNC_SAFE  ;; deprecated - use :fsynced
    :journal-safe  WriteConcern/JOURNAL_SAFE ;; deprecated - use :journaled
-   :none          WriteConcern/NONE ;; deprecated - use :errors-ignored
    :normal        WriteConcern/NORMAL ;; deprecated - use :unacknowledged
    :replicas-safe WriteConcern/REPLICAS_SAFE ;; deprecated - use :replica-acknowledged
    :safe          WriteConcern/SAFE ;; deprecated - use :acknowledged
