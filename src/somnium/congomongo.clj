@@ -27,7 +27,7 @@
             [somnium.congomongo.config :refer [*mongo-config*]]
             [somnium.congomongo.coerce :refer [coerce coerce-fields coerce-index-fields]])
   (:import  [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder MongoClientURI
-             DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes DBCursor
+             DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes
              AggregationOptions AggregationOptions$OutputMode]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
@@ -440,10 +440,11 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
                          ^DBObject n-where
                          ^DBObject n-only)]
                (coerce m [:mongo as]) nil)
-      :else  (when-let [cursor (DBCursor. ^DBCollection n-col
+      :else  (when-let [cursor (.find ^DBCollection n-col
                                       ^DBObject n-where
-                                      ^DBObject n-only
-                                      ^ReadPreference n-preferences)]
+                                      ^DBObject n-only)]
+               (when n-preferences
+                 (.setReadPreference cursor n-preferences))
                (when n-hint
                  (.hint cursor n-hint))
                (when n-options
