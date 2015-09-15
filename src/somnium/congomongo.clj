@@ -287,8 +287,7 @@ releases.  Please use 'make-connection' in combination with
 (defn db-ref
   "Convenience DBRef constructor."
   [ns id]
-  (DBRef. (get-db *mongo-config*)
-          ^String (named ns)
+  (DBRef. ^String (named ns)
           ^Object id))
 
 (defn db-ref? [x]
