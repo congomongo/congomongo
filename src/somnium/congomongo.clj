@@ -298,7 +298,6 @@ releases.  Please use 'make-connection' in combination with
   [collection]
   (.collectionExists (get-db *mongo-config*)
                      ^String (named collection)))
-
 (defn create-collection!
   "Explicitly create a collection with the given name, which must not already exist.
 
@@ -312,10 +311,10 @@ releases.  Please use 'make-connection' in combination with
    :max    -> int: max number of documents."
   {:arglists
    '([collection :capped :size :max])}
-  ([collection & {:keys [capped size max] :as options}]
-     (.createCollection (get-db *mongo-config*)
-                        ^String (named collection)
-                        (coerce options [:clojure :mongo]))))
+  [collection & {:keys [capped size max] :as options}]
+  (.createCollection (get-db *mongo-config*)
+                     ^String (named collection)
+                     (coerce options [:clojure :mongo])))
 
 (def query-option-map
   {:tailable    Bytes/QUERYOPTION_TAILABLE

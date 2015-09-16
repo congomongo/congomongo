@@ -177,9 +177,15 @@
   (clojure->mongo ^IPersistentMap (apply array-map
                                          (flatten
                                           (for [f fields]
+                                            ;; Related to https://jira.mongodb.org/browse/JAVA-2757
+                                            ;; Using longs for field specifiers results in dropIndex
+                                            ;; determining an incorrect name for the index.
+                                            ;;
+                                            ;; NOTE: specifiers can be strings for geospatial indices, e.g.
+                                            ;; "2d", "2dsphere"
                                             (if (vector? f)
-                                              f
-                                              [f 1]))))))
+                                              (update-in f [1] (fn [x] (if (number? x) (int x) x)))
+                                              [f (int 1)]))))))
 
 (defn ^DBObject coerce-index-fields
   "Used for creating index specifications.

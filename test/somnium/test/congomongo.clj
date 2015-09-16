@@ -4,8 +4,10 @@
         somnium.congomongo.config
         somnium.congomongo.coerce
         clojure.pprint)
-  (:use [clojure.data.json :only (read-str write-str)])
-  (:import [com.mongodb MongoClient DB DBObject BasicDBObject BasicDBObjectBuilder DuplicateKeyException
+  (:require [clojure.data.json :refer (read-str write-str)]
+            [clojure.set :as set])
+  (:import [com.mongodb DB DBCollection DBObject BasicDBObject BasicDBObjectBuilder
+                        MongoClient MongoException DuplicateKeyException MongoCommandException
                         Tag TagSet
             ReadPreference
             WriteConcern]
@@ -921,3 +923,27 @@ function ()
     (create-collection! :with-write-concern )
     (set-collection-write-concern! :with-write-concern :unacknowledged )
     (is (= WriteConcern/UNACKNOWLEDGED (get-collection-write-concern :with-write-concern )))))
+
+(deftest index-names-include-asc-desc-information
+  ;; See https://jira.mongodb.org/browse/JAVA-1971
+  (with-test-mongo
+    (when (not (-> (version test-db) (.startsWith "2.4.")))
+      (insert! :test_col {:key1 1})
+
+      ;; Add key1 asc index
+      (.createIndex (get-coll :test_col)
+                    (coerce {:key1 1} [:clojure :mongo])
+                    (coerce {:unique false :sparse false :background false} [:clojure :mongo]))
+
+      ;; Add key1 desc index, fails until JAVA-1971 is fixed
+      (.createIndex (get-coll :test_col)
+                    (coerce {:key1 -1} [:clojure :mongo])
+                    (coerce {:unique false :sparse false :background false} [:clojure :mongo]))
+
+      (let [index-info (coerce (get-indexes :test_col)
+                               [:mongo :clojure]
+                               :many? true) ]
+        ;; default _id index and the two created above
+        (is (= 3 (count index-info)))
+        (is (set/subset? #{"key1_1" "key1_-1"}
+                         (set (map :name index-info))))))))
