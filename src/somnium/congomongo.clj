@@ -479,7 +479,9 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
                  :clojure)
           f  (fn [[k v]]
                [k (if (db-ref? v)
-                    (coerce (.fetch ^DBRef v) [:mongo as])
+                    (let [v ^DBRef v
+                          coll (get-coll (.getCollectionName v))]
+                      (coerce (.findOne coll (.getId v)) [:mongo as]))
                     v)])]
       (postwalk (fn [x]
                   (if (map? x)
