@@ -51,11 +51,13 @@
   (doseq [^String coll (collections)]
     (when-not (.startsWith coll "system")
       (drop-coll! coll))))
+
 (defn setup! []
   (mongo! :db test-db :host test-db-host :port test-db-port)
   (when (and test-db-user test-db-pass)
     (authenticate test-db-user test-db-pass)
     (drop-test-collections!)))
+
 (defn teardown! []
   (if (and test-db-user test-db-pass)
     (try ; some tests don't authenticate so ignore failures here:
@@ -66,8 +68,10 @@
 (defmacro with-test-mongo [& body]
   `(do
      (setup!)
-     ~@body
-     (teardown!)))
+     (try
+      ~@body
+      (finally
+        (teardown!)))))
 
 (deftest options-on-connections
   (with-test-mongo
