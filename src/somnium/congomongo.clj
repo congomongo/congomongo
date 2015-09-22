@@ -29,6 +29,7 @@
   (:import  [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder MongoClientURI
              DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes
              AggregationOptions AggregationOptions$OutputMode
+             GroupCommand
              MapReduceCommand MapReduceCommand$OutputType]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
@@ -893,12 +894,18 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
   [coll & {:keys [key keyfn reducefn where finalizefn initial as]
            :or {key nil keyfn nil reducefn nil where nil finalizefn nil
                 initial nil as :clojure}}]
-  (coerce (.group ^DBCollection
-            (get-coll coll)
-            ^DBObject
-            (coerce (into {} (filter second {:key (when key (coerce-fields key))
-                     :$keyf keyfn
-                     :$reduce reducefn
-                     :finalize finalizefn
-                     :initial initial
-                     :cond where})) [:clojure :mongo ])) [:mongo as]))
+  (let [collection (get-coll coll)
+        group-command (if (not (nil? keyfn))
+                        (GroupCommand. collection
+                                       ^String keyfn
+                                       ^DBObject (coerce where [:clojure :mongo])
+                                       ^DBObject (coerce initial [:clojure :mongo])
+                                       reducefn
+                                       finalizefn)
+                        (GroupCommand. (get-coll coll)
+                                       ^DBObject (coerce-fields key)
+                                       ^DBObject (coerce where [:clojure :mongo])
+                                       ^DBObject (coerce initial [:clojure :mongo])
+                                       reducefn
+                                       finalizefn))]
+    (coerce (.group collection group-command) [:mongo :clojure] :many? true)))
