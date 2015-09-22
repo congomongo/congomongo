@@ -79,15 +79,15 @@
   (with-test-mongo
     ;; set some non-default option values
     (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port
-                             (mongo-options :auto-connect-retry true
+                             (mongo-options :connect-timeout 500
                                             :write-concern (:acknowledged write-concern-map)))
          ^MongoClient m (:mongo a)
-          opts (.getMongoOptions m)]
+          opts (.getMongoClientOptions m)]
       ;; check non-default options attached to Mongo object
-      (is (.isAutoConnectRetry opts))
+      (is (= 500 (.getConnectTimeout opts)))
       (is (= WriteConcern/ACKNOWLEDGED (.getWriteConcern opts)))
       ;; check a default option as well
-      (is (not (.slaveOk opts))))))
+      (is (= (ReadPreference/primary) (.getReadPreference opts))))))
 
 (deftest uri-for-connection
   (with-test-mongo
