@@ -28,7 +28,8 @@
             [somnium.congomongo.coerce :refer [coerce coerce-fields coerce-index-fields]])
   (:import  [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder MongoClientURI
              DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes
-             AggregationOptions AggregationOptions$OutputMode]
+             AggregationOptions AggregationOptions$OutputMode
+             MapReduceCommand MapReduceCommand$OutputType]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
@@ -338,7 +339,7 @@ releases.  Please use 'make-connection' in combination with
    :secondary (fn secondary ([] (ReadPreference/secondary)) ([tags] (ReadPreference/secondary tags)))
    :secondary-preferred (fn secondary-preferred ([] (ReadPreference/secondaryPreferred)) ([tags] (ReadPreference/secondaryPreferred tags)))})
 
-(defn named?
+(defn- named?
   [x]
   (instance? clojure.lang.Named x))
 
@@ -790,6 +791,14 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
         (:retval result)
         (throw (Exception. ^String (format "failure executing javascript: %s" (str result))))))))
 
+(defn- mapreduce-type
+  [k]
+  (get {:replace MapReduceCommand$OutputType/REPLACE
+        :merge   MapReduceCommand$OutputType/MERGE
+        :reduce  MapReduceCommand$OutputType/REDUCE}
+       k
+       MapReduceCommand$OutputType/INLINE))
+
 (defn map-reduce
   "Performs a map-reduce job on the server.
 
@@ -827,30 +836,44 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
   [collection mapfn reducefn out & {:keys [out-from query query-from sort sort-from limit finalize scope scope-from output as]
                                     :or {out-from :clojure query nil query-from :clojure sort nil sort-from :clojure
                                          limit nil finalize nil scope nil scope-from :clojure output :documents as :clojure}}]
-  (let [;; BasicDBObject requires key-value pairs in the correct order... apparently the first one
-        ;; must be :mapreduce
-        mr-query (->> [[:mapreduce collection]
-                       [:map mapfn]
-                       [:reduce reducefn]
-                       [:out (coerce out [out-from :mongo])]
-                       [:verbose true]
-                       (when query [:query (coerce query [query-from :mongo])])
-                       (when sort [:sort (coerce sort [sort-from :mongo])])
-                       (when limit [:limit limit])
-                       (when finalize [:finalize finalize])
-                       (when scope [:scope (coerce scope [scope-from :mongo])])]
-                      (remove nil?)
-                      flatten
-                      (apply array-map))
-        mr-query (coerce mr-query [:clojure :mongo])
-        ^com.mongodb.MapReduceOutput result (.mapReduce (get-coll collection) ^DBObject mr-query)]
-    (if (or (= output :documents)
-            (= (coerce out [out-from :clojure])
-               {:inline 1}))
-      (coerce (.results result) [:mongo as] :many true)
-      (-> (.getOutputCollection result)
+  (let [mr-query (coerce (or query {}) [query-from :mongo])
+        ;; The output collection and output-type are inherently bound to each
+        ;; other. If out is a string/keyword then the output type should be
+        ;; INLINE (and the out 'collection' converted to a string)
+        ;;
+        ;; If out is a map then it should have a single entry, the key is the
+        ;; output-type and the value is the output collection
+        [out-collection mr-type] (letfn [(convert-map [[k v]]
+                                          [(named v) (mapreduce-type k)])]
+                                  (cond
+                                    (= out {:inline 1}) [nil (mapreduce-type :inline)]
+                                    (map? out)          (-> out first convert-map)
+                                    (named? out)        [(named out) (mapreduce-type :replace)]))
+        ;; Verbose is true by default
+        ;; http://api.mongodb.org/java/3.0/com/mongodb/MapReduceCommand.html#setVerbose-java.lang.Boolean-
+        mr-command (MapReduceCommand. (get-coll collection)
+                                      mapfn
+                                      reducefn
+                                      (str out-collection)
+                                      mr-type
+                                      mr-query)]
+    (when sort
+      (.setSort mr-command (coerce sort [sort-from :mongo])))
+    (when limit
+      (.setLimit mr-command limit))
+    (when finalize
+      (.setFinalize mr-command finalize))
+    (when scope
+      (.setScope mr-command (coerce scope [scope-from :mongo])))
+
+    (let [^com.mongodb.MapReduceOutput result (.mapReduce (get-coll collection) mr-command)]
+      (if (or (= output :documents)
+              (= (coerce out [out-from :clojure])
+                 {:inline 1}))
+        (coerce (.results result) [:mongo as] :many true)
+        (-> (.getOutputCollection result)
             .getName
-            keyword))))
+            keyword)))))
 
 (defn group
   "Performs group operation on given collection
