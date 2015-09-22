@@ -126,7 +126,7 @@
      *translations* {[:clojure :mongo  ] #'clojure->mongo
                      [:clojure :json   ] #'write-str
                      [:mongo   :clojure] #(mongo->clojure ^DBObject % ^boolean *keywordize*)
-                     [:mongo   :json   ] #(.toString ^DBObject %)
+                     [:mongo   :json   ] #(JSON/serialize %)
                      [:json    :clojure] #(read-str % :key-fn (if *keywordize*
                                                                 keyword
                                                                 identity))
