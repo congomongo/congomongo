@@ -26,7 +26,8 @@
             [clojure.walk :refer (postwalk)]
             [somnium.congomongo.config :refer [*mongo-config*]]
             [somnium.congomongo.coerce :refer [coerce coerce-fields coerce-index-fields]])
-  (:import  [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder MongoClientURI
+  (:import  [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder
+             MongoClientURI MongoCredential
              DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes
              AggregationOptions AggregationOptions$OutputMode
              GroupCommand
@@ -93,20 +94,40 @@
   [^String host ^Integer port]
   (ServerAddress. host port))
 
+(defn- make-mongo-client
+  ([addresses creds options]
+    (if (> (count addresses) 1)
+      (MongoClient. ^java.util.List addresses creds options)
+      (MongoClient. ^ServerAddress (first addresses) creds options)))
+
+  ([addresses options]
+    (if (> (count addresses) 1)
+      (MongoClient. ^java.util.List addresses options)
+      (MongoClient. ^ServerAddress (first addresses) options))))
+
 (defn- make-connection-args
-  "Makes a connection with passed database name, host, port and MongoClientOptions"
-  [db args]
-    (let [instances (take-while #(not (instance? MongoClientOptions %)) args)
-          addresses (->> (if (keyword? (first instances))
-                           (list (apply array-map instances)) ; Handle legacy connect args
-                           instances)
-                      (map (fn [{:keys [host port] :or {host "127.0.0.1" port 27017}}]
-                             (make-server-address host port))))
-          ^MongoClientOptions options (or (first (filter #(instance? MongoClientOptions %) args)) (mongo-options))
-          mongo (if (> (count addresses) 1)
-                  (MongoClient. ^java.util.List addresses options)
-                  (MongoClient. ^ServerAddress (first addresses) options))
-          n-db (if db (.getDB mongo db) nil)]
+  "Makes a connection with passed database name, [{:host host, :port port}]
+  server addresses and MongoClientOptions.
+
+  username and password may be supplied for authenticated connections."
+  [db {:keys [instances options username password]}]
+  (when (not= (nil? username) (nil? password))
+    (throw (IllegalArgumentException. "Username and password must both be supplied for authenticated connections")))
+
+  (let [addresses (map (fn [{:keys [host port] :or {host "127.0.0.1" port 27017}}]
+                        (make-server-address host port))
+                       (or instances [{:host "127.0.0.1" :port 27017}]))
+
+        ^MongoClientOptions options (or options (mongo-options))
+
+        mongo (cond
+                (and username password) (make-mongo-client
+                                          addresses
+                                          [(MongoCredential/createCredential username db (.toCharArray password))]
+                                          options)
+                :else (make-mongo-client addresses options))
+
+        n-db (if db (.getDB mongo db) nil)]
       {:mongo mongo :db n-db}))
 
 (defn- make-connection-uri
@@ -115,32 +136,37 @@
   (let [^MongoClientURI mongouri (MongoClientURI. db)
         ^MongoClient client (MongoClient. mongouri)
         ^String db (.getDatabase mongouri)
-        conn {:mongo client :db (.getDB client db)}
-        ^DB db (conn :db)
-        ^String username (.getUsername mongouri)
-        ^chars password (.getPassword mongouri)]
-    (when (and username password)
-      (.authenticate db username password))
+        conn {:mongo client :db (.getDB client db)}]
     conn))
 
 (defn make-connection
   "Connects to one or more mongo instances, returning a connection
-that can be used with set-connection! and with-mongo. Each instance is
-a map containing values for :host and/or :port.
+  that can be used with set-connection! and with-mongo.
+
+  Each instance is a map containing values for :host and/or :port.
+
   May be called with database name and optionally:
-    host (default: 127.0.0.1)
-    port (default: 27017)
-    A MongoClientOptions object
+    :instances - a list of server instances to connect to
+    :options - a MongoClientOptions object
+    :username - the username to authenticate with
+    :password - the password to authenticate with
+
+  If instances are not specified a connection is made to 127.0.0.1:27017
+
+  Username and password must be supplied for authenticated connections.
+
   A MongoClientURI string is also supported and must be prefixed with mongodb://
-  If username and password are specified, authenticate will be immediately
-  called on the connection."
-  ([db]
-    (make-connection db {}))
-  ([db & args]
-    (let [^String dbname (named db)]
-      (if (.startsWith dbname "mongodb://")
-        (make-connection-uri dbname)
-        (make-connection-args dbname args)))))
+  If username and password are specified the connection will be authenticated."
+  {:arglists '([db :instances [{:host host, :port port}]
+                   :options mongo-options
+                   :username username
+                   :password password]
+               [mongo-client-uri])}
+  [db & {:as args}]
+  (let [^String dbname (named db)]
+    (if (.startsWith dbname "mongodb://")
+      (make-connection-uri dbname)
+      (make-connection-args dbname args))))
 
 (defn connection?
   "Returns truth if the argument is a map specifying an active connection."
@@ -194,34 +220,6 @@ When with-mongo and set-connection! interact, last one wins"
                   (constantly connection)
                   (when (thread-bound? #'*mongo-config*)
                     (set! *mongo-config* connection))))
-
-(defn mongo!
-  "Creates a Mongo object and sets the default database.
-
-Does not support replica sets, and will be deprecated in future
-releases.  Please use 'make-connection' in combination with
-'with-mongo' or 'set-connection!' instead.
-
-   Keyword arguments include:
-   :host -> defaults to localhost
-   :port -> defaults to 27017
-   :db   -> defaults to nil (you'll have to set it anyway, might as well do it now.)"
-  {:arglists '([:db ? :host "localhost" :port 27017])}
-  [& {:keys [db host port]
-      :or {db nil host "localhost" port 27017}}]
-  (set-connection! (make-connection db :host host :port port))
-  true)
-
-(defn authenticate
-  "Authenticate against either the current or a specified database connection."
-  ([conn username password]
-     (let [db (get-db conn)]
-       (when-not (.isAuthenticated db)
-         (.authenticate db
-                        ^String username
-                        (.toCharArray ^String password)))))
-  ([username password]
-     (authenticate *mongo-config* username password)))
 
 (definline ^DBCollection get-coll
   "Returns a DBCollection object"

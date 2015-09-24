@@ -6,11 +6,13 @@
         clojure.pprint)
   (:require [clojure.data.json :refer (read-str write-str)]
             [clojure.set :as set])
-  (:import [com.mongodb DB DBCollection DBObject BasicDBObject BasicDBObjectBuilder
+  (:import [java.nio.charset Charset]
+           [java.security MessageDigest]
+           [com.mongodb DB DBCollection DBObject BasicDBObject BasicDBObjectBuilder
                         MongoClient MongoException DuplicateKeyException MongoCommandException
                         Tag TagSet
-            ReadPreference
-            WriteConcern]
+                        ReadPreference
+                        WriteConcern]
            [org.bson.types ObjectId]))
 
 (deftest coercions
@@ -55,10 +57,10 @@
       (drop-coll! coll))))
 
 (defn setup! []
-  (mongo! :db test-db :host test-db-host :port test-db-port)
-  (when (and test-db-user test-db-pass)
-    (authenticate test-db-user test-db-pass)
-    (drop-test-collections!)))
+  (set-connection! (make-connection test-db :instances [{:host test-db-host :port test-db-port}]
+                                            :username test-db-user
+                                            :password test-db-pass))
+  (drop-test-collections!))
 
 (defn teardown! []
   (if (and test-db-user test-db-pass)
@@ -75,12 +77,128 @@
       (finally
         (teardown!)))))
 
+(defn- version
+  [db]
+  (-> *mongo-config*
+      :mongo
+      (.getDB db)
+      (.command "buildInfo")
+      (.getString "version")))
+
+(defn- mongo-hash
+  "Uses the same hashing algorithm as
+  https://github.com/mongodb/mongo/blob/09917767b116f4ff1c0eadda1e8bc5db30828500/src/mongo/shell/db.js#L149"
+  [username passphrase]
+  (let [hex-strings (vec (for [a ["0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "a" "b" "c" "d" "e" "f"]
+                               b ["0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "a" "b" "c" "d" "e" "f"]]
+                           (str a b)))
+        ->bytes (fn [s] (.getBytes s (Charset/forName "UTF-8")))
+        digest-bytes (.digest
+                        (doto (MessageDigest/getInstance "MD5")
+                              (.reset)
+                              (.update (->bytes username))
+                              (.update (->bytes ":mongo:"))
+                              (.update (->bytes passphrase))))]
+    (apply str (map #(get hex-strings (bit-and 0xff %)) digest-bytes))))
+
+(defmacro with-test-user
+  [username password & body]
+  `(let [username# ~username
+         password# ~password]
+    (try
+      (cond
+        (= "2.2" (subs (version test-db) 0 3))
+        ;; 2.2 uses a different user creation algorithm to 2.4
+        (is false "Not implemented for 2.2 databases")
+
+        (= "2.4" (subs (version test-db) 0 3))
+        ;; 2.4 mongodb doesn't have a command to create users. Manually hash
+        ;; the password and insert directly
+        (insert! :system.users {:user username#
+                                :pwd (mongo-hash username# password#)
+                                :roles ["readWrite"]})
+
+        :else
+        (let [create-user-cmd# (.. (BasicDBObjectBuilder/start)
+                                   (add "createUser" username#)
+                                   (add "pwd" password#)
+                                   (add "roles" [(BasicDBObject. {"role" "readWrite", "db" test-db})])
+                                   (get))]
+          (.command ^DB (get-db *mongo-config*)
+                    ^DBObject create-user-cmd#)))
+      ~@body
+      (finally
+        (.command ^DB (get-db *mongo-config*)
+                  ^DBObject (coerce {:dropUser username#} [:clojure :mongo]))))))
+
+(deftest authentication-works
+  (with-test-mongo
+    (with-test-user "test_user" "test_password"
+      (testing "valid credentials work"
+        (let [conn (make-connection test-db :instances [{:host test-db-host :port test-db-port}]
+                                            :username "test_user"
+                                            :password "test_password")]
+          ;; Just validate that we can interact with the DB, the 3.0 Mongo driver
+          ;; has removed any way to check if a connection is authenticated.
+          (with-mongo conn
+            (insert! :thingies {:foo 1})
+            (is (= 1 (:foo (fetch-one :thingies :where {:foo 1}))))
+
+          (close-connection conn))))
+
+      (testing "invalid credentials throw"
+        (let [conn (make-connection test-db :instances [{:host test-db-host :port test-db-port}]
+                                            :options (mongo-options :server-selection-timeout 1000)
+                                            :username "not_a_valid_user"
+                                            :password "not_a_valid_password")]
+          (is (thrown? MongoException
+                       (with-mongo conn
+                         (insert! :thingies {:foo 1}))))
+
+          (close-connection conn)))
+
+      (testing "credentials with Mongo URIs"
+        (let [conn (make-connection (format "mongodb://test_user:test_password@127.0.0.1:27017/%s" test-db))]
+          ;; Just validate that we can interact with the DB, the 3.0 Mongo driver
+          ;; has removed any way to check if a connection is authenticated.
+          (with-mongo conn
+            (insert! :thingies {:foo 1})
+            (is (= 1 (:foo (fetch-one :thingies :where {:foo 1}))))
+
+          (close-connection conn))))
+
+      (testing "bad credentials in a MongoURI"
+        ;; This adds a 30 second wait to the test suite when using the 3.0 driver.
+        ;; Since all connections are authenticated the server selection times
+        ;; out due to invalid credentials.
+        ;; Unlike MongoClient, http://api.mongodb.org/java/current/com/mongodb/MongoClientURI.html
+        ;; does not allow the server selection timeout to be set
+        (let [conn (make-connection (format "mongodb://invalid_user:test_password@127.0.0.1:27017/%s" test-db))]
+          (is (thrown? MongoException
+                       (with-mongo conn
+                         (insert! :thingies {:foo 1}))))
+
+          (close-connection conn))))))
+
+(deftest make-connection-variations
+  (testing "No optional arguments"
+    (is (make-connection test-db)))
+
+  (testing "Username/password combinations"
+    (is (thrown-with-msg? IllegalArgumentException #"Username and password must both be supplied"
+          (make-connection test-db :username "foo" :password nil)))
+
+    (is (thrown-with-msg? IllegalArgumentException #"Username and password must both be supplied"
+          (make-connection test-db :username nil :password "bar")))
+
+    (is (make-connection test-db :username nil :password nil))))
+
 (deftest options-on-connections
   (with-test-mongo
     ;; set some non-default option values
-    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port
-                             (mongo-options :connect-timeout 500
-                                            :write-concern (:acknowledged write-concern-map)))
+    (let [a (make-connection "congomongotest-db-a" :instances [{:host test-db-host :port test-db-port}]
+                                                   :options (mongo-options :connect-timeout 500
+                                                                           :write-concern (:acknowledged write-concern-map)))
          ^MongoClient m (:mongo a)
           opts (.getMongoClientOptions m)]
       ;; check non-default options attached to Mongo object
@@ -105,7 +223,7 @@
 
 (deftest with-mongo-database
   (with-test-mongo
-    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port)]
+    (let [a (make-connection "congomongotest-db-a" :instances [{:host test-db-host :port test-db-port}])]
       (with-mongo a
         (with-db "congomongotest-db-b"
           (testing "with-mongo uses new database"
@@ -115,20 +233,20 @@
 
 (deftest with-mongo-interactions
   (with-test-mongo
-    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port)
-          b (make-connection :congomongotest-db-b :host test-db-host :port test-db-port)]
+    (let [a (make-connection "congomongotest-db-a" :instances [{:host test-db-host :port test-db-port}])
+          b (make-connection :congomongotest-db-b :instances [{:host test-db-host :port test-db-port}])]
       (with-mongo a
         (testing "with-mongo sets the mongo-config"
           (is (= "congomongotest-db-a" (.getName ^DB (*mongo-config* :db)))))
-        (testing "mongo! inside with-mongo stomps on current config"
-          (mongo! :db "congomongotest-db-b" :host test-db-host :port test-db-port)
-          (is (= "congomongotest-db-b" (.getName ^DB (*mongo-config* :db))))))
-      (testing "and previous mongo! inside with-mongo is visible afterwards"
-        (is (= "congomongotest-db-b" (.getName ^DB (*mongo-config* :db))))))))
+        (testing "set-connection! inside with-mongo stomps on current config"
+          (set-connection! (make-connection "congomongotest-db-c" :instances [{:host test-db-host :port test-db-port}]))
+          (is (= "congomongotest-db-c" (.getName ^DB (*mongo-config* :db))))))
+      (testing "and previous set-connection! inside with-mongo is visible afterwards"
+        (is (= "congomongotest-db-c" (.getName ^DB (*mongo-config* :db))))))))
 
 (deftest closing-with-mongo
   (with-test-mongo
-    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port)]
+    (let [a (make-connection "congomongotest-db-a" :instances [{:host test-db-host :port test-db-port}])]
       (with-mongo a
         (testing "close-connection inside with-mongo sets mongo-config to nil"
           (close-connection a)
@@ -300,13 +418,8 @@
 
 (deftest fetch-with-hint-changes-index
   (with-test-mongo
-    (let [version (-> *mongo-config*
-                      :mongo
-                      (.getDB test-db)
-                      (.command "buildInfo")
-                      (.getString "version"))
-          mongo2? (-> version (.startsWith "2"))
-          mongo3? (-> version (.startsWith "3"))]
+    (let [mongo2? (-> test-db version (.startsWith "2"))
+          mongo3? (-> test-db version (.startsWith "3"))]
 
       ;; only 1 versions
       (is (or mongo2? mongo3?))
