@@ -407,8 +407,8 @@ When with-mongo and set-connection! interact, last one wins"
   (when (and one? sort)
     (throw (IllegalArgumentException. "Fetch :one? (or fetch-one) can't be used with :sort.
 You should use fetch with :limit 1 instead."))); one? and sort should NEVER be called together
-  (when (and one? (or read-preferences (not= [] options) (not= 0 limit) hint explain?))
-    (throw (IllegalArgumentException. "At the moment, fetch-one doesn't support read-preferences, options, limit or hint"))) ;; these are allowed but not implemented here
+  (when (and one? (or (not= [] options) (not= 0 limit) hint explain?))
+    (throw (IllegalArgumentException. "At the moment, fetch-one doesn't support options, limit, or hint"))) ;; these are allowed but not implemented here
   (when-not (or (nil? hint)
                 (string? hint)
                 (and (instance? clojure.lang.Sequential hint)
@@ -434,11 +434,14 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
                         :else (somnium.congomongo/read-preference read-preferences))]
     (cond
       count? (.getCount n-col n-where n-only)
-      one?   (if-let [m (.findOne
-                         ^DBCollection n-col
-                         ^DBObject n-where
-                         ^DBObject n-only)]
-               (coerce m [:mongo as]) nil)
+
+      ;; The find command isn't documented so there's no nice way to build a
+      ;; find command that adds read-preferences when necessary
+      one?   (if-let [m (if (not (nil? n-preferences))
+                          (.findOne ^DBCollection n-col ^DBObject n-where ^DBObject n-only ^ReadPreference n-preferences)
+                          (.findOne ^DBCollection n-col ^DBObject n-where ^DBObject n-only))]
+              (coerce m [:mongo as]) nil)
+
       :else  (when-let [cursor (.find ^DBCollection n-col
                                       ^DBObject n-where
                                       ^DBObject n-only)]

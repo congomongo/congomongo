@@ -358,10 +358,10 @@
     (is (thrown? IllegalArgumentException
                  (fetch-one :stuff :sort {:a 1})))))
 
-(deftest fetch-one-with-read-preferences-fails
+(deftest fetch-one-with-read-preferences-does-not-explode
   (with-test-mongo
-    (is (thrown? IllegalArgumentException
-                 (fetch-one :test_col :read-preferences :secondary)))))
+    (insert! :test_col {:foo "bar"})
+    (is (fetch-one :test_col :read-preferences :secondary))))
 
 (deftest fetch-one-with-hint-fails
   (with-test-mongo
