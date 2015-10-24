@@ -196,6 +196,10 @@ conn => {:mongo #<MongoClient Mongo: /127.0.0.1:20717>, :db #<DBApiLayer mydb>}
 (m/with-mongo conn
     (m/insert! :robots {:name "robby"}))
 ```
+#### close the connection
+```clojure
+(m/close-connection conn)
+```
 #### specify a write concern
 ```clojure
 (m/set-write-concern conn :journaled)
