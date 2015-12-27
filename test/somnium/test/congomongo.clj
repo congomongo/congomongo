@@ -299,57 +299,57 @@
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_1"))]
           (when mongo2?
             (is (= "BtreeCursor key1_1" (-> plan :cursor))))
-          (when mongo3?  ;; TODO
-            (is false))))
+          (when mongo3?
+            (is (= "key1_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
 
       (testing "index1 seq"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [:key1]))]
           (when mongo2?
             (is (= "BtreeCursor key1_1" (-> plan :cursor))))
-          (when mongo3?  ;; TODO
-            (is false))))
+          (when mongo3?
+            (is (= "key1_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
 
       (testing "index2"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_1_key2_1"))]
           (when mongo2?
             (is (= "BtreeCursor key1_1_key2_1" (-> plan :cursor))))
-          (when mongo3?  ;; TODO
-            (is false))))
+          (when mongo3?
+            (is (= "key1_1_key2_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
 
       (testing "index2 seq"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [:key1 :key2]))]
           (when mongo2?
             (is (= "BtreeCursor key1_1_key2_1" (-> plan :cursor))))
-          (when mongo3?  ;; TODO
-            (is false))))
+          (when mongo3?
+            (is (= "key1_1_key2_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
 
       (testing "index3"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_-1"))]
           (when mongo2?
             (is (= "BtreeCursor key1_-1" (-> plan :cursor))))
-          (when mongo3?  ;; TODO
-            (is false))))
+          (when mongo3?
+            (is (= "key1_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
 
       (testing "index3 seq"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [[:key1 -1]]))]
           (when mongo2?
             (is (= "BtreeCursor key1_-1" (-> plan :cursor))))
-          (when mongo3?  ;; TODO
-            (is false))))
+          (when mongo3?
+            (is (= "key1_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
 
       (testing "index4"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_1_key2_-1"))]
           (when mongo2?
             (is (= "BtreeCursor key1_1_key2_-1" (-> plan :cursor))))
-          (when mongo3?  ;; TODO
-            (is false))))
+          (when mongo3?
+            (is (= "key1_1_key2_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
 
       (testing "index4 seq"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [:key1 [:key2 -1]]))]
           (when mongo2?
             (is (= "BtreeCursor key1_1_key2_-1" (-> plan :cursor))))
-          (when mongo3?  ;; TODO
-            (is false)))))))
+          (when mongo3?
+            (is (= "key1_1_key2_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))))))
 
 
 (deftest fetch-by-id-of-any-type
