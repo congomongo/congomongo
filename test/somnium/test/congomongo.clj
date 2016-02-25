@@ -457,7 +457,7 @@
       (is (= nil (fetch-one :points
                             :where {:_id point-id}))))))
 
-(deftest update
+(deftest update-one
   (with-test-mongo
     (make-points!)
     (let [point-id (:_id (fetch-one :points))]
