@@ -1,8 +1,9 @@
+sudo: false
 language: clojure
 services: mongodb
-lein: lein2
-script: lein2 test-all
+script: lein test-all
 jdk:
   - openjdk6
   - openjdk7
   - oraclejdk7
+  - oraclejdk8
