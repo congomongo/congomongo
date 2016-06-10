@@ -1,6 +1,6 @@
 (ns somnium.congomongo.coerce
-  (:use [clojure.data.json :only [write-str read-str]]
-        [clojure.core.incubator :only [seqable?]])
+  ;; Clojure 1.3 support prevents us using :require :refer here
+  (:use [clojure.data.json :only [write-str read-str]])
   (:import [clojure.lang IPersistentMap IPersistentVector Keyword]
            [java.util Map List Set]
            [com.mongodb DBObject BasicDBObject BasicDBList]
