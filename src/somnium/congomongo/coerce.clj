@@ -11,6 +11,21 @@
        :doc "Set this to false to prevent coercion from setting string keys to keywords"}
       *keywordize* true)
 
+;; seqable? is present in Clojure 1.9.0
+(if-let [ccs (resolve 'clojure.core/seqable?)]
+  (def ^:private seqable'? ccs)
+  (defn- seqable'?
+    "Returns true if (seq x) will succeed, false otherwise.
+    Present to support pre-Clojure 1.9.0 Alpha 5 without needing
+    to depend on clojure.core.incubator."
+    [x]
+    (or (seq? x)
+        (instance? clojure.lang.Seqable x)
+        (nil? x)
+        (instance? Iterable x)
+        (.isArray (.getClass ^Object x))
+        (string? x)
+        (instance? java.util.Map x))))
 
 ;;; Converting data from mongo into Clojure data objects
 
@@ -107,7 +122,7 @@
             (nil?   to) nil
             :else       (if-let [f (translations from-and-to)]
                           (if many
-                            (map f (if (seqable? obj)
+                            (map f (if (seqable'? obj)
                                      obj
                                      (iterator-seq obj)))
                             (f obj))
