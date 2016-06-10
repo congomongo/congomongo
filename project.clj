@@ -1,5 +1,5 @@
 (defproject congomongo
-  "0.4.8"
+  "0.5.0"
   :description "Clojure-friendly API for MongoDB"
   :url "https://github.com/aboekhoff/congomongo"
   :mailing-list {:name "CongoMongo mailing list"
@@ -14,11 +14,10 @@
                  [org.clojure/clojure "1.8.0" :scope "provided"]]
   ;; if a :dev profile is added, remember to update :aliases below to
   ;; use it in each with-profile group!
-  :profiles {:1.3 {:dependencies [[org.clojure/clojure "1.3.0"]]}
-             :1.4 {:dependencies [[org.clojure/clojure "1.4.0"]]}
+  :profiles {:1.4 {:dependencies [[org.clojure/clojure "1.4.0"]]}
              :1.5 {:dependencies [[org.clojure/clojure "1.5.1"]]}
              :1.6 {:dependencies [[org.clojure/clojure "1.6.0"]]}
              :1.7 {:dependencies [[org.clojure/clojure "1.7.0"]]}
              :1.9 {:repositories [["snapshots" "https://oss.sonatype.org/content/repositories/snapshots/"]]
                    :dependencies [[org.clojure/clojure "1.9.0-master-SNAPSHOT"]]}}
-  :aliases {"test-all" ["with-profile" "default:1.3,default:1.4,default:1.5,default:1.6,default:1.7,default,default:1.9" "test"]})
+  :aliases {"test-all" ["with-profile" "default:1.4,default:1.5,default:1.6,default:1.7,default,default:1.9" "test"]})

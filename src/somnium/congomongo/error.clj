@@ -1,7 +1,7 @@
 (ns
   ^{:author "Jeff Sapp"}
   somnium.congomongo.error
-  (:use [somnium.congomongo.config :only [*mongo-config*]])
+  (:require [somnium.congomongo.config :refer [*mongo-config*]])
   (:import [com.mongodb DB]))
 
 (defn get-last-error

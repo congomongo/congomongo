@@ -22,10 +22,10 @@
   ^{:author "Andrew Boekhoff, Sean Corfield",
     :doc "Various wrappers and utilities for the mongodb-java-driver"}
   somnium.congomongo
-  (:require [clojure.string])
-  (:use     [clojure.walk :only (postwalk)]
-            [somnium.congomongo.config :only [*mongo-config*]]
-            [somnium.congomongo.coerce :only [coerce coerce-fields coerce-index-fields]])
+  (:require [clojure.string]
+            [clojure.walk :refer (postwalk)]
+            [somnium.congomongo.config :refer [*mongo-config*]]
+            [somnium.congomongo.coerce :refer [coerce coerce-fields coerce-index-fields]])
   (:import  [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder MongoClientURI
              DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes DBCursor]
             [com.mongodb.gridfs GridFS]

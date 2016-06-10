@@ -1,6 +1,5 @@
 (ns somnium.congomongo.coerce
-  ;; Clojure 1.3 support prevents us using :require :refer here
-  (:use [clojure.data.json :only [write-str read-str]])
+  (:require [clojure.data.json :refer [write-str read-str]])
   (:import [clojure.lang IPersistentMap IPersistentVector Keyword]
            [java.util Map List Set]
            [com.mongodb DBObject BasicDBObject BasicDBList]
@@ -142,8 +141,9 @@
    maps truthy to 1 and falsey to 0, default 1."
   [fields]
   (clojure->mongo ^IPersistentMap (if (map? fields)
-                                    (into {} (for [[k v] fields]
-                                               [k (if v 1 0)]))
+                                    (reduce-kv (fn [m k v]
+                                                 (assoc m k (if v 1 0)))
+                                               {} fields)
                                     (zipmap fields (repeat 1)))))
 
 (defn ^DBObject coerce-ordered-fields

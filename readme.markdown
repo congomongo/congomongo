@@ -5,10 +5,18 @@ What?
 ------
 A toolkit for using MongoDB with Clojure.
 
-For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3 is the last release that will support Clojure 1.2.x. CongoMongo 0.3.0 onward no longer supports Clojure 1.2.x.
+CongoMongo 0.5.0 onward no longer supports Clojure 1.3.0 or earlier.
+For Clojure 1.3.0, use CongoMongo 0.3.0 thru 0.4.8. CongoMongo 0.4.8 is the last release that supports Clojure 1.3.0.
+For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3 is the last release that supports Clojure 1.2.x.
 
 News
 --------------
+Version 0.5.0 - Jun 6th, 2016
+
+* DROP SUPPORT FOR CLOJURE 1.3.0!
+* Add Clojure 1.9.0 compatibility (handling of seqable? in coerce namespace) - issue #147
+* Clojure is now a "provided" dependency and should no longer appear as a transitive dependency in projects that use CongoMongo, making it easier to get rid of conflicts! _Potentially a breaking change if a project depended on CongoMongo but did not have an explicit dependency on Clojure itself._
+
 Version 0.4.8 - Feb 25th, 2016
 
 * Update clojure.data.json to 0.2.6
@@ -398,13 +406,14 @@ Install
 -------
 
 Leiningen is the recommended way to use congomongo.
-If you are using Clojure 1.3.0 or later, just add
+If you are using Clojure 1.4.0 or later, just add
 
-    [congomongo "0.4.8"]
+    [congomongo "0.5.0"]
 
 to your project.clj (for the latest stable version).
 
-If you are still on Clojure 1.2.x, use congomongo version 0.2.3 instead.
+If you are still on Clojure 1.3.0, use CongoMongo 0.3.0-0.4.8.
+If you are still on Clojure 1.2.x, use CongoMongo version 0.2.3 instead.
 
 ### Feedback
 
