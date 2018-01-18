@@ -703,14 +703,16 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
    Options include:
    :filename    -> defaults to nil
    :contentType -> defaults to nil
-   :metadata    -> defaults to nil"
+   :metadata    -> defaults to nil
+   :_id         -> defaults to nil (autogenerate)"
   {:arglists '([fs data {:filename nil :contentType nil :metadata nil}])}
-  [fs data & {:keys [^String filename ^String contentType ^DBObject metadata]
-              :or {filename nil contentType nil metadata nil}}]
+  [fs data & {:keys [^String filename ^String contentType ^DBObject metadata _id]
+              :or {filename nil contentType nil metadata nil _id nil}}]
   (let [^com.mongodb.gridfs.GridFSInputFile f (.createFile ^GridFS (get-gridfs fs) data)]
     (if filename (.setFilename f ^String filename))
     (if contentType (.setContentType f contentType))
     (if metadata (.setMetaData f (coerce metadata [:clojure :mongo])))
+    (if _id (.setId f _id))
     (.save f)
     (coerce f [:mongo :clojure])))
 

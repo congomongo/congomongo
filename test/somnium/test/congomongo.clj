@@ -7,7 +7,8 @@
   (:use [clojure.data.json :only (read-str write-str)])
   (:import [com.mongodb MongoClient DB DBObject BasicDBObject BasicDBObjectBuilder MongoException$DuplicateKey
             ReadPreference
-            WriteConcern]))
+            WriteConcern]
+           [org.bson.types ObjectId]))
 
 (deftest coercions
   (let [clojure      (array-map :a
@@ -638,6 +639,14 @@
                           :metadata {:calories 50, :opinion "tasty"})]
       (is (= "tasty" (get-in f [:metadata :opinion])))
       (is (= f (fetch-one-file :testfs :where { :metadata.opinion "tasty" }))))))
+
+(deftest gridfs-insert-with-id
+  (with-test-mongo
+    (let [file-id (ObjectId.)
+          f (insert-file! :testfs (.getBytes "nuts")
+                          :_id file-id)]
+      (is (= file-id (get f :_id)))
+      (is (= f (fetch-one-file :testfs :where { :_id file-id }))))))
 
 (deftest gridfs-write-file-to
   (with-test-mongo
