@@ -11,6 +11,10 @@ For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3
 
 News
 --------------
+Version 0.5.1 - Jan 19th, 2017
+* Add support for setting _id when creating GridFS files
+* Update Java driver to 2.14.2
+
 Version 0.5.0 - Jun 6th, 2016
 
 * DROP SUPPORT FOR CLOJURE 1.3.0!
