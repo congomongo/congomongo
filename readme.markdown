@@ -5,6 +5,12 @@ What?
 ------
 A toolkit for using MongoDB with Clojure.
 
+**Unfortunately, all of the original maintainers of CongoMongo have moved on from using MongoDB, so we're looking for a new maintainer!**
+
+If you are interested in taking over CongoMongo, I'd recommend creating a `congomongo` organization on GitHub and forking it into that, so that it is easier to add/change maintainers in future. I'd be happy to update this README to point to a new, well-maintained version of CongoMongo. For a discussion about CongoMongo's maintenance, see https://groups.google.com/forum/#!topic/congomongo-dev/2rM1OfX276E (which started back in 2014!).
+
+If you are looking to get started with MongoDB and Clojure, I would recommend looking at [Monger](http://clojuremongodb.info/) which is well-maintained and extremely well-documented!
+
 CongoMongo 0.5.0 onward no longer supports Clojure 1.3.0 or earlier.
 For Clojure 1.3.0, use CongoMongo 0.3.0 thru 0.4.8. CongoMongo 0.4.8 is the last release that supports Clojure 1.3.0.
 For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3 is the last release that supports Clojure 1.2.x.
