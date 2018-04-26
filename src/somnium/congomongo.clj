@@ -27,7 +27,8 @@
             [somnium.congomongo.config :refer [*mongo-config*]]
             [somnium.congomongo.coerce :refer [coerce coerce-fields coerce-index-fields]])
   (:import  [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder MongoClientURI
-             DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes DBCursor]
+             DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes DBCursor
+             AggregationOptions AggregationOptions$OutputMode]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
@@ -641,11 +642,15 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
   [coll op & ops-and-from-to]
   (let [ops (take-while (complement keyword?) ops-and-from-to)
         from-and-to (drop-while (complement keyword?) ops-and-from-to)
-        {:keys [from to] :or {from :clojure to :clojure}} from-and-to]
-    (coerce (.getCommandResult (.aggregate (get-coll coll)
-                                           (coerce op [from :mongo])
-                                           (into-array DBObject (map #(coerce % [from :mongo]) ops))))
-            [:mongo to])))
+        {:keys [from to] :or {from :clojure to :clojure}} from-and-to
+        cursor (.aggregate (get-coll coll)
+                           ^java.util.List (coerce (conj ops op) [from :mongo])
+                           ^AggregationOptions (-> (AggregationOptions/builder)
+                                                   (.outputMode AggregationOptions$OutputMode/CURSOR)
+                                                   (.build)))]
+    {:serverUsed (.toString (.getServerAddress cursor))
+     :result (coerce cursor [:mongo to] :many true)
+     :ok 1.0}))
 
 (defn command
   "Executes a database command."
