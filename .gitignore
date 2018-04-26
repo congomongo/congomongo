@@ -11,6 +11,7 @@ classes/*
 pom.xml
 /.lein-failures
 /.lein-deps-sum
+/.lein-repl-history
 /.nrepl-port
 /target/
 /pom.xml.asc
