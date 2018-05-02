@@ -12,7 +12,7 @@ This library is using an outdated version of the MongoDB Java driver and it will
 Releases and Dependency Information
 ----------------------------------------
 
-Latest stable release is [0.5.2]
+Latest stable release is **0.5.2**.
 
 [Leiningen] dependency information:
 
