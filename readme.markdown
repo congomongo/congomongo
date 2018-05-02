@@ -5,11 +5,9 @@ What?
 ------
 A toolkit for using MongoDB with Clojure.
 
-This library is using an outdated version of the MongoDB Java driver and it will likely take some time before we get around to upgrading it. If you are starting up a new project with MongoDB and Clojure, we would recommend looking at [Monger](http://clojuremongodb.info/) which is well-maintained and extremely well-documented!
+This library is using an outdated version of the MongoDB Java driver and it will likely take some time before we get around to upgrading it. *If you are starting up a new project with MongoDB and Clojure, we would recommend looking at [Monger](http://clojuremongodb.info/) which is well-maintained and extremely well-documented!*
 
-CongoMongo 0.5.0 onward no longer supports Clojure 1.3.0 or earlier.
-For Clojure 1.3.0, use CongoMongo 0.3.0 thru 0.4.8. CongoMongo 0.4.8 is the last release that supports Clojure 1.3.0.
-For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3 is the last release that supports Clojure 1.2.x.
+
 
 Releases and Dependency Information
 ----------------------------------------
@@ -43,65 +41,65 @@ Latest stable release is [0.5.2]
 
 Changes
 --------------
-Version 0.5.2 - Apr 26th, 2018
+Version 0.5.2 - May 2, 2018
 
 * Make aggregate method compatible with MongoDB 3.6
 
-Version 0.5.1 - Jan 19th, 2018
+Version 0.5.1 - Jan 19, 2018
 
 * Add support for setting `_id` when creating GridFS files
 * Update Java driver to 2.14.2
 
-Version 0.5.0 - Jun 6th, 2016
+Version 0.5.0 - Jun 6, 2016
 
-* DROP SUPPORT FOR CLOJURE 1.3.0!
+* DROP SUPPORT FOR CLOJURE 1.3.0! CongoMongo 0.5.0 onward no longer supports Clojure 1.3.0 or earlier. For Clojure 1.3.0, use CongoMongo 0.3.0 thru 0.4.8. CongoMongo 0.4.8 is the last release that supports Clojure 1.3.0. For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3 is the last release that supports Clojure 1.2.x.
 * Add Clojure 1.9.0 compatibility (handling of seqable? in coerce namespace) - issue #147
 * Clojure is now a "provided" dependency and should no longer appear as a transitive dependency in projects that use CongoMongo, making it easier to get rid of conflicts! _Potentially a breaking change if a project depended on CongoMongo but did not have an explicit dependency on Clojure itself._
 
-Version 0.4.8 - Feb 25th, 2016
+Version 0.4.8 - Feb 25, 2016
 
 * Update clojure.data.json to 0.2.6
 * Update default Clojure version to 1.8.0 and update test-all alias
 * Rename `update` test to `update-one` to avoid Clojure `update` name conflict
 
-Version 0.4.7 - Dec 27th, 2015
+Version 0.4.7 - Dec 27, 2015
 
 * Update Java driver to 2.14.0
 
-Version 0.4.6 - Jul 29th, 2015
+Version 0.4.6 - Jul 29, 2015
 
 * Add support for hints on fetches
 * Error on unsupported arguments (eg read-preferences on fetch-one)
 
-Version 0.4.5 - Jul 18th, 2015
+Version 0.4.5 - Jul 18, 2015
 
 * update Java driver to 2.13.2
 * change default Clojure version from 1.6.0 to 1.7.0 (we still support back to 1.3.0)
 
-Version 0.4.4 - April 29th, 2014
+Version 0.4.4 - April 29, 2014
 
 * update Java driver to 2.12.1
 
-Version 0.4.3 - April 8th, 2014
+Version 0.4.3 - April 8, 2014
 
 * change default Clojure version from 1.5.1 to 1.6.0 (we still support back to 1.3.0)
 * update Java driver to 2.12.0 to support MongoDB 2.6.0
 * support `:write-concern` on `mass-insert!`
 
-Version 0.4.2 - February 25th, 2014
+Version 0.4.2 - February 25, 2014
 
 * change default Clojure version from 1.4 to 1.5.1 and add test coverage for 1.6.0-beta1
 * fix set insertion test for Clojure 1.6
 * fix docstring (#130 dwwoelfel)
 * fix reflection warnings (#123 niclasmeier)
 
-Version 0.4.1 - March 14th, 2013
+Version 0.4.1 - March 14, 2013
 
 * read preference supported (per-connection, per-collection, per-fetch (#122 niclasmeier)
 * add-index! supports :background true/false (#121 dwwoelfel)
 * namespaced keyword keys in maps are roundtripped correctly (#120 AdamClements)
 
-Version 0.4.0 - January 4th, 2013
+Version 0.4.0 - January 4, 2013
 
 BREAKING CHANGES IN THIS RELEASE!
 
