@@ -13,7 +13,11 @@ For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3
 
 News
 --------------
-Version 0.5.1 - Jan 19th, 2017
+Version 0.5.2 - Apr 26th, 2018
+
+* Make aggregate method compatible with MongoDB 3.6
+
+Version 0.5.1 - Jan 19th, 2018
 
 * Add support for setting `_id` when creating GridFS files
 * Update Java driver to 2.14.2
