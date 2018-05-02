@@ -169,6 +169,21 @@
     (is (= #{1 2 3} (set (:num-set (fetch-one :test_col)))))
     (is (= #{"key1" "key2"} (set (:kw-set (fetch-one :test_col)))))))
 
+;; TODO Uncomment this test after upgrading java driver, see issue #148
+; (deftest can-insert-bigdecimal
+;   (let [numbers [(BigDecimal. 123)
+;                  (BigDecimal. "12345678901234567890")
+;                  (BigDecimal. (long 42))
+;                  (BigDecimal. "42.0")
+;                  (BigDecimal. (double 42))
+;                  (BigDecimal. "1.2345678901234567890")
+;                  (BigDecimal. Long/MAX_VALUE)
+;                  (BigDecimal. Long/MIN_VALUE)
+;                  (BigDecimal. 0)]]
+;     (with-test-mongo
+;       (insert! :test_col {:_id "can-insert-bigdecimal" :numbers numbers})
+;       (is (= numbers (:numbers (fetch-one :test_col :where {:_id "can-insert-bigdecimal"})))))))
+
 (deftest collection-existence
   (with-test-mongo
     (insert! :notbogus {:foo "bar"})
