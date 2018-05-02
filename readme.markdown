@@ -11,7 +11,37 @@ CongoMongo 0.5.0 onward no longer supports Clojure 1.3.0 or earlier.
 For Clojure 1.3.0, use CongoMongo 0.3.0 thru 0.4.8. CongoMongo 0.4.8 is the last release that supports Clojure 1.3.0.
 For Clojure 1.2.1 and earlier, use CongoMongo 0.2.3 or earlier. CongoMongo 0.2.3 is the last release that supports Clojure 1.2.x.
 
-News
+Releases and Dependency Information
+----------------------------------------
+
+Latest stable release is [0.5.2]
+
+[Leiningen] dependency information:
+
+    [congomongo "0.5.2"]
+
+[Clojure CLI]:
+
+    congomongo {:mvn/version "0.5.2"}
+
+[Maven] dependency information:
+
+    <dependency>
+      <groupId>congomongo</groupId>
+      <artifactId>congomongo</artifactId>
+      <version>0.5.2</version>
+    </dependency>
+
+[Gradle] dependency information:
+
+    compile 'congomongo:congomongo:0.5.2'
+
+[Leiningen]: https://leiningen.org/
+[Clojure CLI]: https://clojure.org/guides/deps_and_cli
+[Maven]: https://maven.apache.org/
+[Gradle]: https://www.gradle.org/
+
+Changes
 --------------
 Version 0.5.2 - Apr 26th, 2018
 
@@ -186,7 +216,7 @@ As of congomongo 0.1.3, Clojure 1.2 and Clojure-contrib 1.2 are required.
 If you need compatibility with Clojure 1.1,
 please stick with congomongo 0.1.2.
 
-There is now a [Google Group](http://groups.google.com/group/congomongo-dev)
+There is now a [Google Group](https://groups.google.com/group/congomongo-dev)
 Come help us make ponies for great good.
 
 Clojars group is congomongo.
@@ -342,7 +372,7 @@ my-robot => {:name "robby",
 ```
 This pipeline of operations selects expenses with type = 'airfare', passes just the department and amount fields thru, and groups by department with an average for each.
 
-Based on [10gen's Java Driver example of aggregation](http://www.mongodb.org/display/DOCS/Using+The+Aggregation+Framework+with+The+Java+Driver).
+Based on [10gen's Java Driver example of aggregation](https://www.mongodb.org/display/DOCS/Using+The+Aggregation+Framework+with+The+Java+Driver).
 
 The aggregate function accepts any number of pipeline operations.
 
@@ -413,23 +443,10 @@ Use :explain? on fetch to get performance information about a query. Returns a m
  :oldPlan {:cursor "BasicCursor", :indexBounds {}}}
 ```
 
-Install
--------
-
-Leiningen is the recommended way to use congomongo.
-If you are using Clojure 1.4.0 or later, just add
-
-    [congomongo "0.5.0"]
-
-to your project.clj (for the latest stable version).
-
-If you are still on Clojure 1.3.0, use CongoMongo 0.3.0-0.4.8.
-If you are still on Clojure 1.2.x, use CongoMongo version 0.2.3 instead.
-
 ### Feedback
 
 CongoMongo is a work in progress. If you've used, improved,
-or abused it tell us about it at our [Google Group](http://groups.google.com/group/congomongo-dev).
+or abused it tell us about it at our [Google Group](https://groups.google.com/group/congomongo-dev).
 
 ### License and copyright
 
