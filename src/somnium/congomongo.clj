@@ -57,7 +57,7 @@
 
 (def ^:private builder-map
   "A map from keywords to builder invocation functions."
-  ;; Be aware that using refelction directly here will also issue Clojure reflection warnings.
+  ;; Be aware that using reflection directly here will also issue Clojure reflection warnings.
   (let [is-builder-method? (fn [^java.lang.reflect.Method f]
                              (let [m (.getModifiers f)]
                                (and (java.lang.reflect.Modifier/isPublic m)
@@ -351,8 +351,8 @@ releases.  Please use 'make-connection' in combination with
     (if (empty? tags)
       (pref-factory)
       (pref-factory
-        (coerce (first tags) [:clojure :mongo ])
-        (into-array com.mongodb.DBObject (coerce (rest tags) [:clojure :mongo ] :many true)))
+        (coerce (first tags) [:clojure :mongo])
+        (into-array com.mongodb.DBObject (coerce (rest tags) [:clojure :mongo] :many true)))
       )
     (throw (IllegalArgumentException. (str preference " is not a valid ReadPreference alias.")))))
 

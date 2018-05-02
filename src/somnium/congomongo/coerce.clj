@@ -7,7 +7,8 @@
            [com.mongodb.util JSON]))
 
 (def ^{:dynamic true
-       :doc "Set this to false to prevent coercion from setting string keys to keywords"}
+       :doc "Set this to false to prevent coercion from setting string keys to keywords"
+       :tag 'boolean}
       *keywordize* true)
 
 ;; seqable? is present in Clojure 1.9.0
@@ -103,7 +104,7 @@
 
 (let [translations {[:clojure :mongo  ] clojure->mongo
                     [:clojure :json   ] write-str
-                    [:mongo   :clojure] #(mongo->clojure ^DBObject % ^Boolean/TYPE *keywordize*)
+                    [:mongo   :clojure] #(mongo->clojure ^DBObject % ^boolean *keywordize*)
                     [:mongo   :json   ] #(.toString ^DBObject %)
                     [:json    :clojure] #(read-str % :key-fn (if *keywordize*
                                                                keyword
@@ -114,7 +115,7 @@
      from [ :clojure :mongo :json ]
      to   [ :clojure :mongo :json ],
      and an an optional :many keyword parameter which defaults to false"
-    {:arglists '([obj [:from :to] {:many false}])}
+    {:arglists '([obj [:from :to]] [obj [:from :to] :many many?])}
     [obj from-and-to & {:keys [many] :or {many false}}]
     (let [[from to] from-and-to]
       (cond (= from to) obj

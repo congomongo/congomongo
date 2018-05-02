@@ -1,7 +1,7 @@
 (defproject congomongo
   "0.5.2"
   :description "Clojure-friendly API for MongoDB"
-  :url "https://github.com/aboekhoff/congomongo"
+  :url "https://github.com/congomongo/congomongo"
   :mailing-list {:name "CongoMongo mailing list"
                  :archive "https://groups.google.com/forum/?fromgroups#!forum/congomongo-dev"
                  :post "congomongo-dev@googlegroups.com"}
