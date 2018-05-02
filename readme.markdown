@@ -5,7 +5,7 @@ What?
 ------
 A toolkit for using MongoDB with Clojure.
 
-This library is using an outdated version of the MongoDB Java driver and it will likely take some time before we get around to upgrading it. *If you are starting up a new project with MongoDB and Clojure, we would recommend looking at [Monger](http://clojuremongodb.info/) which is well-maintained and extremely well-documented!*
+This library is using an outdated version of the MongoDB Java driver and it will likely take some time before we get around to upgrading it. **If you are starting up a new project with MongoDB and Clojure, we would recommend looking at [Monger](http://clojuremongodb.info/) which is well-maintained and extremely well-documented!**
 
 
 
