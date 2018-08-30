@@ -12,27 +12,27 @@ This library is using an outdated version of the MongoDB Java driver and it will
 Releases and Dependency Information
 ----------------------------------------
 
-Latest stable release is **0.5.2**.
+Latest stable release is **0.5.3**.
 
 [Leiningen] dependency information:
 
-    [congomongo "0.5.2"]
+    [congomongo "0.5.3"]
 
 [Clojure CLI]:
 
-    congomongo {:mvn/version "0.5.2"}
+    congomongo {:mvn/version "0.5.3"}
 
 [Maven] dependency information:
 
     <dependency>
       <groupId>congomongo</groupId>
       <artifactId>congomongo</artifactId>
-      <version>0.5.2</version>
+      <version>0.5.3</version>
     </dependency>
 
 [Gradle] dependency information:
 
-    compile 'congomongo:congomongo:0.5.2'
+    compile 'congomongo:congomongo:0.5.3'
 
 [Leiningen]: https://leiningen.org/
 [Clojure CLI]: https://clojure.org/guides/deps_and_cli
@@ -265,6 +265,11 @@ Developer information
 
 Change Log
 ----------
+
+Version 0.5.3 - Aug 30, 2018
+
+* Add new option `:partial-filter-expression` to `add-index!` in order to support partial indexes.
+
 Version 0.5.2 - May 2, 2018
 
 * Make aggregate method compatible with MongoDB 3.6
