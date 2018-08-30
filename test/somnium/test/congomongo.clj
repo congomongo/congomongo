@@ -459,7 +459,7 @@
 (deftest slow-insert-and-fetch
   (with-test-mongo
     (make-points!)
-    (is (= (* 100 100)) (fetch-count :points))
+    (is (= (* 100 100) (fetch-count :points)))
     (is (= (fetch-count :points
                         :where {:x 42}) 100))))
 
@@ -584,13 +584,28 @@
                  (insert! :sparse-index-coll {:a "foo"})))
     (set-write-concern *mongo-config* :unacknowledged)))
 
+(deftest partial-indexing
+  (with-test-mongo
+    (add-index! :partial-index-coll [:a] :unique true :partial-filter-expression {:b {:$gt 5}})
+    (set-write-concern *mongo-config* :acknowledged)
+    (insert! :partial-index-coll {:a "foo" :b 10})
+    (insert! :partial-index-coll {:a "foo" :b 1})
+    (try
+      (insert! :partial-index-coll {:a "foo" :b 2})
+      (is true)
+      (catch MongoException$DuplicateKey e
+        (is false "Unable to insert second document with fields not matching unique partial index")))
+    (is (thrown? MongoException$DuplicateKey
+                 (insert! :partial-index-coll {:a "foo" :b 6})))
+    (set-write-concern *mongo-config* :unacknowledged)))
+
 (deftest index-name
   (with-test-mongo
     (let [coll :test-index-name
           index "customIndexName"]
       (add-index! coll [:foo :bar :baz] :name index)
-      (is (= (get (get-index coll index)
-                  "key"))))))
+      (is (= {"foo" 1 "bar" 1 "baz" 1}
+             (get (get-index coll index) "key"))))))
 
 (deftest test-delete-index
   (with-test-mongo
