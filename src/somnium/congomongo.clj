@@ -597,13 +597,16 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
     :name   -> defaults to the system-generated default
     :unique -> defaults to false
     :sparse -> defaults to false
-    :background -> defaults to false"
-   {:arglists '([collection fields {:name nil :unique false :sparse false}])}
-   [c f & {:keys [name unique sparse background]
+    :background -> defaults to false
+    :partial-filter-expression -> defauls to no filter expression"
+   {:arglists '([collection fields {:name nil :unique false :sparse false :partial-filter-expression nil}])}
+   [c f & {:keys [name unique sparse background partial-filter-expression]
            :or {name nil unique false sparse false background false}}]
    (-> (get-coll c)
        (.ensureIndex (coerce-index-fields f) ^DBObject (coerce (merge {:unique unique :sparse sparse :background background}
-                                                                       (if name {:name name}))
+                                                                       (if name {:name name})
+                                                                       (if partial-filter-expression
+                                                                         {:partialFilterExpression partial-filter-expression}))
                                                                 [:clojure :mongo]))))
 (defn drop-index!
   "Drops an index on the collection for the specified fields.
