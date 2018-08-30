@@ -459,7 +459,7 @@
 (deftest slow-insert-and-fetch
   (with-test-mongo
     (make-points!)
-    (is (= (* 100 100)) (fetch-count :points))
+    (is (= (* 100 100) (fetch-count :points)))
     (is (= (fetch-count :points
                         :where {:x 42}) 100))))
 
@@ -604,8 +604,8 @@
     (let [coll :test-index-name
           index "customIndexName"]
       (add-index! coll [:foo :bar :baz] :name index)
-      (is (= (get (get-index coll index)
-                  "key"))))))
+      (is (= {"foo" 1 "bar" 1 "baz" 1}
+             (get (get-index coll index) "key"))))))
 
 (deftest test-delete-index
   (with-test-mongo
