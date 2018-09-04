@@ -424,7 +424,28 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
   (let [n-where (coerce where [from :mongo])
         n-only  (coerce-fields only)
         n-col   (get-coll coll)
-        n-limit (if limit (- 0 (Math/abs (long limit))) 0)
+        ; congomongo originally used do convert passed `limit` into negative number because mongo
+        ; protocol says:
+        ;  > If the number is negative, then the database will return that number and close the
+        ;  > cursor. No further results for that query can be fetched.
+        ; (see https://docs.mongodb.com/manual/reference/mongodb-wire-protocol/#op-query)
+        ;
+        ;  But after bumping mongo-driver from 3.0.2 to 3.2.2 we discovered that
+        ;  if a number of available matching records in mongo is bigger than `batchSize`
+        ;  (101 by default) and limit is a negative number then mongo will return only `batchSize`
+        ;  of results and close the cursor. Which is in agreement with mongo shell docs:
+        ;   > A negative limit is similar to a positive limit but closes the cursor after
+        ;   > returning a single batch of results. As such, with a negative limit, if the
+        ;   > limited result set does not fit into a single batch, the number of documents
+        ;   > received will be less than the specified limit. By passing a negative limit,
+        ;   > the client indicates to the server that it will not ask for a subsequent batch
+        ;   > via getMore.
+        ;  (see https://docs.mongodb.com/manual/reference/method/cursor.limit/#negative-values)
+        ;
+        ; Maybe protocol description implies that number can't be bigger than a `batchSize`
+        ; or maybe protocol has been changed and docs aren't updated. Anyway current behaviour
+        ; (with negative limit) doesn't match expectations therefore changed to keep limit as is.
+        n-limit (or limit 0)
         n-sort (when sort (coerce sort [from :mongo]))
         n-options (calculate-query-options options)
         n-hint (cond (string? hint) hint
