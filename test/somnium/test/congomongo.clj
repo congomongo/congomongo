@@ -924,6 +924,12 @@ function ()
     (set-collection-write-concern! :with-write-concern :unacknowledged )
     (is (= WriteConcern/UNACKNOWLEDGED (get-collection-write-concern :with-write-concern )))))
 
+(deftest deferred-collection-creation-does-not-throw
+  ;; See https://jira.mongodb.org/browse/JAVA-1970
+  (with-test-mongo
+    (let [db (-> *mongo-config* :mongo (.getDB test-db))]
+      (is (instance? DBCollection (.createCollection db "no-options-so-deferred-creation" nil))))))
+
 (deftest index-names-include-asc-desc-information
   ;; See https://jira.mongodb.org/browse/JAVA-1971
   (with-test-mongo
