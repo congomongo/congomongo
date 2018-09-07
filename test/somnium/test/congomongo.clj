@@ -216,7 +216,7 @@
           opts (.getMongoOptions m)]
       (testing "make-connection parses options from URI"
         (is (= 123 (.getConnectionsPerHost opts)))
-        (is (= WriteConcern/ACKNOWLEDGED (.getWriteConcern opts))))
+        (is (= WriteConcern/W1 (.getWriteConcern opts))))
       (with-mongo a
         (testing "make-connection accepts Mongo URI"
                 (is (= "congomongotest-db-a" (.getName ^DB (*mongo-config* :db)))))))))
