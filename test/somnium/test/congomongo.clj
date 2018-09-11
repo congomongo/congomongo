@@ -395,6 +395,18 @@
            [:foo :bar] {:_id false}
            [:_id :bar] {:foo false}))))
 
+(deftest fetch-with-limit-more-than-batchsize
+  (with-test-mongo
+    (doseq [n (range 150)]
+      (insert! :big-limit {:x n}))
+    (is (= 150 (count (fetch :big-limit :where {:x {:$gte 0}} :limit 200))))))
+
+(deftest fetch-without-limit-more-than-batchsize
+  (with-test-mongo
+    (doseq [n (range 150)]
+      (insert! :no-limit {:x n}))
+    (is (= 150 (count (fetch :no-limit :where {:x {:$gte 0}}))))))
+
 (deftest fetch-with-hint-fails-correctly-on-bad-args
   (with-test-mongo
     (testing "vector has wrong types"
