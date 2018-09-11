@@ -12,6 +12,8 @@
   :dependencies [[org.clojure/data.json "0.2.6"]
                  [org.mongodb/mongo-java-driver "3.8.1"]
                  [org.clojure/clojure "1.9.0" :scope "provided"]]
+  :deploy-repositories {"releases" {:url "https://repo.clojars.org" :creds :gpg}}
+  :signing {:gpg-key "EA54F11444E6EA12D4065F6DA580E4C123595343"}
   ;; if a :dev profile is added, remember to update :aliases below to
   ;; use it in each with-profile group!
   :profiles {:1.4 {:dependencies [[org.clojure/clojure "1.4.0"]]}
