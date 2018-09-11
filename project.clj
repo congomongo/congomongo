@@ -1,5 +1,5 @@
 (defproject congomongo
-  "0.5.3"
+  "0.6.0"
   :description "Clojure-friendly API for MongoDB"
   :url "https://github.com/congomongo/congomongo"
   :mailing-list {:name "CongoMongo mailing list"
@@ -10,7 +10,7 @@
             :distribution :repo}
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/data.json "0.2.6"]
-                 [org.mongodb/mongo-java-driver "2.14.3"]
+                 [org.mongodb/mongo-java-driver "3.2.2"]
                  [org.clojure/clojure "1.9.0" :scope "provided"]]
   ;; if a :dev profile is added, remember to update :aliases below to
   ;; use it in each with-profile group!

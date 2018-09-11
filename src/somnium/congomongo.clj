@@ -26,9 +26,12 @@
             [clojure.walk :refer (postwalk)]
             [somnium.congomongo.config :refer [*mongo-config*]]
             [somnium.congomongo.coerce :refer [coerce coerce-fields coerce-index-fields]])
-  (:import  [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder MongoClientURI
-             DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes DBCursor
-             AggregationOptions AggregationOptions$OutputMode]
+  (:import  [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder
+             MongoClientURI MongoCredential
+             DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes
+             AggregationOptions AggregationOptions$OutputMode
+             GroupCommand
+             MapReduceCommand MapReduceCommand$OutputType]
             [com.mongodb.gridfs GridFS]
             [com.mongodb.util JSON]
             [org.bson.types ObjectId]))
@@ -91,20 +94,40 @@
   [^String host ^Integer port]
   (ServerAddress. host port))
 
+(defn- make-mongo-client
+  ([addresses creds options]
+    (if (> (count addresses) 1)
+      (MongoClient. ^java.util.List addresses creds options)
+      (MongoClient. ^ServerAddress (first addresses) creds options)))
+
+  ([addresses options]
+    (if (> (count addresses) 1)
+      (MongoClient. ^java.util.List addresses options)
+      (MongoClient. ^ServerAddress (first addresses) options))))
+
 (defn- make-connection-args
-  "Makes a connection with passed database name, host, port and MongoClientOptions"
-  [db args]
-    (let [instances (take-while #(not (instance? MongoClientOptions %)) args)
-          addresses (->> (if (keyword? (first instances))
-                           (list (apply array-map instances)) ; Handle legacy connect args
-                           instances)
-                      (map (fn [{:keys [host port] :or {host "127.0.0.1" port 27017}}]
-                             (make-server-address host port))))
-          ^MongoClientOptions options (or (first (filter #(instance? MongoClientOptions %) args)) (mongo-options))
-          mongo (if (> (count addresses) 1)
-                  (MongoClient. ^java.util.List addresses options)
-                  (MongoClient. ^ServerAddress (first addresses) options))
-          n-db (if db (.getDB mongo db) nil)]
+  "Makes a connection with passed database name, [{:host host, :port port}]
+  server addresses and MongoClientOptions.
+
+  username and password may be supplied for authenticated connections."
+  [db {:keys [instances options username password]}]
+  (when (not= (nil? username) (nil? password))
+    (throw (IllegalArgumentException. "Username and password must both be supplied for authenticated connections")))
+
+  (let [addresses (map (fn [{:keys [host port] :or {host "127.0.0.1" port 27017}}]
+                        (make-server-address host port))
+                       (or instances [{:host "127.0.0.1" :port 27017}]))
+
+        ^MongoClientOptions options (or options (mongo-options))
+
+        mongo (cond
+                (and username password) (make-mongo-client
+                                          addresses
+                                          [(MongoCredential/createCredential username db (.toCharArray password))]
+                                          options)
+                :else (make-mongo-client addresses options))
+
+        n-db (if db (.getDB mongo db) nil)]
       {:mongo mongo :db n-db}))
 
 (defn- make-connection-uri
@@ -113,32 +136,37 @@
   (let [^MongoClientURI mongouri (MongoClientURI. db)
         ^MongoClient client (MongoClient. mongouri)
         ^String db (.getDatabase mongouri)
-        conn {:mongo client :db (.getDB client db)}
-        ^DB db (conn :db)
-        ^String username (.getUsername mongouri)
-        ^chars password (.getPassword mongouri)]
-    (when (and username password)
-      (.authenticate db username password))
+        conn {:mongo client :db (.getDB client db)}]
     conn))
 
 (defn make-connection
   "Connects to one or more mongo instances, returning a connection
-that can be used with set-connection! and with-mongo. Each instance is
-a map containing values for :host and/or :port.
+  that can be used with set-connection! and with-mongo.
+
+  Each instance is a map containing values for :host and/or :port.
+
   May be called with database name and optionally:
-    host (default: 127.0.0.1)
-    port (default: 27017)
-    A MongoClientOptions object
+    :instances - a list of server instances to connect to
+    :options - a MongoClientOptions object
+    :username - the username to authenticate with
+    :password - the password to authenticate with
+
+  If instances are not specified a connection is made to 127.0.0.1:27017
+
+  Username and password must be supplied for authenticated connections.
+
   A MongoClientURI string is also supported and must be prefixed with mongodb://
-  If username and password are specified, authenticate will be immediately
-  called on the connection."
-  ([db]
-    (make-connection db {}))
-  ([db & args]
-    (let [^String dbname (named db)]
-      (if (.startsWith dbname "mongodb://")
-        (make-connection-uri dbname)
-        (make-connection-args dbname args)))))
+  If username and password are specified the connection will be authenticated."
+  {:arglists '([db :instances [{:host host, :port port}]
+                   :options mongo-options
+                   :username username
+                   :password password]
+               [mongo-client-uri])}
+  [db & {:as args}]
+  (let [^String dbname (named db)]
+    (if (.startsWith dbname "mongodb://")
+      (make-connection-uri dbname)
+      (make-connection-args dbname args))))
 
 (defn connection?
   "Returns truth if the argument is a map specifying an active connection."
@@ -193,34 +221,6 @@ When with-mongo and set-connection! interact, last one wins"
                   (when (thread-bound? #'*mongo-config*)
                     (set! *mongo-config* connection))))
 
-(defn mongo!
-  "Creates a Mongo object and sets the default database.
-
-Does not support replica sets, and will be deprecated in future
-releases.  Please use 'make-connection' in combination with
-'with-mongo' or 'set-connection!' instead.
-
-   Keyword arguments include:
-   :host -> defaults to localhost
-   :port -> defaults to 27017
-   :db   -> defaults to nil (you'll have to set it anyway, might as well do it now.)"
-  {:arglists '([:db ? :host "localhost" :port 27017])}
-  [& {:keys [db host port]
-      :or {db nil host "localhost" port 27017}}]
-  (set-connection! (make-connection db :host host :port port))
-  true)
-
-(defn authenticate
-  "Authenticate against either the current or a specified database connection."
-  ([conn username password]
-     (let [db (get-db conn)]
-       (when-not (.isAuthenticated db)
-         (.authenticate db
-                        ^String username
-                        (.toCharArray ^String password)))))
-  ([username password]
-     (authenticate *mongo-config* username password)))
-
 (definline ^DBCollection get-coll
   "Returns a DBCollection object"
   [collection]
@@ -229,7 +229,6 @@ releases.  Please use 'make-connection' in combination with
 
 (def write-concern-map
   {:acknowledged         WriteConcern/ACKNOWLEDGED
-   :errors-ignored       WriteConcern/ERRORS_IGNORED
    :fsynced              WriteConcern/FSYNCED
    :journaled            WriteConcern/JOURNALED
    :majority             WriteConcern/MAJORITY
@@ -238,7 +237,6 @@ releases.  Please use 'make-connection' in combination with
    ;; these are pre-2.10.x names for write concern:
    :fsync-safe    WriteConcern/FSYNC_SAFE  ;; deprecated - use :fsynced
    :journal-safe  WriteConcern/JOURNAL_SAFE ;; deprecated - use :journaled
-   :none          WriteConcern/NONE ;; deprecated - use :errors-ignored
    :normal        WriteConcern/NORMAL ;; deprecated - use :unacknowledged
    :replicas-safe WriteConcern/REPLICAS_SAFE ;; deprecated - use :replica-acknowledged
    :safe          WriteConcern/SAFE ;; deprecated - use :acknowledged
@@ -289,8 +287,7 @@ releases.  Please use 'make-connection' in combination with
 (defn db-ref
   "Convenience DBRef constructor."
   [ns id]
-  (DBRef. (get-db *mongo-config*)
-          ^String (named ns)
+  (DBRef. ^String (named ns)
           ^Object id))
 
 (defn db-ref? [x]
@@ -301,7 +298,6 @@ releases.  Please use 'make-connection' in combination with
   [collection]
   (.collectionExists (get-db *mongo-config*)
                      ^String (named collection)))
-
 (defn create-collection!
   "Explicitly create a collection with the given name, which must not already exist.
 
@@ -315,10 +311,10 @@ releases.  Please use 'make-connection' in combination with
    :max    -> int: max number of documents."
   {:arglists
    '([collection :capped :size :max])}
-  ([collection & {:keys [capped size max] :as options}]
-     (.createCollection (get-db *mongo-config*)
-                        ^String (named collection)
-                        (coerce options [:clojure :mongo]))))
+  [collection & {:keys [capped size max] :as options}]
+  (.createCollection (get-db *mongo-config*)
+                     ^String (named collection)
+                     (coerce options [:clojure :mongo])))
 
 (def query-option-map
   {:tailable    Bytes/QUERYOPTION_TAILABLE
@@ -336,24 +332,33 @@ releases.  Please use 'make-connection' in combination with
 
 (def ^:private read-preference-map
   "Private map of facory functions of ReadPreferences to aliases."
-  {:nearest (fn nearest ([] (ReadPreference/nearest)) ([first-tag remaining-tags] (ReadPreference/nearest first-tag remaining-tags)))
-   :primary (fn primary ([] (ReadPreference/primary)) ([_ _] (throw (IllegalArgumentException. "Read preference :primary does not accept tag sets."))))
-   :primary-preferred (fn primary-preferred ([] (ReadPreference/primaryPreferred)) ([first-tag remaining-tags] (ReadPreference/primaryPreferred first-tag remaining-tags)))
-   :secondary (fn secondary ([] (ReadPreference/secondary)) ([first-tag remaining-tags] (ReadPreference/secondary first-tag remaining-tags)))
-   :secondary-preferred (fn secondary-preferred ([] (ReadPreference/secondaryPreferred)) ([first-tag remaining-tags] (ReadPreference/secondaryPreferred first-tag remaining-tags)))})
+  {:nearest (fn nearest ([] (ReadPreference/nearest)) ([tags] (ReadPreference/nearest tags)))
+   :primary (fn primary ([] (ReadPreference/primary)) ([_] (throw (IllegalArgumentException. "Read preference :primary does not accept tag sets."))))
+   :primary-preferred (fn primary-preferred ([] (ReadPreference/primaryPreferred)) ([tags] (ReadPreference/primaryPreferred tags)))
+   :secondary (fn secondary ([] (ReadPreference/secondary)) ([tags] (ReadPreference/secondary tags)))
+   :secondary-preferred (fn secondary-preferred ([] (ReadPreference/secondaryPreferred)) ([tags] (ReadPreference/secondaryPreferred tags)))})
+
+(defn- named?
+  [x]
+  (instance? clojure.lang.Named x))
+
+(defn ->tagset
+  [tag]
+  (letfn [(->tag [[k v]]
+            (com.mongodb.Tag. (if (named? k) (name k) (str k))
+                              (if (named? v) (name v) (str v))))]
+    (com.mongodb.TagSet. (map ->tag tag))))
+
 
 (defn read-preference
   "Creates a ReadPreference from an alias and optional tag sets. Valid aliases are :nearest,
    :primary, :primary-preferred, :secondary and :secondary-preferred."
-  {:arglists '([preference {:first-tag "value"} {:other-tag-set "other-value"}])}
+  {:arglists '([preference {:first-tag "value", :second-tag "second-value"} {:other-tag-set "other-value"}])}
   [preference & tags]
   (if-let [pref-factory (get read-preference-map preference)]
     (if (empty? tags)
       (pref-factory)
-      (pref-factory
-        (coerce (first tags) [:clojure :mongo])
-        (into-array com.mongodb.DBObject (coerce (rest tags) [:clojure :mongo] :many true)))
-      )
+      (pref-factory (map ->tagset tags)))
     (throw (IllegalArgumentException. (str preference " is not a valid ReadPreference alias.")))))
 
 (defn set-read-preference
@@ -402,8 +407,8 @@ releases.  Please use 'make-connection' in combination with
   (when (and one? sort)
     (throw (IllegalArgumentException. "Fetch :one? (or fetch-one) can't be used with :sort.
 You should use fetch with :limit 1 instead."))); one? and sort should NEVER be called together
-  (when (and one? (or read-preferences (not= [] options) (not= 0 limit) hint explain?))
-    (throw (IllegalArgumentException. "At the moment, fetch-one doesn't support read-preferences, options, limit or hint"))) ;; these are allowed but not implemented here
+  (when (and one? (or (not= [] options) (not= 0 limit) hint explain?))
+    (throw (IllegalArgumentException. "At the moment, fetch-one doesn't support options, limit, or hint"))) ;; these are allowed but not implemented here
   (when-not (or (nil? hint)
                 (string? hint)
                 (and (instance? clojure.lang.Sequential hint)
@@ -429,15 +434,19 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
                         :else (somnium.congomongo/read-preference read-preferences))]
     (cond
       count? (.getCount n-col n-where n-only)
-      one?   (if-let [m (.findOne
-                         ^DBCollection n-col
-                         ^DBObject n-where
-                         ^DBObject n-only)]
-               (coerce m [:mongo as]) nil)
-      :else  (when-let [cursor (DBCursor. ^DBCollection n-col
+
+      ;; The find command isn't documented so there's no nice way to build a
+      ;; find command that adds read-preferences when necessary
+      one?   (if-let [m (if (not (nil? n-preferences))
+                          (.findOne ^DBCollection n-col ^DBObject n-where ^DBObject n-only ^ReadPreference n-preferences)
+                          (.findOne ^DBCollection n-col ^DBObject n-where ^DBObject n-only))]
+              (coerce m [:mongo as]) nil)
+
+      :else  (when-let [cursor (.find ^DBCollection n-col
                                       ^DBObject n-where
-                                      ^DBObject n-only
-                                      ^ReadPreference n-preferences)]
+                                      ^DBObject n-only)]
+               (when n-preferences
+                 (.setReadPreference cursor n-preferences))
                (when n-hint
                  (.hint cursor n-hint))
                (when n-options
@@ -473,7 +482,9 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
                  :clojure)
           f  (fn [[k v]]
                [k (if (db-ref? v)
-                    (coerce (.fetch ^DBRef v) [:mongo as])
+                    (let [v ^DBRef v
+                          coll (get-coll (.getCollectionName v))]
+                      (coerce (.findOne coll (.getId v)) [:mongo as]))
                     v)])]
       (postwalk (fn [x]
                   (if (map? x)
@@ -603,7 +614,7 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
    [c f & {:keys [name unique sparse background partial-filter-expression]
            :or {name nil unique false sparse false background false}}]
    (-> (get-coll c)
-       (.ensureIndex (coerce-index-fields f) ^DBObject (coerce (merge {:unique unique :sparse sparse :background background}
+       (.createIndex (coerce-index-fields f) ^DBObject (coerce (merge {:unique unique :sparse sparse :background background}
                                                                        (if name {:name name})
                                                                        (if partial-filter-expression
                                                                          {:partialFilterExpression partial-filter-expression}))
@@ -782,6 +793,14 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
         (:retval result)
         (throw (Exception. ^String (format "failure executing javascript: %s" (str result))))))))
 
+(defn- mapreduce-type
+  [k]
+  (get {:replace MapReduceCommand$OutputType/REPLACE
+        :merge   MapReduceCommand$OutputType/MERGE
+        :reduce  MapReduceCommand$OutputType/REDUCE}
+       k
+       MapReduceCommand$OutputType/INLINE))
+
 (defn map-reduce
   "Performs a map-reduce job on the server.
 
@@ -819,30 +838,44 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
   [collection mapfn reducefn out & {:keys [out-from query query-from sort sort-from limit finalize scope scope-from output as]
                                     :or {out-from :clojure query nil query-from :clojure sort nil sort-from :clojure
                                          limit nil finalize nil scope nil scope-from :clojure output :documents as :clojure}}]
-  (let [;; BasicDBObject requires key-value pairs in the correct order... apparently the first one
-        ;; must be :mapreduce
-        mr-query (->> [[:mapreduce collection]
-                       [:map mapfn]
-                       [:reduce reducefn]
-                       [:out (coerce out [out-from :mongo])]
-                       [:verbose true]
-                       (when query [:query (coerce query [query-from :mongo])])
-                       (when sort [:sort (coerce sort [sort-from :mongo])])
-                       (when limit [:limit limit])
-                       (when finalize [:finalize finalize])
-                       (when scope [:scope (coerce scope [scope-from :mongo])])]
-                      (remove nil?)
-                      flatten
-                      (apply array-map))
-        mr-query (coerce mr-query [:clojure :mongo])
-        ^com.mongodb.MapReduceOutput result (.mapReduce (get-coll collection) ^DBObject mr-query)]
-    (if (or (= output :documents)
-            (= (coerce out [out-from :clojure])
-               {:inline 1}))
-      (coerce (.results result) [:mongo as] :many true)
-      (-> (.getOutputCollection result)
+  (let [mr-query (coerce (or query {}) [query-from :mongo])
+        ;; The output collection and output-type are inherently bound to each
+        ;; other. If out is a string/keyword then the output type should be
+        ;; INLINE (and the out 'collection' converted to a string)
+        ;;
+        ;; If out is a map then it should have a single entry, the key is the
+        ;; output-type and the value is the output collection
+        [out-collection mr-type] (letfn [(convert-map [[k v]]
+                                          [(named v) (mapreduce-type k)])]
+                                  (cond
+                                    (= out {:inline 1}) [nil (mapreduce-type :inline)]
+                                    (map? out)          (-> out first convert-map)
+                                    (named? out)        [(named out) (mapreduce-type :replace)]))
+        ;; Verbose is true by default
+        ;; http://api.mongodb.org/java/3.0/com/mongodb/MapReduceCommand.html#setVerbose-java.lang.Boolean-
+        mr-command (MapReduceCommand. (get-coll collection)
+                                      mapfn
+                                      reducefn
+                                      (str out-collection)
+                                      mr-type
+                                      mr-query)]
+    (when sort
+      (.setSort mr-command (coerce sort [sort-from :mongo])))
+    (when limit
+      (.setLimit mr-command limit))
+    (when finalize
+      (.setFinalize mr-command finalize))
+    (when scope
+      (.setScope mr-command (coerce scope [scope-from :mongo])))
+
+    (let [^com.mongodb.MapReduceOutput result (.mapReduce (get-coll collection) mr-command)]
+      (if (or (= output :documents)
+              (= (coerce out [out-from :clojure])
+                 {:inline 1}))
+        (coerce (.results result) [:mongo as] :many true)
+        (-> (.getOutputCollection result)
             .getName
-            keyword))))
+            keyword)))))
 
 (defn group
   "Performs group operation on given collection
@@ -862,12 +895,18 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
   [coll & {:keys [key keyfn reducefn where finalizefn initial as]
            :or {key nil keyfn nil reducefn nil where nil finalizefn nil
                 initial nil as :clojure}}]
-  (coerce (.group ^DBCollection
-            (get-coll coll)
-            ^DBObject
-            (coerce (into {} (filter second {:key (when key (coerce-fields key))
-                     :$keyf keyfn
-                     :$reduce reducefn
-                     :finalize finalizefn
-                     :initial initial
-                     :cond where})) [:clojure :mongo ])) [:mongo as]))
+  (let [collection (get-coll coll)
+        group-command (if (not (nil? keyfn))
+                        (GroupCommand. collection
+                                       ^String keyfn
+                                       ^DBObject (coerce where [:clojure :mongo])
+                                       ^DBObject (coerce initial [:clojure :mongo])
+                                       reducefn
+                                       finalizefn)
+                        (GroupCommand. (get-coll coll)
+                                       ^DBObject (coerce-fields key)
+                                       ^DBObject (coerce where [:clojure :mongo])
+                                       ^DBObject (coerce initial [:clojure :mongo])
+                                       reducefn
+                                       finalizefn))]
+    (coerce (.group collection group-command) [:mongo :clojure] :many? true)))

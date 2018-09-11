@@ -53,8 +53,7 @@ Basics
 ```clojure
 (def conn
   (m/make-connection "mydb"
-                     :host "127.0.0.1"
-                     :port 27017))
+                     :instances {:host "127.0.0.1" :port 27017}))
 => #'user/conn
 
 conn => {:mongo #<MongoClient Mongo: /127.0.0.1:20717>, :db #<DBApiLayer mydb>}
@@ -197,7 +196,9 @@ The aggregate function accepts any number of pipeline operations.
 ```
 #### advanced initialization using mongo-options
 ```clojure
-(m/make-connection :mydb :host "127.0.0.1" (m/mongo-options :auto-connect-retry true))
+(m/make-connection :mydb
+                   :instances [{:host "127.0.0.1"}]
+                   :options (m/mongo-options :auto-connect-retry true))
 ```
 The available options are hyphen-separated lowercase keyword versions of the camelCase options supported by the Java driver. Prior to CongoMongo 0.4.0, the options matched the fields in the *MongoOptions* class. As of CongoMongo 0.4.0, the options match the method names in the *MongoClientOptions* class instead (and an *IllegalArgumentException* will be thrown if you use an illegal option). The full list (with the 2.10.1 Java driver) is:
 ```clojure
@@ -265,6 +266,15 @@ Developer information
 
 Change Log
 ----------
+Version 0.6.0 - Sep 6th, 2018
+
+Updated to support mongo-java-driver 3.0+ which enables use of TLS connections.
+Authentication has changed significantly in the 3.0 driver which necessitated some breaking API changes around connecting and authenticating.
+
+BREAKING CHANGES IN THIS RELEASE!
+* Usernames and passwords for authenticated connections must be supplied to `make-connection` rather than authenticating after the connection has been created. The `make-connection` API has been changed to accomodate this. Optional parameters (instances, Mongo options, username and password) are now passed via keyword args.
+* The `authenticate` function has been removed.
+* The deprecated `mongo!` function has been removed. Use `(set-connection (make-connection ...))`
 
 Version 0.5.3 - Aug 30, 2018
 

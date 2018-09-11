@@ -4,10 +4,15 @@
         somnium.congomongo.config
         somnium.congomongo.coerce
         clojure.pprint)
-  (:use [clojure.data.json :only (read-str write-str)])
-  (:import [com.mongodb MongoClient DB DBObject BasicDBObject BasicDBObjectBuilder MongoException$DuplicateKey
-            ReadPreference
-            WriteConcern]
+  (:require [clojure.data.json :refer (read-str write-str)]
+            [clojure.set :as set])
+  (:import [java.nio.charset Charset]
+           [java.security MessageDigest]
+           [com.mongodb DB DBCollection DBObject BasicDBObject BasicDBObjectBuilder
+                        MongoClient MongoException DuplicateKeyException MongoCommandException
+                        Tag TagSet
+                        ReadPreference
+                        WriteConcern]
            [org.bson.types ObjectId]))
 
 (deftest coercions
@@ -50,11 +55,13 @@
   (doseq [^String coll (collections)]
     (when-not (.startsWith coll "system")
       (drop-coll! coll))))
+
 (defn setup! []
-  (mongo! :db test-db :host test-db-host :port test-db-port)
-  (when (and test-db-user test-db-pass)
-    (authenticate test-db-user test-db-pass)
-    (drop-test-collections!)))
+  (set-connection! (make-connection test-db :instances [{:host test-db-host :port test-db-port}]
+                                            :username test-db-user
+                                            :password test-db-pass))
+  (drop-test-collections!))
+
 (defn teardown! []
   (if (and test-db-user test-db-pass)
     (try ; some tests don't authenticate so ignore failures here:
@@ -65,22 +72,140 @@
 (defmacro with-test-mongo [& body]
   `(do
      (setup!)
-     ~@body
-     (teardown!)))
+     (try
+      ~@body
+      (finally
+        (teardown!)))))
+
+(defn- version
+  [db]
+  (-> *mongo-config*
+      :mongo
+      (.getDB db)
+      (.command "buildInfo")
+      (.getString "version")))
+
+(defn- mongo-hash
+  "Uses the same hashing algorithm as
+  https://github.com/mongodb/mongo/blob/09917767b116f4ff1c0eadda1e8bc5db30828500/src/mongo/shell/db.js#L149"
+  [username passphrase]
+  (let [hex-strings (vec (for [a ["0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "a" "b" "c" "d" "e" "f"]
+                               b ["0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "a" "b" "c" "d" "e" "f"]]
+                           (str a b)))
+        ->bytes (fn [s] (.getBytes s (Charset/forName "UTF-8")))
+        digest-bytes (.digest
+                        (doto (MessageDigest/getInstance "MD5")
+                              (.reset)
+                              (.update (->bytes username))
+                              (.update (->bytes ":mongo:"))
+                              (.update (->bytes passphrase))))]
+    (apply str (map #(get hex-strings (bit-and 0xff %)) digest-bytes))))
+
+(defmacro with-test-user
+  [username password & body]
+  `(let [username# ~username
+         password# ~password]
+    (try
+      (cond
+        (= "2.2" (subs (version test-db) 0 3))
+        ;; 2.2 uses a different user creation algorithm to 2.4
+        (is false "Not implemented for 2.2 databases")
+
+        (= "2.4" (subs (version test-db) 0 3))
+        ;; 2.4 mongodb doesn't have a command to create users. Manually hash
+        ;; the password and insert directly
+        (insert! :system.users {:user username#
+                                :pwd (mongo-hash username# password#)
+                                :roles ["readWrite"]})
+
+        :else
+        (let [create-user-cmd# (.. (BasicDBObjectBuilder/start)
+                                   (add "createUser" username#)
+                                   (add "pwd" password#)
+                                   (add "roles" [(BasicDBObject. {"role" "readWrite", "db" test-db})])
+                                   (get))]
+          (.command ^DB (get-db *mongo-config*)
+                    ^DBObject create-user-cmd#)))
+      ~@body
+      (finally
+        (.command ^DB (get-db *mongo-config*)
+                  ^DBObject (coerce {:dropUser username#} [:clojure :mongo]))))))
+
+(deftest authentication-works
+  (with-test-mongo
+    (with-test-user "test_user" "test_password"
+      (testing "valid credentials work"
+        (let [conn (make-connection test-db :instances [{:host test-db-host :port test-db-port}]
+                                            :username "test_user"
+                                            :password "test_password")]
+          ;; Just validate that we can interact with the DB, the 3.0 Mongo driver
+          ;; has removed any way to check if a connection is authenticated.
+          (with-mongo conn
+            (insert! :thingies {:foo 1})
+            (is (= 1 (:foo (fetch-one :thingies :where {:foo 1}))))
+
+          (close-connection conn))))
+
+      (testing "invalid credentials throw"
+        (let [conn (make-connection test-db :instances [{:host test-db-host :port test-db-port}]
+                                            :options (mongo-options :server-selection-timeout 1000)
+                                            :username "not_a_valid_user"
+                                            :password "not_a_valid_password")]
+          (is (thrown? MongoException
+                       (with-mongo conn
+                         (insert! :thingies {:foo 1}))))
+
+          (close-connection conn)))
+
+      (testing "credentials with Mongo URIs"
+        (let [conn (make-connection (format "mongodb://test_user:test_password@127.0.0.1:27017/%s" test-db))]
+          ;; Just validate that we can interact with the DB, the 3.0 Mongo driver
+          ;; has removed any way to check if a connection is authenticated.
+          (with-mongo conn
+            (insert! :thingies {:foo 1})
+            (is (= 1 (:foo (fetch-one :thingies :where {:foo 1}))))
+
+          (close-connection conn))))
+
+      (testing "bad credentials in a MongoURI"
+        ;; This adds a 30 second wait to the test suite when using the 3.0 driver.
+        ;; Since all connections are authenticated the server selection times
+        ;; out due to invalid credentials.
+        ;; Unlike MongoClient, http://api.mongodb.org/java/current/com/mongodb/MongoClientURI.html
+        ;; does not allow the server selection timeout to be set
+        (let [conn (make-connection (format "mongodb://invalid_user:test_password@127.0.0.1:27017/%s" test-db))]
+          (is (thrown? MongoException
+                       (with-mongo conn
+                         (insert! :thingies {:foo 1}))))
+
+          (close-connection conn))))))
+
+(deftest make-connection-variations
+  (testing "No optional arguments"
+    (is (make-connection test-db)))
+
+  (testing "Username/password combinations"
+    (is (thrown-with-msg? IllegalArgumentException #"Username and password must both be supplied"
+          (make-connection test-db :username "foo" :password nil)))
+
+    (is (thrown-with-msg? IllegalArgumentException #"Username and password must both be supplied"
+          (make-connection test-db :username nil :password "bar")))
+
+    (is (make-connection test-db :username nil :password nil))))
 
 (deftest options-on-connections
   (with-test-mongo
     ;; set some non-default option values
-    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port
-                             (mongo-options :auto-connect-retry true
-                                            :write-concern (:acknowledged write-concern-map)))
+    (let [a (make-connection "congomongotest-db-a" :instances [{:host test-db-host :port test-db-port}]
+                                                   :options (mongo-options :connect-timeout 500
+                                                                           :write-concern (:acknowledged write-concern-map)))
          ^MongoClient m (:mongo a)
-          opts (.getMongoOptions m)]
+          opts (.getMongoClientOptions m)]
       ;; check non-default options attached to Mongo object
-      (is (.isAutoConnectRetry opts))
+      (is (= 500 (.getConnectTimeout opts)))
       (is (= WriteConcern/ACKNOWLEDGED (.getWriteConcern opts)))
       ;; check a default option as well
-      (is (not (.slaveOk opts))))))
+      (is (= (ReadPreference/primary) (.getReadPreference opts))))))
 
 (deftest uri-for-connection
   (with-test-mongo
@@ -91,14 +216,14 @@
           opts (.getMongoOptions m)]
       (testing "make-connection parses options from URI"
         (is (= 123 (.getConnectionsPerHost opts)))
-        (is (= WriteConcern/ACKNOWLEDGED (.getWriteConcern opts))))
+        (is (= WriteConcern/W1 (.getWriteConcern opts))))
       (with-mongo a
         (testing "make-connection accepts Mongo URI"
                 (is (= "congomongotest-db-a" (.getName ^DB (*mongo-config* :db)))))))))
 
 (deftest with-mongo-database
   (with-test-mongo
-    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port)]
+    (let [a (make-connection "congomongotest-db-a" :instances [{:host test-db-host :port test-db-port}])]
       (with-mongo a
         (with-db "congomongotest-db-b"
           (testing "with-mongo uses new database"
@@ -108,20 +233,20 @@
 
 (deftest with-mongo-interactions
   (with-test-mongo
-    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port)
-          b (make-connection :congomongotest-db-b :host test-db-host :port test-db-port)]
+    (let [a (make-connection "congomongotest-db-a" :instances [{:host test-db-host :port test-db-port}])
+          b (make-connection :congomongotest-db-b :instances [{:host test-db-host :port test-db-port}])]
       (with-mongo a
         (testing "with-mongo sets the mongo-config"
           (is (= "congomongotest-db-a" (.getName ^DB (*mongo-config* :db)))))
-        (testing "mongo! inside with-mongo stomps on current config"
-          (mongo! :db "congomongotest-db-b" :host test-db-host :port test-db-port)
-          (is (= "congomongotest-db-b" (.getName ^DB (*mongo-config* :db))))))
-      (testing "and previous mongo! inside with-mongo is visible afterwards"
-        (is (= "congomongotest-db-b" (.getName ^DB (*mongo-config* :db))))))))
+        (testing "set-connection! inside with-mongo stomps on current config"
+          (set-connection! (make-connection "congomongotest-db-c" :instances [{:host test-db-host :port test-db-port}]))
+          (is (= "congomongotest-db-c" (.getName ^DB (*mongo-config* :db))))))
+      (testing "and previous set-connection! inside with-mongo is visible afterwards"
+        (is (= "congomongotest-db-c" (.getName ^DB (*mongo-config* :db))))))))
 
 (deftest closing-with-mongo
   (with-test-mongo
-    (let [a (make-connection "congomongotest-db-a" :host test-db-host :port test-db-port)]
+    (let [a (make-connection "congomongotest-db-a" :instances [{:host test-db-host :port test-db-port}])]
       (with-mongo a
         (testing "close-connection inside with-mongo sets mongo-config to nil"
           (close-connection a)
@@ -233,10 +358,10 @@
     (is (thrown? IllegalArgumentException
                  (fetch-one :stuff :sort {:a 1})))))
 
-(deftest fetch-one-with-read-preferences-fails
+(deftest fetch-one-with-read-preferences-does-not-explode
   (with-test-mongo
-    (is (thrown? IllegalArgumentException
-                 (fetch-one :test_col :read-preferences :secondary)))))
+    (insert! :test_col {:foo "bar"})
+    (is (fetch-one :test_col :read-preferences :secondary))))
 
 (deftest fetch-one-with-hint-fails
   (with-test-mongo
@@ -293,13 +418,8 @@
 
 (deftest fetch-with-hint-changes-index
   (with-test-mongo
-    (let [version (-> *mongo-config*
-                      :mongo
-                      (.getDB test-db)
-                      (.command "buildInfo")
-                      (.getString "version"))
-          mongo2? (-> version (.startsWith "2"))
-          mongo3? (-> version (.startsWith "3"))]
+    (let [mongo2? (-> test-db version (.startsWith "2"))
+          mongo3? (-> test-db version (.startsWith "3"))]
 
       ;; only 1 versions
       (is (or mongo2? mongo3?))
@@ -578,26 +698,29 @@
     (try
       (insert! :sparse-index-coll {})
       (is true)
-      (catch MongoException$DuplicateKey e
+      (catch DuplicateKeyException e
         (is false "Unable to insert second document without the sparse index key")))
-    (is (thrown? MongoException$DuplicateKey
+    (is (thrown? DuplicateKeyException
                  (insert! :sparse-index-coll {:a "foo"})))
     (set-write-concern *mongo-config* :unacknowledged)))
 
 (deftest partial-indexing
   (with-test-mongo
-    (add-index! :partial-index-coll [:a] :unique true :partial-filter-expression {:b {:$gt 5}})
-    (set-write-concern *mongo-config* :acknowledged)
-    (insert! :partial-index-coll {:a "foo" :b 10})
-    (insert! :partial-index-coll {:a "foo" :b 1})
-    (try
-      (insert! :partial-index-coll {:a "foo" :b 2})
-      (is true)
-      (catch MongoException$DuplicateKey e
-        (is false "Unable to insert second document with fields not matching unique partial index")))
-    (is (thrown? MongoException$DuplicateKey
-                 (insert! :partial-index-coll {:a "foo" :b 6})))
-    (set-write-concern *mongo-config* :unacknowledged)))
+    (let [db-version (version test-db)]
+      (when (not (or (.startsWith db-version "2")
+                     (.startsWith db-version "3.0")))
+        (add-index! :partial-index-coll [:a] :unique true :partial-filter-expression {:b {:$gt 5}})
+        (set-write-concern *mongo-config* :acknowledged)
+        (insert! :partial-index-coll {:a "foo" :b 10})
+        (insert! :partial-index-coll {:a "foo" :b 1})
+        (try
+          (insert! :partial-index-coll {:a "foo" :b 2})
+          (is true)
+          (catch DuplicateKeyException e
+            (is false "Unable to insert second document with fields not matching unique partial index")))
+        (is (thrown? DuplicateKeyException
+                     (insert! :partial-index-coll {:a "foo" :b 6})))
+        (set-write-concern *mongo-config* :unacknowledged)))))
 
 (deftest index-name
   (with-test-mongo
@@ -886,20 +1009,19 @@ function ()
 
 
 (deftest test-read-preference
-  (let [^DBObject f-tag (BasicDBObject. "location" "nearby")
-        r-tags (into-array DBObject [(BasicDBObject. "rack" "bottom")])
-        empty-tags (into-array DBObject [])]
+  (let [f-tag (TagSet. (Tag. "location" "nearby"))
+        r-tags (TagSet. (Tag. "rack" "bottom"))]
     (are [expected type tags] (= expected (apply read-preference (cons type tags)))
       (ReadPreference/nearest) :nearest nil
-      (ReadPreference/nearest f-tag empty-tags) :nearest [{:location "nearby"}]
-      (ReadPreference/nearest f-tag r-tags) :nearest [{:location "nearby"} {:rack :bottom}]
+      (ReadPreference/nearest f-tag) :nearest [{:location "nearby"}]
+      (ReadPreference/nearest [f-tag r-tags]) :nearest [{:location "nearby"} {:rack :bottom}]
       (ReadPreference/primary) :primary nil
       (ReadPreference/primaryPreferred) :primary-preferred nil
-      (ReadPreference/primaryPreferred f-tag empty-tags) :primary-preferred [{:location "nearby"}]
-      (ReadPreference/primaryPreferred f-tag r-tags) :primary-preferred [{:location "nearby"} {:rack :bottom}]
+      (ReadPreference/primaryPreferred f-tag) :primary-preferred [{:location "nearby"}]
+      (ReadPreference/primaryPreferred [f-tag r-tags]) :primary-preferred [{:location "nearby"} {:rack :bottom}]
       (ReadPreference/secondary) :secondary nil
-      (ReadPreference/secondary f-tag empty-tags) :secondary [{:location "nearby"}]
-      (ReadPreference/secondary f-tag r-tags) :secondary [{:location "nearby"} {:rack :bottom}]
+      (ReadPreference/secondary f-tag) :secondary [{:location "nearby"}]
+      (ReadPreference/secondary [f-tag r-tags]) :secondary [{:location "nearby"} {:rack :bottom}]
       (ReadPreference/secondaryPreferred) :secondary-preferred nil
       )))
 
@@ -914,3 +1036,33 @@ function ()
     (create-collection! :with-write-concern )
     (set-collection-write-concern! :with-write-concern :unacknowledged )
     (is (= WriteConcern/UNACKNOWLEDGED (get-collection-write-concern :with-write-concern )))))
+
+(deftest deferred-collection-creation-does-not-throw
+  ;; See https://jira.mongodb.org/browse/JAVA-1970
+  (with-test-mongo
+    (let [db (-> *mongo-config* :mongo (.getDB test-db))]
+      (is (instance? DBCollection (.createCollection db "no-options-so-deferred-creation" nil))))))
+
+(deftest index-names-include-asc-desc-information
+  ;; See https://jira.mongodb.org/browse/JAVA-1971
+  (with-test-mongo
+    (when (not (-> (version test-db) (.startsWith "2.4.")))
+      (insert! :test_col {:key1 1})
+
+      ;; Add key1 asc index
+      (.createIndex (get-coll :test_col)
+                    (coerce {:key1 1} [:clojure :mongo])
+                    (coerce {:unique false :sparse false :background false} [:clojure :mongo]))
+
+      ;; Add key1 desc index, fails until JAVA-1971 is fixed
+      (.createIndex (get-coll :test_col)
+                    (coerce {:key1 -1} [:clojure :mongo])
+                    (coerce {:unique false :sparse false :background false} [:clojure :mongo]))
+
+      (let [index-info (coerce (get-indexes :test_col)
+                               [:mongo :clojure]
+                               :many? true) ]
+        ;; default _id index and the two created above
+        (is (= 3 (count index-info)))
+        (is (set/subset? #{"key1_1" "key1_-1"}
+                         (set (map :name index-info))))))))
