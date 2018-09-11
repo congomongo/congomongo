@@ -5,34 +5,34 @@ What?
 ------
 A toolkit for using MongoDB with Clojure.
 
-This library is using an outdated version of the MongoDB Java driver and it will likely take some time before we get around to upgrading it. **If you are starting up a new project with MongoDB and Clojure, we would recommend looking at [Monger](http://clojuremongodb.info/) which is well-maintained and extremely well-documented!**
-
-
+This library is a pretty lightweight wrapper around the MongoDB Java driver. If you are starting a new
+project and looking for a more complete package including validation, better documentation and more it
+is a good idea to also look at [Monger](http://clojuremongodb.info/).
 
 Releases and Dependency Information
 ----------------------------------------
 
-Latest stable release is **0.5.3**.
+Latest stable release is **1.0.0**.
 
 [Leiningen] dependency information:
 
-    [congomongo "0.5.3"]
+    [congomongo "1.0.0"]
 
 [Clojure CLI]:
 
-    congomongo {:mvn/version "0.5.3"}
+    congomongo {:mvn/version "1.0.0"}
 
 [Maven] dependency information:
 
     <dependency>
       <groupId>congomongo</groupId>
       <artifactId>congomongo</artifactId>
-      <version>0.5.3</version>
+      <version>1.0.0</version>
     </dependency>
 
 [Gradle] dependency information:
 
-    compile 'congomongo:congomongo:0.5.3'
+    compile 'congomongo:congomongo:1.0.0'
 
 [Leiningen]: https://leiningen.org/
 [Clojure CLI]: https://clojure.org/guides/deps_and_cli
@@ -49,11 +49,19 @@ Basics
 (ns my-mongo-app
   (:require [somnium.congomongo :as m]))
 ```
-#### make a connection
+#### make a connection using array of hosts
 ```clojure
 (def conn
   (m/make-connection "mydb"
-                     :instances {:host "127.0.0.1" :port 27017}))
+                     :instances [{:host "127.0.0.1" :port 27017}]))
+=> #'user/conn
+
+conn => {:mongo #<MongoClient Mongo: /127.0.0.1:20717>, :db #<DBApiLayer mydb>}
+```
+#### or using a mongodb uri
+```clojure
+(def conn
+  (m/make-connection "mongodb://127.0.0.1/mydb"))
 => #'user/conn
 
 conn => {:mongo #<MongoClient Mongo: /127.0.0.1:20717>, :db #<DBApiLayer mydb>}
@@ -212,9 +220,13 @@ The available options are hyphen-separated lowercase keyword versions of the cam
 ```clojure
 (m/make-connection "mongodb://user:pass@host:27071/databasename")
 ;; note that authentication is handled when given a user:pass@ section
+
+;; or using SRV DNS service detection
+(m/make-connection "mongodb+srv://user:pass@mymongocluster/databasename")
+
 ```
 
-A query string may also be specified containing the options supported by the *MongoClientURI* class (as of CongoMongo 0.4.0; previously the *MongoURI* class was used).
+A query string may also be specified containing the options supported by the *MongoClientURI* class.
 #### easy json
 ```clojure
 (m/fetch-one :points
@@ -266,9 +278,9 @@ Developer information
 
 Change Log
 ----------
-Version 0.6.0 - Sep 6th, 2018
+Version 1.0.0 - Sep 11, 2018
 
-Updated to support mongo-java-driver 3.0+ which enables use of TLS connections.
+Updated to support mongo-java-driver 3.0+ which enables use of TLS connections and DNS SRV connection strings.
 Authentication has changed significantly in the 3.0 driver which necessitated some breaking API changes around connecting and authenticating.
 
 BREAKING CHANGES IN THIS RELEASE!

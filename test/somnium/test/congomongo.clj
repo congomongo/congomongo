@@ -17,15 +17,15 @@
 
 (deftest coercions
   (let [clojure      (array-map :a
-                                (array-map :b "c" :d 1 :f ["a" "b" "c"] :g
+                                (array-map :b "c" :d (int 1) :f ["a" "b" "c"] :g
                                            (array-map :h ["i" "j" -42.42])))
         mongo        (.. (BasicDBObjectBuilder/start)
                          (push "a")
                          (add "b" "c")
-                         (add "d" 1)
-                         (add "f" ["a" "b" "c"])
+                         (add "d" (int 1))
+                         (add "f" '("a" "b" "c"))
                          (push "g")
-                         (add "h" ["i" "j" -42.42])
+                         (add "h" '("i" "j" -42.42))
                          get)
         clojure-json (write-str clojure); no padding
         mongo-json   (str mongo)        ; contains whitespace padding
@@ -39,9 +39,10 @@
                                         ; changed in 2.12.0 driver
             (is (= (.toString actual) (.toString expected)) [from to])
             (= [from to] [:mongo :json]); padding difference
-            (is (= actual mongo-json) [from to])
+            (is (= (read-str actual) (read-str expected)) [from to])
             :else
-            (is (= actual expected) [from to])))))
+            (is (= actual expected) [from to])
+      ))))
 
 (def test-db-host (get (System/getenv) "MONGOHOST" "127.0.0.1"))
 (def test-db-port (Integer/parseInt (get (System/getenv) "MONGOPORT" "27017")))
@@ -674,9 +675,9 @@
           actual-index (get (get-index :testing-indexes auto-generated-index-name)
                             "key")
           expected-index (doto (BasicDBObject.)
-                           (.put "a" 1)
-                           (.put "b" 1)
-                           (.put "c" 1))]
+                           (.put "a" (int 1))
+                           (.put "b" (int 1))
+                           (.put "c" (int 1)))]
       (is (= (.toString actual-index) (.toString expected-index))))
 
     (add-index! :testing-indexes [:a [:b -1] :c])
@@ -684,9 +685,9 @@
           actual-index (get (get-index :testing-indexes auto-generated-index-name)
                             "key")
           expected-index (doto (BasicDBObject.)
-                           (.put "a" 1)
-                           (.put "b" -1)
-                           (.put "c" 1))]
+                           (.put "a" (int 1))
+                           (.put "b" (int -1))
+                           (.put "c" (int 1)))]
       (is (= (.toString actual-index) (.toString expected-index))))))
 
 (deftest sparse-indexing

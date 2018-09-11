@@ -156,7 +156,8 @@
   Username and password must be supplied for authenticated connections.
 
   A MongoClientURI string is also supported and must be prefixed with mongodb://
-  If username and password are specified the connection will be authenticated."
+  or mongodb+srv://. If username and password are specified the connection will
+  be authenticated."
   {:arglists '([db :instances [{:host host, :port port}]
                    :options mongo-options
                    :username username
@@ -164,7 +165,8 @@
                [mongo-client-uri])}
   [db & {:as args}]
   (let [^String dbname (named db)]
-    (if (.startsWith dbname "mongodb://")
+    (if (or (.startsWith dbname "mongodb://")
+            (.startsWith dbname "mongodb+srv://"))
       (make-connection-uri dbname)
       (make-connection-args dbname args))))
 
