@@ -12,27 +12,27 @@ is a good idea to also look at [Monger](http://clojuremongodb.info/).
 Releases and Dependency Information
 ----------------------------------------
 
-Latest stable release is **1.0.0**.
+Latest stable release is **1.0.1**.
 
 [Leiningen] dependency information:
 
-    [congomongo "1.0.0"]
+    [congomongo "1.0.1"]
 
 [Clojure CLI]:
 
-    congomongo {:mvn/version "1.0.0"}
+    congomongo {:mvn/version "1.0.1"}
 
 [Maven] dependency information:
 
     <dependency>
       <groupId>congomongo</groupId>
       <artifactId>congomongo</artifactId>
-      <version>1.0.0</version>
+      <version>1.0.1</version>
     </dependency>
 
 [Gradle] dependency information:
 
-    compile 'congomongo:congomongo:1.0.0'
+    compile 'congomongo:congomongo:1.0.1'
 
 [Leiningen]: https://leiningen.org/
 [Clojure CLI]: https://clojure.org/guides/deps_and_cli
@@ -278,6 +278,10 @@ Developer information
 
 Change Log
 ----------
+Version 1.0.1 - Sep 11, 2018
+Fixed bug where too few documents were returned if fetching with a limit that was larger than the
+default batch size.
+
 Version 1.0.0 - Sep 11, 2018
 
 Updated to support mongo-java-driver 3.0+ which enables use of TLS connections and DNS SRV connection strings.
