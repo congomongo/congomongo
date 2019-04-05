@@ -12,7 +12,7 @@
                         MongoClient MongoException DuplicateKeyException MongoCommandException
                         Tag TagSet
                         ReadPreference
-                        WriteConcern]
+                        WriteConcern MongoExecutionTimeoutException]
            [org.bson.types ObjectId]))
 
 (deftest coercions
@@ -582,12 +582,15 @@
           "changed DB exists")
       (drop-database! test-db2))))
 
-(defn make-points! []
-  (println "slow insert of 10000 points:")
-  (time
-   (doseq [x (range 100)
-           y (range 100)]
-     (insert! :points {:x x :y y}))))
+(defn make-points!
+  ([]
+   (make-points! 100))
+  ([num-points]
+   (println "slow insert of " (* num-points num-points) " points:")
+   (time
+    (doseq [x (range num-points)
+            y (range num-points)]
+      (insert! :points {:x x :y y})))))
 
 (deftest slow-insert-and-fetch
   (with-test-mongo
