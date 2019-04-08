@@ -12,27 +12,27 @@ is a good idea to also look at [Monger](http://clojuremongodb.info/).
 Releases and Dependency Information
 ----------------------------------------
 
-Latest stable release is **1.0.1**.
+Latest stable release is **1.1.0**.
 
 [Leiningen] dependency information:
 
-    [congomongo "1.0.1"]
+    [congomongo "1.1.0"]
 
 [Clojure CLI]:
 
-    congomongo {:mvn/version "1.0.1"}
+    congomongo {:mvn/version "1.1.0"}
 
 [Maven] dependency information:
 
     <dependency>
       <groupId>congomongo</groupId>
       <artifactId>congomongo</artifactId>
-      <version>1.0.1</version>
+      <version>1.1.0</version>
     </dependency>
 
 [Gradle] dependency information:
 
-    compile 'congomongo:congomongo:1.0.1'
+    compile 'congomongo:congomongo:1.1.0'
 
 [Leiningen]: https://leiningen.org/
 [Clojure CLI]: https://clojure.org/guides/deps_and_cli
@@ -278,8 +278,8 @@ Developer information
 
 Change Log
 ----------
-Version 1.0.2 - Apr 5, 2019
-Added ability to specify timeout for fetch and fetch-and-modify operations
+Version 1.1.0 - Apr 8, 2019
+Added ability to specify timeout for fetch and fetch-and-modify operations.
 
 Version 1.0.1 - Sep 11, 2018
 Fixed bug where too few documents were returned if fetching with a limit that was larger than the
