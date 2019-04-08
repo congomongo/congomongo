@@ -26,15 +26,16 @@
             [clojure.walk :refer (postwalk)]
             [somnium.congomongo.config :refer [*mongo-config*]]
             [somnium.congomongo.coerce :refer [coerce coerce-fields coerce-index-fields]])
-  (:import  [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder
-             MongoClientURI MongoCredential
-             DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes
-             AggregationOptions AggregationOptions$OutputMode
-             GroupCommand
-             MapReduceCommand MapReduceCommand$OutputType]
-            [com.mongodb.gridfs GridFS]
-            [com.mongodb.util JSON]
-            [org.bson.types ObjectId]))
+  (:import [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder
+                        MongoClientURI MongoCredential
+                        DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes
+                        AggregationOptions AggregationOptions$OutputMode
+                        GroupCommand
+                        MapReduceCommand MapReduceCommand$OutputType]
+           [com.mongodb.gridfs GridFS]
+           [com.mongodb.util JSON]
+           [org.bson.types ObjectId]
+           (java.util.concurrent TimeUnit)))
 
 
 (defprotocol StringNamed
@@ -400,10 +401,11 @@ When with-mongo and set-connection! interact, last one wins"
    :sort     -> sort the results by a specific key
    :options  -> query options [:tailable :slaveok :oplogreplay :notimeout :awaitdata]
    :hint     -> tell the query which index to use (name (string) or [:compound :index] (seq of keys))
-   :read-preferences -> read preferences (e.g. :primary or ReadPreference instance)"
+   :read-preferences -> read preferences (e.g. :primary or ReadPreference instance)
+   :max-time-ms      -> set the maximum execution time for operations"
   {:arglists
-   '([collection :where :only :limit :skip :as :from :one? :count? :sort :hint :explain? :options :read-preferences])}
-  [coll & {:keys [where only as from one? count? limit skip sort hint options explain? read-preferences]
+   '([collection :where :only :limit :skip :as :from :one? :count? :sort :hint :explain? :options :max-time-ms :read-preferences])}
+  [coll & {:keys [where only as from one? count? limit skip sort hint options explain? max-time-ms read-preferences]
            :or {where {} only [] as :clojure from :clojure
                 one? false count? false limit 0 skip 0 sort nil hint nil options [] explain? false}}]
   (when (and one? sort)
@@ -480,6 +482,8 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
                  (.skip cursor skip))
                (when n-limit
                  (.limit cursor n-limit))
+               (when max-time-ms
+                 (.maxTime cursor max-time-ms TimeUnit/MILLISECONDS))
                (if explain?
                  (coerce (.explain cursor) [:mongo as] :many false)
                  (coerce cursor [:mongo as] :many true))))))
@@ -585,19 +589,23 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
        :return-new? -> if true, the updated document is returned,
                        otherwise the old document is returned
                        (or it would be lost forever)
-       :upsert?     -> do upsert (insert if document not present)"
+       :upsert?     -> do upsert (insert if document not present)
+       :max-time-ms -> set the maximum execution time for operations"
   {:arglists '([collection where update {:only nil :sort nil :remove? false
-                                         :return-new? false :upsert? false :from :clojure :as :clojure}])}
-  [coll where update & {:keys [only sort remove? return-new? upsert? from as]
+                                         :return-new? false :upsert? false :max-time-ms 0 :from :clojure :as :clojure}])}
+  [coll where update & {:keys [only sort remove? return-new? upsert? from as max-time-ms]
                         :or {only nil sort nil remove? false
-                             return-new? false upsert? false from :clojure as :clojure}}]
+                             return-new? false upsert? false
+                             max-time-ms 0
+                             from :clojure as :clojure}}]
   (coerce (.findAndModify ^DBCollection (get-coll coll)
                           ^DBObject (coerce where [from :mongo])
                           ^DBObject (coerce-fields only)
                           ^DBObject (coerce sort [from :mongo])
                           remove?
                           ^DBObject (coerce update [from :mongo])
-                          return-new? upsert?) [:mongo as]))
+                          return-new? upsert?
+                          max-time-ms TimeUnit/MILLISECONDS) [:mongo as]))
 
 
 (defn destroy!

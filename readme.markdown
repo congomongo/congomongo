@@ -278,6 +278,9 @@ Developer information
 
 Change Log
 ----------
+Version 1.0.2 - Apr 5, 2019
+Added ability to specify timeout for fetch and fetch-and-modify operations
+
 Version 1.0.1 - Sep 11, 2018
 Fixed bug where too few documents were returned if fetching with a limit that was larger than the
 default batch size.
