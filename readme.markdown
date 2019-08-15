@@ -84,12 +84,12 @@ conn => {:mongo #<MongoClient Mongo: /127.0.0.1:20717>, :db #<DBApiLayer mydb>}
 (m/set-write-concern conn :journaled)
 ```
 These are the official write concerns, more details about them can be found in the [WriteConcern javadoc](https://mongodb.github.io/mongo-java-driver/3.6/javadoc/com/mongodb/WriteConcern.html).
-* :unacknowledged will report network errors - but does not wait for the write to be acknowledged
-* :acknowledged will report key constraint and other errors - this is the default
-* :journaled waits until the primary has sync'd the write to the journal
-* :fsynced waits until a write is sync'd to the filesystem
-* :replica-acknowledged waits until a write is sync'd to at least one replica as well
-* :majority waits until a write is sync'd to a majority of replica nodes
+* `:unacknowledged` will report network errors - but does not wait for the write to be acknowledged
+* `:acknowledged` will report key constraint and other errors - this is the default
+* `:journaled` waits until the primary has sync'd the write to the journal
+* `:fsynced` waits until a write is sync'd to the filesystem
+* `:replica-acknowledged` waits until a write is sync'd to at least one replica as well
+* `:majority` waits until a write is sync'd to a majority of replica nodes
 
 #### specify a read preference
 You can pass a simple read preference (without tags) to each function accepting read preferences. This may look like:
