@@ -83,16 +83,13 @@ conn => {:mongo #<MongoClient Mongo: /127.0.0.1:20717>, :db #<DBApiLayer mydb>}
 ```clojure
 (m/set-write-concern conn :journaled)
 ```
-These are the new, official write concerns as of release 0.4.0, using the 2.10 Java
-driver. The earlier write concerns are shown in parentheses and are deprecated as
-of the 0.4.0 release.
-* :errors-ignored will not report any errors - fire and forget (:none)
-* :unacknowledged will report network errors - but does not wait for the write to be acknowledged (:normal - this was the default prior to 0.4.0)
-* :acknowledged will report key constraint and other errors - this is the default (:safe, :strict was deprecated in 0.1.9)
-* :journaled waits until the primary has sync'd the write to the journal (:journal-safe)
-* :fsynced waits until a write is sync'd to the filesystem (:fsync-safe)
-* :replica-acknowledged waits until a write is sync'd to at least one replica as well (:replicas-safe, :replica-safe)
-* :majority waits until a write is sync'd to a majority of replica nodes (no previous equivalent)
+These are the official write concerns, more details about them can be found in the [WriteConcern javadoc](https://mongodb.github.io/mongo-java-driver/3.6/javadoc/com/mongodb/WriteConcern.html).
+* :unacknowledged will report network errors - but does not wait for the write to be acknowledged
+* :acknowledged will report key constraint and other errors - this is the default
+* :journaled waits until the primary has sync'd the write to the journal
+* :fsynced waits until a write is sync'd to the filesystem
+* :replica-acknowledged waits until a write is sync'd to at least one replica as well
+* :majority waits until a write is sync'd to a majority of replica nodes
 
 #### specify a read preference
 You can pass a simple read preference (without tags) to each function accepting read preferences. This may look like:
