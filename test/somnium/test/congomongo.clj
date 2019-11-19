@@ -49,6 +49,7 @@
 (def test-db-user (get (System/getenv) "MONGOUSER" nil))
 (def test-db-pass (get (System/getenv) "MONGOPASS" nil))
 (def test-db "congomongotestdb")
+(def admin-db "admin")
 (defn- drop-test-collections!
   "When we can't drop the test database (because it requires admin rights),
    we just drop all the non-system connections."
@@ -102,6 +103,21 @@
                               (.update (->bytes passphrase))))]
     (apply str (map #(get hex-strings (bit-and 0xff %)) digest-bytes))))
 
+(defn- create-test-user
+  [conn username password roles]
+  (with-mongo conn
+    (let [create-user-cmd (.. (BasicDBObjectBuilder/start)
+                              (add "createUser" username)
+                              (add "pwd" password)
+                              (add "roles" [(BasicDBObject. roles)])
+                              (get))]
+      (.command ^DB (get-db *mongo-config*)
+                ^DBObject create-user-cmd))))
+
+(defn- drop-test-user
+  [conn username]
+  (.command ^DB (get-db conn) ^DBObject (coerce {:dropUser username} [:clojure :mongo])))
+
 (defmacro with-test-user
   [username password & body]
   `(let [username# ~username
@@ -120,17 +136,10 @@
                                 :roles ["readWrite"]})
 
         :else
-        (let [create-user-cmd# (.. (BasicDBObjectBuilder/start)
-                                   (add "createUser" username#)
-                                   (add "pwd" password#)
-                                   (add "roles" [(BasicDBObject. {"role" "readWrite", "db" test-db})])
-                                   (get))]
-          (.command ^DB (get-db *mongo-config*)
-                    ^DBObject create-user-cmd#)))
+        (create-test-user *mongo-config* username# password# {"role" "readWrite", "db" test-db}))
       ~@body
       (finally
-        (.command ^DB (get-db *mongo-config*)
-                  ^DBObject (coerce {:dropUser username#} [:clojure :mongo]))))))
+        (drop-test-user *mongo-config* username#)))))
 
 (deftest authentication-works
   (with-test-mongo
@@ -179,7 +188,30 @@
                        (with-mongo conn
                          (insert! :thingies {:foo 1}))))
 
-          (close-connection conn))))))
+          (close-connection conn)))))
+  (testing "Using authentication source"
+    (let [auth-source-conn (make-connection admin-db
+                                            :instances [{:host test-db-host :port test-db-port}]
+                                            :username test-db-user
+                                            :password test-db-pass)
+          test-user (create-test-user auth-source-conn "test_user" "test_password" {"role" "readWrite", "db" test-db})]
+      (is (= 1.0 (get test-user "ok"))
+          (str "Failed to create test user. Error: " (get test-user "errmsg")))
+      (try
+        (testing "valid credentials work"
+          (let [conn (make-connection test-db
+                                      :instances [{:host test-db-host :port test-db-port}]
+                                      :username "test_user"
+                                      :password "test_password"
+                                      :auth-source {:mechanism :scram-1 :source admin-db})]
+            (with-mongo conn
+              (insert! :thingies {:foo 1})
+              (is (= 1 (:foo (fetch-one :thingies :where {:foo 1}))))
+
+              (close-connection conn))))
+        (finally
+          (drop-test-user auth-source-conn "test_user")
+          (close-connection auth-source-conn))))))
 
 (deftest make-connection-variations
   (testing "No optional arguments"
