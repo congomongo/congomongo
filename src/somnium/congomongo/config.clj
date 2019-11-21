@@ -21,3 +21,4 @@
 (ns somnium.congomongo.config)
 
 (def ^{:dynamic true} *mongo-config* {})
+(def ^{:dynamic true} *default-query-options* {})
