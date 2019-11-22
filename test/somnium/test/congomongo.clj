@@ -431,12 +431,12 @@
 
 (deftest fetch-with-hint-changes-index
   (with-test-mongo
-    (let [mongo2? (-> test-db version (.startsWith "2"))
-          mongo3? (-> test-db version (.startsWith "3"))]
+    (let [mongo3? (-> test-db version (.startsWith "3"))
+          mongo4? (-> test-db version (.startsWith "4"))]
 
       ;; only 1 versions
-      (is (or mongo2? mongo3?))
-      (is (not (and mongo2? mongo3?)))
+      (is (or mongo3? mongo4?))
+      (is (not (and mongo3? mongo4?)))
       (insert! :test_col {:key1 1 :key2 2})
 
       (add-index! :test_col [:key1]) ;; index1
@@ -446,59 +446,35 @@
 
       (testing "index1"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_1"))]
-          (when mongo2?
-            (is (= "BtreeCursor key1_1" (-> plan :cursor))))
-          (when mongo3?
-            (is (= "key1_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
+          (is (= "key1_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
       (testing "index1 seq"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [:key1]))]
-          (when mongo2?
-            (is (= "BtreeCursor key1_1" (-> plan :cursor))))
-          (when mongo3?
-            (is (= "key1_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
+          (is (= "key1_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
       (testing "index2"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_1_key2_1"))]
-          (when mongo2?
-            (is (= "BtreeCursor key1_1_key2_1" (-> plan :cursor))))
-          (when mongo3?
-            (is (= "key1_1_key2_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
+          (is (= "key1_1_key2_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
       (testing "index2 seq"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [:key1 :key2]))]
-          (when mongo2?
-            (is (= "BtreeCursor key1_1_key2_1" (-> plan :cursor))))
-          (when mongo3?
-            (is (= "key1_1_key2_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
+          (is (= "key1_1_key2_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
       (testing "index3"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_-1"))]
-          (when mongo2?
-            (is (= "BtreeCursor key1_-1" (-> plan :cursor))))
-          (when mongo3?
-            (is (= "key1_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
+          (is (= "key1_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
       (testing "index3 seq"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [[:key1 -1]]))]
-          (when mongo2?
-            (is (= "BtreeCursor key1_-1" (-> plan :cursor))))
-          (when mongo3?
-            (is (= "key1_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
+          (is (= "key1_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
       (testing "index4"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_1_key2_-1"))]
-          (when mongo2?
-            (is (= "BtreeCursor key1_1_key2_-1" (-> plan :cursor))))
-          (when mongo3?
-            (is (= "key1_1_key2_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))
+          (is (= "key1_1_key2_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
       (testing "index4 seq"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [:key1 [:key2 -1]]))]
-          (when mongo2?
-            (is (= "BtreeCursor key1_1_key2_-1" (-> plan :cursor))))
-          (when mongo3?
-            (is (= "key1_1_key2_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))))))
+          (is (= "key1_1_key2_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))))
 
 
 (deftest fetch-by-id-of-any-type
@@ -557,18 +533,13 @@
       (is (map?    (-> (fetch-eagerly :posts) first :user)))
 
       ;; and on database commands
-      (let [earth-radius (* 6378 1000) ; in meters
-            radians      (fn [meters]
-                           (float (/ meters earth-radius)))
-            cmd          {:geoNear     :posts
-                          :near        [10 20]
-                          :spherical   true
-                          :maxDistance (radians 1000)}
+      (let [cmd          {:find     :posts
+                          :filter {:comment "I agree..."}}
             lazy-result  (command cmd)
             eager-result (command-eagerly cmd)]
-        (is (db-ref?      (-> lazy-result  :results first :obj :user)))
-        (is (map?         (-> eager-result :results first :obj :user)))
-        (is (= "Jane Doe" (-> eager-result :results first :obj :user :name)))))))
+        (is (db-ref?      (-> lazy-result  :cursor :firstBatch first :user)))
+        (is (map?         (-> eager-result :cursor :firstBatch first :user)))
+        (is (= "Jane Doe" (-> eager-result :cursor :firstBatch first :user :name)))))))
 
 `(deftest databases-test
   (with-test-mongo
@@ -965,20 +936,6 @@
                    {:_id "tasty plantains" :value {:count 5.0}}])))
       )))
 
-(deftest test-server-eval
-  (with-test-mongo
-    (is (= (server-eval
-            "
-function ()
-{
- function square (n)
- {
-  return n*n;                           ;
-  }
- return square (25);
- }
-") 625.0))))
-
 (deftest dup-key-exception-works
   (with-test-mongo
     (println "unique index / write concern interaction")
@@ -1003,7 +960,7 @@ function ()
         (catch Exception e
           (is false "Unable to insert duplicate with :acknowledged concern"))))))
 
-(deftest test-group-command
+(deftest test-aggregate-command
   (with-test-mongo
     (drop-coll! :test-group )
     (insert! :test-group {:fruit "bananas" :count 1})
@@ -1012,16 +969,17 @@ function ()
     (insert! :test-group {:fruit "plantains" :count 2})
     (insert! :test-group {:fruit "pineapples" :count 4})
     (insert! :test-group {:fruit "pineapples" :count 2})
-    (let [reduce-count-fn "function(obj,prev){prev.count+=obj.count;}"
-          bananas-count (group :test-group :key [:fruit ] :initial {:count 0} :reducefn reduce-count-fn
-        :where {:fruit "bananas"})
-          all-count-keyf (group :test-group :keyfn "function(obj){return {'category':obj.fruit};}"
-        :initial {:count 0} :reducefn reduce-count-fn
-        :finalizefn "function(obj) {return {'items':obj.count,'fruit':obj.category};}")]
-      (is (= bananas-count
-            [{:fruit "bananas", :count 3.0}]))
-      (is (= all-count-keyf
-            [{:items 3.0, :fruit "bananas"} {:items 5.0, :fruit "plantains"} {:items 6.0, :fruit "pineapples"}])))))
+    (let [bananas-count (aggregate :test-group
+            {:$match {:fruit "bananas"}}
+            {:$group {:_id "$fruit" :count {:$sum "$count"}}})
+          all-count-keyf (aggregate :test-group
+            {:$group {:_id "$fruit" :count {:$sum "$count"}}}
+            {:$project {:_id false :fruit "$_id" :items "$count"}}
+            {:$sort {:fruit 1}})]
+      (is (= (:result bananas-count)
+            [{:_id "bananas", :count 3}]))
+      (is (= (:result all-count-keyf)
+            [{:items 3, :fruit "bananas"} {:items 6, :fruit "pineapples"} {:items 5, :fruit "plantains"}])))))
 
 
 (deftest test-read-preference

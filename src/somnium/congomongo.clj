@@ -814,16 +814,6 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
   (if-let [^com.mongodb.gridfs.GridFSDBFile f (.findOne ^GridFS (get-gridfs fs) (coerce file [:clojure :mongo]))]
     (.getInputStream f)))
 
-(defn server-eval
-  "Sends javascript to the server to be evaluated. js should define a function that takes no arguments. The server will call the function."
-  [js & args]
-  (let [db (get-db *mongo-config*)
-        m (.doEval db js (into-array Object args))]
-    (let [result (coerce m [:mongo :clojure])]
-      (if (= 1.0 (:ok result)) ;; In Clojure 1.3.0, 1 != 1.0 so we must compare against 1.0 instead (the JS stuff always returns floats)
-        (:retval result)
-        (throw (Exception. ^String (format "failure executing javascript: %s" (str result))))))))
-
 (defn- mapreduce-type
   [k]
   (get {:replace MapReduceCommand$OutputType/REPLACE
@@ -907,37 +897,3 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
         (-> (.getOutputCollection result)
             .getName
             keyword)))))
-
-(defn group
-  "Performs group operation on given collection
-
-  Parameters:
-  coll         -> the collection
-  :reducefn    -> a javascript reduce function as a string
-  :where       -> query to match
-  :key         -> fields to group-by
-  :keyfn       -> string with javascript function returning a key object
-  :initial     -> initial value for reduce function
-  :finalizefn  -> string containing javascript function to be run on each item in result set just before return
-
-  See http://www.mongodb.org/display/DOCS/Aggregation for more information"
-  {:arglists '([coll {:key nil :keyfn nil :reducefn nil :where nil :finalizefn nil
-                      :initial nil :as :clojure}])}
-  [coll & {:keys [key keyfn reducefn where finalizefn initial as]
-           :or {key nil keyfn nil reducefn nil where nil finalizefn nil
-                initial nil as :clojure}}]
-  (let [collection (get-coll coll)
-        group-command (if (not (nil? keyfn))
-                        (GroupCommand. collection
-                                       ^String keyfn
-                                       ^DBObject (coerce where [:clojure :mongo])
-                                       ^DBObject (coerce initial [:clojure :mongo])
-                                       reducefn
-                                       finalizefn)
-                        (GroupCommand. (get-coll coll)
-                                       ^DBObject (coerce-fields key)
-                                       ^DBObject (coerce where [:clojure :mongo])
-                                       ^DBObject (coerce initial [:clojure :mongo])
-                                       reducefn
-                                       finalizefn))]
-    (coerce (.group collection group-command) [:mongo :clojure] :many? true)))

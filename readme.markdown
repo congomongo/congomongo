@@ -12,27 +12,27 @@ is a good idea to also look at [Monger](http://clojuremongodb.info/).
 Releases and Dependency Information
 ----------------------------------------
 
-Latest stable release is **1.1.0**.
+Latest stable release is **2.0.0**.
 
 [Leiningen] dependency information:
 
-    [congomongo "1.1.0"]
+    [congomongo "2.0.0"]
 
 [Clojure CLI]:
 
-    congomongo {:mvn/version "1.1.0"}
+    congomongo {:mvn/version "2.0.0"}
 
 [Maven] dependency information:
 
     <dependency>
       <groupId>congomongo</groupId>
       <artifactId>congomongo</artifactId>
-      <version>1.1.0</version>
+      <version>2.0.0</version>
     </dependency>
 
 [Gradle] dependency information:
 
-    compile 'congomongo:congomongo:1.1.0'
+    compile 'congomongo:congomongo:2.0.0'
 
 [Leiningen]: https://leiningen.org/
 [Clojure CLI]: https://clojure.org/guides/deps_and_cli
@@ -275,6 +275,12 @@ Developer information
 
 Change Log
 ----------
+Version 2.0.0 - Nov 22, 2019
+BREAKING CHANGES IN THIS RELEASE!
+The `group`, `eval` and `geoNear` commands have been deprecated for a long while now and were finally removed
+in MongoDB 4.2. They have now been removed from this library as well. You are recommended to use the `aggregate`
+command to replace the functionality of `group` and `geoNear`.
+
 Version 1.1.0 - Apr 8, 2019
 Added ability to specify timeout for fetch and fetch-and-modify operations.
 
