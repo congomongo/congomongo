@@ -1,5 +1,5 @@
 (defproject congomongo
-  "2.1.0"
+  "2.2.0-SNAPSHOT"
   :description "Clojure-friendly API for MongoDB"
   :url "https://github.com/congomongo/congomongo"
   :mailing-list {:name "CongoMongo mailing list"
@@ -10,7 +10,7 @@
             :distribution :repo}
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/data.json "0.2.7"]
-                 [org.mongodb/mongo-java-driver "3.8.2"]
+                 [org.mongodb/mongo-java-driver "3.10.2"]
                  [org.clojure/clojure "1.10.1" :scope "provided"]]
   :deploy-repositories {"releases" {:url "https://repo.clojars.org" :creds :gpg}}
   ;; if a :dev profile is added, remember to update :aliases below to
