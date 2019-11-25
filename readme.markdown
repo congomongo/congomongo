@@ -266,6 +266,22 @@ Use :explain? on fetch to get performance information about a query. Returns a m
  :oldPlan {:cursor "BasicCursor", :indexBounds {}}}
 ```
 
+#### default query options
+Sometimes it's very helpful to be able to provide default options for all queries (for example, specify default
+`max-time-ms` timeout) instead of specifying it for each call. You can do this by wrapping your code in the
+`with-default-query-options` macro. Options specified in a particular call will have a priority and overwrite
+`default-query-options`.
+
+```clojure
+; This call will only return one item, since it is using the default options
+(with-default-query-options {:limit 1}
+  (fetch :thingies :where {:foo 1}))
+
+; You can also override the defaults by specifying a new value
+(with-default-query-options {:limit 1}
+  (fetch :thingies :where {:foo 1} :limit 2)) ; returns 2 items
+```
+
 Developer information
 ---------------------
 
@@ -275,6 +291,9 @@ Developer information
 
 Change Log
 ----------
+Version 2.1.0 - Nov 25, 2019
+Adds support for setting default query options, see documentation above.
+
 Version 2.0.0 - Nov 22, 2019
 BREAKING CHANGES IN THIS RELEASE!
 The `group`, `eval` and `geoNear` commands have been deprecated for a long while now and were finally removed
