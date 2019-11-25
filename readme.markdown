@@ -165,6 +165,7 @@ my-robot => {:name "robby",
 (m/fetch-count :points)
 => 10000
 ```
+
 #### ad-hoc queries
 ```clojure
 (m/fetch-one
@@ -199,6 +200,7 @@ The aggregate function accepts any number of pipeline operations.
 
 => true
 ```
+
 #### advanced initialization using mongo-options
 ```clojure
 (m/make-connection :mydb
@@ -213,6 +215,7 @@ The available options are hyphen-separated lowercase keyword versions of the cam
  :socket-keep-alive :socket-timeout :threads-allowed-to-block-for-connection-multiplier
  :write-concern)
 ```
+
 #### initialization using a Mongo URI
 ```clojure
 (m/make-connection "mongodb://user:pass@host:27071/databasename")
@@ -224,6 +227,7 @@ The available options are hyphen-separated lowercase keyword versions of the cam
 ```
 
 A query string may also be specified containing the options supported by the *MongoClientURI* class.
+
 #### easy json
 ```clojure
 (m/fetch-one :points
