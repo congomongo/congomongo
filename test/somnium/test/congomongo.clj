@@ -277,6 +277,18 @@
     (is (= 1 (-> (fetch :thingies :where {:foo 1} :read-preference :primary) first :foo)))
     (is (= 1 (-> (fetch :thingies :where {:foo 1} :read-preference :nearest) first :foo)))))
 
+(deftest fetch-with-default-query-options
+  (with-test-mongo
+    (insert! :thingies {:foo 1})
+    (insert! :thingies {:foo 1})
+
+    (testing "default options apply"
+      (with-default-query-options {:limit 1}
+        (is (= 1 (count (fetch :thingies :where {:foo 1}))))))
+
+    (testing "explicit option overwrites default"
+      (with-default-query-options {:limit 1}
+        (is (= 2 (count (fetch :thingies :where {:foo 1} :limit 2))))))))
 
 (deftest test-fetch-and-modify
   (with-test-mongo
@@ -287,6 +299,19 @@
     (let [res (fetch-and-modify :test_col {:key "123"} {:$inc {:value 1}} :only [:value] :return-new? true)]
       (is (not (contains? res :key)))
       (is (= 4 (:value res))))))
+
+(deftest fetch-and-modify-with-default-query-options
+  (with-test-mongo
+    (insert! :thingies {:foo 1})
+    (insert! :thingies {:foo 1})
+
+    (testing "default options apply"
+      (with-default-query-options {:return-new? true}
+        (is (= {:foo 2} (fetch-and-modify :thingies {:foo 1} {:$inc {:foo 1}} :only {:_id false})))))
+
+    (testing "explicit option overwrites default"
+      (with-default-query-options {:limit 1}
+        (is (= {:foo 1} (fetch-and-modify :thingies {:foo 1} {:$inc {:foo 1}} :return-new? false :only {:_id false})))))))
 
 (deftest can-insert-sets
   (with-test-mongo

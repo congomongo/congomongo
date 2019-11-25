@@ -24,7 +24,7 @@
   somnium.congomongo
   (:require [clojure.string]
             [clojure.walk :refer (postwalk)]
-            [somnium.congomongo.config :refer [*mongo-config*]]
+            [somnium.congomongo.config :refer [*mongo-config* *default-query-options*]]
             [somnium.congomongo.coerce :refer [coerce coerce-fields coerce-index-fields]])
   (:import [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder
                         MongoClientURI MongoCredential
@@ -212,6 +212,12 @@
   [dbname & body]
   `(let [^DB db# (.getDB ^MongoClient (:mongo *mongo-config*) (name ~dbname))]
      (binding [*mongo-config* (assoc *mongo-config* :db db#)]
+       ~@body)))
+
+(defmacro with-default-query-options
+  [options & body]
+  `(do
+     (binding [*default-query-options* ~options]
        ~@body)))
 
 (defn set-connection!
@@ -405,88 +411,91 @@ When with-mongo and set-connection! interact, last one wins"
    :max-time-ms      -> set the maximum execution time for operations"
   {:arglists
    '([collection :where :only :limit :skip :as :from :one? :count? :sort :hint :explain? :options :max-time-ms :read-preferences])}
-  [coll & {:keys [where only as from one? count? limit skip sort hint options explain? max-time-ms read-preferences]
-           :or {where {} only [] as :clojure from :clojure
-                one? false count? false limit 0 skip 0 sort nil hint nil options [] explain? false}}]
-  (when (and one? sort)
-    (throw (IllegalArgumentException. "Fetch :one? (or fetch-one) can't be used with :sort.
+  [coll & {:as params}]
+  (let [{:keys [where only as from one? count? limit skip sort hint options explain? max-time-ms read-preferences]}
+        (merge {:where {} :only [] :as :clojure :from :clojure
+                 :one? false :count? false :limit 0 :skip 0 :sort nil :hint nil :options [] :explain? false}
+                *default-query-options*
+                params)]
+    (when (and one? sort)
+      (throw (IllegalArgumentException. "Fetch :one? (or fetch-one) can't be used with :sort.
 You should use fetch with :limit 1 instead."))); one? and sort should NEVER be called together
-  (when (and one? (or (not= [] options) (not= 0 limit) hint explain?))
-    (throw (IllegalArgumentException. "At the moment, fetch-one doesn't support options, limit, or hint"))) ;; these are allowed but not implemented here
-  (when-not (or (nil? hint)
-                (string? hint)
-                (and (instance? clojure.lang.Sequential hint)
-                     (every? #(or (keyword? %)
-                                  (and (instance? clojure.lang.Sequential %)
-                                       (= 2 (count %))
-                                       (-> % first keyword?)
-                                       (-> % second #{1 -1})))
-                             hint)))
-    (throw (IllegalArgumentException. ":hint requires a string name of the index, or a seq of keywords that is the index definition")))
-  (let [n-where (coerce where [from :mongo])
-        n-only  (coerce-fields only)
-        n-col   (get-coll coll)
-        ; congomongo originally used do convert passed `limit` into negative number because mongo
-        ; protocol says:
-        ;  > If the number is negative, then the database will return that number and close the
-        ;  > cursor. No further results for that query can be fetched.
-        ; (see https://docs.mongodb.com/manual/reference/mongodb-wire-protocol/#op-query)
-        ;
-        ;  But after bumping mongo-driver from 3.0.2 to 3.2.2 we discovered that
-        ;  if a number of available matching records in mongo is bigger than `batchSize`
-        ;  (101 by default) and limit is a negative number then mongo will return only `batchSize`
-        ;  of results and close the cursor. Which is in agreement with mongo shell docs:
-        ;   > A negative limit is similar to a positive limit but closes the cursor after
-        ;   > returning a single batch of results. As such, with a negative limit, if the
-        ;   > limited result set does not fit into a single batch, the number of documents
-        ;   > received will be less than the specified limit. By passing a negative limit,
-        ;   > the client indicates to the server that it will not ask for a subsequent batch
-        ;   > via getMore.
-        ;  (see https://docs.mongodb.com/manual/reference/method/cursor.limit/#negative-values)
-        ;
-        ; Maybe protocol description implies that number can't be bigger than a `batchSize`
-        ; or maybe protocol has been changed and docs aren't updated. Anyway current behaviour
-        ; (with negative limit) doesn't match expectations therefore changed to keep limit as is.
-        n-limit (or limit 0)
-        n-sort (when sort (coerce sort [from :mongo]))
-        n-options (calculate-query-options options)
-        n-hint (cond (string? hint) hint
-                     (nil? hint) nil
-                     :else (coerce-index-fields hint))
-        n-preferences (cond
-                        (nil? read-preferences) nil
-                        (instance? ReadPreference read-preferences) read-preferences
-                        :else (somnium.congomongo/read-preference read-preferences))]
-    (cond
-      count? (.getCount n-col n-where n-only)
+    (when (and one? (or (not= [] options) (not= 0 limit) hint explain?))
+      (throw (IllegalArgumentException. "At the moment, fetch-one doesn't support options, limit, or hint"))) ;; these are allowed but not implemented here
+    (when-not (or (nil? hint)
+                  (string? hint)
+                  (and (instance? clojure.lang.Sequential hint)
+                       (every? #(or (keyword? %)
+                                    (and (instance? clojure.lang.Sequential %)
+                                         (= 2 (count %))
+                                         (-> % first keyword?)
+                                         (-> % second #{1 -1})))
+                               hint)))
+      (throw (IllegalArgumentException. ":hint requires a string name of the index, or a seq of keywords that is the index definition")))
+    (let [n-where (coerce where [from :mongo])
+          n-only  (coerce-fields only)
+          n-col   (get-coll coll)
+                                        ; congomongo originally used do convert passed `limit` into negative number because mongo
+                                        ; protocol says:
+                                        ;  > If the number is negative, then the database will return that number and close the
+                                        ;  > cursor. No further results for that query can be fetched.
+                                        ; (see https://docs.mongodb.com/manual/reference/mongodb-wire-protocol/#op-query)
+                                        ;
+                                        ;  But after bumping mongo-driver from 3.0.2 to 3.2.2 we discovered that
+                                        ;  if a number of available matching records in mongo is bigger than `batchSize`
+                                        ;  (101 by default) and limit is a negative number then mongo will return only `batchSize`
+                                        ;  of results and close the cursor. Which is in agreement with mongo shell docs:
+                                        ;   > A negative limit is similar to a positive limit but closes the cursor after
+                                        ;   > returning a single batch of results. As such, with a negative limit, if the
+                                        ;   > limited result set does not fit into a single batch, the number of documents
+                                        ;   > received will be less than the specified limit. By passing a negative limit,
+                                        ;   > the client indicates to the server that it will not ask for a subsequent batch
+                                        ;   > via getMore.
+                                        ;  (see https://docs.mongodb.com/manual/reference/method/cursor.limit/#negative-values)
+                                        ;
+                                        ; Maybe protocol description implies that number can't be bigger than a `batchSize`
+                                        ; or maybe protocol has been changed and docs aren't updated. Anyway current behaviour
+                                        ; (with negative limit) doesn't match expectations therefore changed to keep limit as is.
+          n-limit (or limit 0)
+          n-sort (when sort (coerce sort [from :mongo]))
+          n-options (calculate-query-options options)
+          n-hint (cond (string? hint) hint
+                       (nil? hint) nil
+                       :else (coerce-index-fields hint))
+          n-preferences (cond
+                          (nil? read-preferences) nil
+                          (instance? ReadPreference read-preferences) read-preferences
+                          :else (somnium.congomongo/read-preference read-preferences))]
+      (cond
+        count? (.getCount n-col n-where n-only)
 
-      ;; The find command isn't documented so there's no nice way to build a
-      ;; find command that adds read-preferences when necessary
-      one?   (if-let [m (if (not (nil? n-preferences))
-                          (.findOne ^DBCollection n-col ^DBObject n-where ^DBObject n-only ^ReadPreference n-preferences)
-                          (.findOne ^DBCollection n-col ^DBObject n-where ^DBObject n-only))]
-              (coerce m [:mongo as]) nil)
+        ;; The find command isn't documented so there's no nice way to build a
+        ;; find command that adds read-preferences when necessary
+        one?   (if-let [m (if (not (nil? n-preferences))
+                            (.findOne ^DBCollection n-col ^DBObject n-where ^DBObject n-only ^ReadPreference n-preferences)
+                            (.findOne ^DBCollection n-col ^DBObject n-where ^DBObject n-only))]
+                 (coerce m [:mongo as]) nil)
 
-      :else  (when-let [cursor (.find ^DBCollection n-col
-                                      ^DBObject n-where
-                                      ^DBObject n-only)]
-               (when n-preferences
-                 (.setReadPreference cursor n-preferences))
-               (when n-hint
-                 (.hint cursor n-hint))
-               (when n-options
-                 (.setOptions cursor n-options))
-               (when n-sort
-                 (.sort cursor n-sort))
-               (when skip
-                 (.skip cursor skip))
-               (when n-limit
-                 (.limit cursor n-limit))
-               (when max-time-ms
-                 (.maxTime cursor max-time-ms TimeUnit/MILLISECONDS))
-               (if explain?
-                 (coerce (.explain cursor) [:mongo as] :many false)
-                 (coerce cursor [:mongo as] :many true))))))
+        :else  (when-let [cursor (.find ^DBCollection n-col
+                                        ^DBObject n-where
+                                        ^DBObject n-only)]
+                 (when n-preferences
+                   (.setReadPreference cursor n-preferences))
+                 (when n-hint
+                   (.hint cursor n-hint))
+                 (when n-options
+                   (.setOptions cursor n-options))
+                 (when n-sort
+                   (.sort cursor n-sort))
+                 (when skip
+                   (.skip cursor skip))
+                 (when n-limit
+                   (.limit cursor n-limit))
+                 (when max-time-ms
+                   (.maxTime cursor max-time-ms TimeUnit/MILLISECONDS))
+                 (if explain?
+                   (coerce (.explain cursor) [:mongo as] :many false)
+                   (coerce cursor [:mongo as] :many true)))))))
 
 (defn fetch-one [col & options]
   (apply fetch col (concat options '[:one? true])))
@@ -593,19 +602,21 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
        :max-time-ms -> set the maximum execution time for operations"
   {:arglists '([collection where update {:only nil :sort nil :remove? false
                                          :return-new? false :upsert? false :max-time-ms 0 :from :clojure :as :clojure}])}
-  [coll where update & {:keys [only sort remove? return-new? upsert? from as max-time-ms]
-                        :or {only nil sort nil remove? false
-                             return-new? false upsert? false
-                             max-time-ms 0
-                             from :clojure as :clojure}}]
-  (coerce (.findAndModify ^DBCollection (get-coll coll)
-                          ^DBObject (coerce where [from :mongo])
-                          ^DBObject (coerce-fields only)
-                          ^DBObject (coerce sort [from :mongo])
-                          remove?
-                          ^DBObject (coerce update [from :mongo])
-                          return-new? upsert?
-                          max-time-ms TimeUnit/MILLISECONDS) [:mongo as]))
+  [coll where update & {:as params}]
+  (let [{:keys [only sort remove? return-new? upsert? from as max-time-ms]}
+        (merge {:only nil :sort nil :remove? false
+                :return-new? false :upsert? false
+                :max-time-ms 0 :from :clojure :as :clojure}
+               *default-query-options*
+               params)]
+      (coerce (.findAndModify ^DBCollection (get-coll coll)
+                              ^DBObject (coerce where [from :mongo])
+                              ^DBObject (coerce-fields only)
+                              ^DBObject (coerce sort [from :mongo])
+                              remove?
+                              ^DBObject (coerce update [from :mongo])
+                              return-new? upsert?
+                              max-time-ms TimeUnit/MILLISECONDS) [:mongo as])))
 
 
 (defn destroy!
