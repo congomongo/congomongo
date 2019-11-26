@@ -315,6 +315,8 @@ Change Log
 
 [Read the change log](CHANGES.md)
 
+Discussions and contributions
+-----------------------------
 
 There is now a [Google Group](https://groups.google.com/group/congomongo-dev)
 Come help us make ponies for great good.
@@ -324,6 +326,6 @@ Clojars group is congomongo.
 License and copyright
 ---------------------
 
-Congomongo is made available under the terms of an MIT-style
-license. Please refer to the source code for the full text of this
-license and for copyright details.
+Congomongo is made available under the terms of an
+[MIT-style license](LICENSE). Please refer to the source code for
+the full text of this license and for copyright details.
