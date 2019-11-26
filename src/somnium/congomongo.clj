@@ -110,8 +110,8 @@
   "Makes a connection with passed database name, [{:host host, :port port}]
   server addresses and MongoClientOptions.
 
-  username and password may be supplied for authenticated connections."
-  [db {:keys [instances options username password]}]
+  username, password, and optionally auth-source, may be supplied for authenticated connections."
+  [db {:keys [instances options username password] {auth-mechanism :mechanism auth-source :source} :auth-source}]
   (when (not= (nil? username) (nil? password))
     (throw (IllegalArgumentException. "Username and password must both be supplied for authenticated connections")))
 
@@ -120,13 +120,29 @@
                        (or instances [{:host "127.0.0.1" :port 27017}]))
 
         ^MongoClientOptions options (or options (mongo-options))
+        ^MongoCredential credential (when (and username password)
+                                      (cond
+                                        (= :plain auth-mechanism)
+                                        (MongoCredential/createPlainCredential username auth-source
+                                                                               (.toCharArray password))
 
-        mongo (cond
-                (and username password) (make-mongo-client
-                                          addresses
-                                          [(MongoCredential/createCredential username db (.toCharArray password))]
-                                          options)
-                :else (make-mongo-client addresses options))
+                                        (= :scram-1 auth-mechanism)
+                                        (MongoCredential/createScramSha1Credential username auth-source
+                                                                                   (.toCharArray password))
+
+                                        (= :scram-256 auth-mechanism)
+                                        (MongoCredential/createScramSha256Credential username auth-source
+                                                                                     (.toCharArray password))
+
+                                        auth-mechanism
+                                        (throw (UnsupportedOperationException. (str auth-mechanism " is not supported.")))
+
+                                        :else
+                                        (MongoCredential/createCredential username db (.toCharArray password))))
+
+        mongo (if credential
+                (make-mongo-client addresses [credential] options)
+                (make-mongo-client addresses options))
 
         n-db (if db (.getDB mongo db) nil)]
       {:mongo mongo :db n-db}))
@@ -151,6 +167,12 @@
     :options - a MongoClientOptions object
     :username - the username to authenticate with
     :password - the password to authenticate with
+    :auth-source - the authentication source for authenticated connections in form:
+      {:mechanism mechanism :source source}
+      Supported authentication mechanisms:
+        :plain
+        :scram-1
+        :scram-256
 
   If instances are not specified a connection is made to 127.0.0.1:27017
 
@@ -162,7 +184,8 @@
   {:arglists '([db :instances [{:host host, :port port}]
                    :options mongo-options
                    :username username
-                   :password password]
+                   :password password
+                   :auth-source {:mechanism mechanism :source source}]
                [mongo-client-uri])}
   [db & {:as args}]
   (let [^String dbname (named db)]

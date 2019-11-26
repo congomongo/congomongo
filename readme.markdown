@@ -216,6 +216,23 @@ The available options are hyphen-separated lowercase keyword versions of the cam
  :write-concern)
 ```
 
+#### specifying authentication mechanism and source
+
+```clojure
+(m/make-connection :mydb
+                   :instances [{:host "127.0.0.1"}]
+                   :username "user"
+                   :password "password"
+                   :auth-source {:mechanism :scram-1 :source "authsourcedb"})
+```
+Supported authentication mechanisms:
+
+| Key | Mechanism |
+| --- | --- |
+| `:plain` | AuthenticationMechanism.PLAIN |
+| `:scram-1` | AuthenticationMechanism.SCRAM_SHA_1 |
+| `:scram-256` | AuthenticationMechanism.SCRAM_SHA_256 |
+
 #### initialization using a Mongo URI
 ```clojure
 (m/make-connection "mongodb://user:pass@host:27071/databasename")
@@ -295,6 +312,13 @@ Developer information
 
 Change Log
 ----------
+*Version 2.?.? - November ??, 2019
+
+Adds support for authentication source using one of the following authentication mechanisms:
+  AuthenticationMechanism.PLAIN, 
+  AuthenticationMechanism.SCRAM_SHA_1,
+  AuthenticationMechanism.SCRAM_SHA_256
+
 *Version 2.1.0 - Nov 25, 2019*
 
 Adds support for setting default query options, see documentation above.
