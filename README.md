@@ -1,4 +1,4 @@
-CongoMongo [![Build Status](https://travis-ci.org/congomongo/congomongo.svg?branch=master)](https://travis-ci.org/congomongo/congomongo) ![ClojarsVersionRelease](https://img.shields.io/clojars/v/congomongo)
+CongoMongo [![Build Status](https://travis-ci.org/congomongo/congomongo.svg?branch=master)](https://travis-ci.org/congomongo/congomongo) [![ClojarsVersionRelease](https://img.shields.io/clojars/v/congomongo)](https://clojars.org/congomongo)
 ===========
 
 What?
