@@ -129,8 +129,11 @@ my-robot => {:name "robby",
              :_id  #<ObjectId> "0c23396f7e53e34a4c8cf400">}
 ```
 #### update
+Update query and modifier can use all [mongodb operators](https://docs.mongodb.com/manual/reference/operator/)
 ```clojure
-(m/update! :robots my-robot (merge my-robot {:name "asimo"}))
+(m/update! :robots
+  {:_id (:_id my-robot)}
+  {:$set {:name "asimo"}})
 
 =>  #<WriteResult { "serverUsed" : "/127.0.0.1:27017" ,
                     "updatedExisting" : true ,
