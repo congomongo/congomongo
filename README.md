@@ -12,27 +12,27 @@ is a good idea to also look at [Monger](http://clojuremongodb.info/).
 Releases and Dependency Information
 ----------------------------------------
 
-Latest stable release is **2.2.0**.
+Latest stable release is **2.2.1**.
 
 [Leiningen] dependency information:
 
-    [congomongo "2.2.0"]
+    [congomongo "2.2.1"]
 
 [Clojure CLI]:
 
-    congomongo {:mvn/version "2.2.0"}
+    congomongo {:mvn/version "2.2.1"}
 
 [Maven] dependency information:
 
     <dependency>
       <groupId>congomongo</groupId>
       <artifactId>congomongo</artifactId>
-      <version>2.2.0</version>
+      <version>2.2.1</version>
     </dependency>
 
 [Gradle] dependency information:
 
-    compile 'congomongo:congomongo:2.2.0'
+    compile 'congomongo:congomongo:2.2.1'
 
 [Leiningen]: https://leiningen.org/
 [Clojure CLI]: https://clojure.org/guides/deps_and_cli

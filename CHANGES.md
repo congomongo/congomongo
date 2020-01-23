@@ -1,3 +1,7 @@
+# Version 2.2.1 - Jan 23, 2020
+
+Fix some reflection warnings to improve performance
+
 # Version 2.2.0 - Nov 26, 2019
 
 Adds support for authentication source using one of the following authentication mechanisms:
