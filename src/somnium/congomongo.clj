@@ -30,11 +30,10 @@
                         MongoClientURI MongoCredential
                         DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes
                         AggregationOptions AggregationOptions$OutputMode
-                        GroupCommand
                         MapReduceCommand MapReduceCommand$OutputType]
            [com.mongodb.gridfs GridFS]
-           [com.mongodb.util JSON]
            [org.bson.types ObjectId]
+           java.util.List
            (java.util.concurrent TimeUnit)))
 
 
@@ -97,15 +96,15 @@
 
 (defn- make-mongo-client
   (^com.mongodb.MongoClient
-   [addresses creds options]
+   [addresses creds ^MongoClientOptions options]
     (if (> (count addresses) 1)
-      (MongoClient. ^java.util.List addresses creds options)
-      (MongoClient. ^ServerAddress (first addresses) creds options)))
+      (MongoClient. ^List addresses ^List creds options)
+      (MongoClient. ^ServerAddress (first addresses) ^List creds options)))
 
   (^com.mongodb.MongoClient
-   [addresses options]
+   [addresses ^MongoClientOptions options]
     (if (> (count addresses) 1)
-      (MongoClient. ^java.util.List addresses options)
+      (MongoClient. ^List addresses options)
       (MongoClient. ^ServerAddress (first addresses) options))))
 
 (defn- make-connection-args
@@ -366,11 +365,11 @@ When with-mongo and set-connection! interact, last one wins"
 
 (def ^:private read-preference-map
   "Private map of facory functions of ReadPreferences to aliases."
-  {:nearest (fn nearest ([] (ReadPreference/nearest)) ([tags] (ReadPreference/nearest tags)))
+  {:nearest (fn nearest ([] (ReadPreference/nearest)) ([^List tags] (ReadPreference/nearest tags)))
    :primary (fn primary ([] (ReadPreference/primary)) ([_] (throw (IllegalArgumentException. "Read preference :primary does not accept tag sets."))))
-   :primary-preferred (fn primary-preferred ([] (ReadPreference/primaryPreferred)) ([tags] (ReadPreference/primaryPreferred tags)))
-   :secondary (fn secondary ([] (ReadPreference/secondary)) ([tags] (ReadPreference/secondary tags)))
-   :secondary-preferred (fn secondary-preferred ([] (ReadPreference/secondaryPreferred)) ([tags] (ReadPreference/secondaryPreferred tags)))})
+   :primary-preferred (fn primary-preferred ([] (ReadPreference/primaryPreferred)) ([^List tags] (ReadPreference/primaryPreferred tags)))
+   :secondary (fn secondary ([] (ReadPreference/secondary)) ([^List tags] (ReadPreference/secondary tags)))
+   :secondary-preferred (fn secondary-preferred ([] (ReadPreference/secondaryPreferred)) ([^List tags] (ReadPreference/secondaryPreferred tags)))})
 
 (defn- named?
   [x]
@@ -381,7 +380,7 @@ When with-mongo and set-connection! interact, last one wins"
   (letfn [(->tag [[k v]]
             (com.mongodb.Tag. (if (named? k) (name k) (str k))
                               (if (named? v) (name v) (str v))))]
-    (com.mongodb.TagSet. ^java.util.List (map ->tag tag))))
+    (com.mongodb.TagSet. ^List (map ->tag tag))))
 
 
 (defn read-preference
@@ -580,9 +579,9 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
         list-obj (if many coerced-obj (list coerced-obj))
         res (if write-concern
               (if-let [wc (write-concern write-concern-map)]
-                (.insert ^DBCollection (get-coll coll) ^java.util.List list-obj ^WriteConcern wc)
+                (.insert ^DBCollection (get-coll coll) ^List list-obj ^WriteConcern wc)
                 (illegal-write-concern write-concern))
-              (.insert ^DBCollection (get-coll coll) ^java.util.List list-obj))]
+              (.insert ^DBCollection (get-coll coll) ^List list-obj))]
     (coerce coerced-obj [:mongo to] :many many)))
 
 (defn mass-insert!
@@ -724,7 +723,7 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
         from-and-to (drop-while (complement keyword?) ops-and-from-to)
         {:keys [from to] :or {from :clojure to :clojure}} from-and-to
         cursor (.aggregate (get-coll coll)
-                           ^java.util.List (coerce (conj ops op) [from :mongo])
+                           ^List (coerce (conj ops op) [from :mongo])
                            ^AggregationOptions (-> (AggregationOptions/builder)
                                                    (.outputMode AggregationOptions$OutputMode/CURSOR)
                                                    (.build)))]
