@@ -1,3 +1,7 @@
+# Version 2.2.2 - Aug 3, 2021
+
+Fix some reflection warnings in preparation for upgrade to MongoDB 4.x driver
+
 # Version 2.2.1 - Jan 23, 2020
 
 Fix some reflection warnings to improve performance

@@ -15,3 +15,4 @@ pom.xml
 /.nrepl-port
 /target/
 /pom.xml.asc
+/.lsp
