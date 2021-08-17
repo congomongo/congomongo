@@ -1097,3 +1097,30 @@
         (is (= 3 (count index-info)))
         (is (set/subset? #{"key1_1" "key1_-1"}
                          (set (map :name index-info))))))))
+
+
+(deftest test-json-serialization
+  (with-test-mongo
+    (drop-coll! :json-test)
+    (insert! :json-test {:fruit "bananas" :count 1})
+    (let [bananas (fetch-one :json-test :as :json)
+          parsed (read-str bananas)]
+      (is (= {"fruit" "bananas"
+              "count" 1}
+             (select-keys parsed ["fruit" "count"]))))
+    (insert! :json-test
+            
+             (clojure.data.json/write-str
+              {:fruit "apples" :count 2})
+             
+             :from :json)
+    (let [fruits (->>
+                  (fetch :json-test :as :json)
+                  (map read-str)
+                  (map #(select-keys % ["fruit" "count"]))
+                  (set))]
+      (is (= #{{"fruit" "bananas"
+                "count" 1}
+               {"fruit" "apples"
+                "count" 2}}
+             fruits)))))
