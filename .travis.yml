@@ -1,7 +1,0 @@
-sudo: false
-language: clojure
-services: mongodb
-script: lein test-all
-jdk:
-  - openjdk11
-  - openjdk10

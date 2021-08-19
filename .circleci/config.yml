@@ -1,0 +1,10 @@
+version: 2.1
+
+jobs:
+  build:
+    docker:
+      - image: cimg/clojure:1.10.1
+      - image: mongo:3.6
+    steps:
+      - checkout
+      - run: lein test
