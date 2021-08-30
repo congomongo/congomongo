@@ -19,12 +19,19 @@
 ; THE SOFTWARE.
 
 (ns somnium.congomongo.coerce
-  (:require [clojure.data.json :refer [write-str read-str]])
-  (:import [clojure.lang IPersistentMap IPersistentVector Keyword]
+  (:require [clojure.data.json :as json :refer [write-str read-str]])
+  (:import [clojure.lang IPersistentMap Keyword]
            [java.util Map List Set]
            [com.mongodb DBObject BasicDBObject BasicDBList]
-           [com.mongodb.gridfs GridFSFile]
-           [com.mongodb.util JSON]))
+           [org.bson.json JsonWriterSettings JsonMode]
+           [org.bson.types ObjectId]))
+
+(def ^:private json-settings
+  ; Create a settings object to allow us to serialize an object with "RELAXED" JSON.
+  ; https://github.com/mongodb/specifications/blob/df6be82f865e9b72444488fd62ae1eb5fca18569/source/extended-json.rst
+  (-> (JsonWriterSettings/builder)
+      (.outputMode JsonMode/RELAXED)
+      (.build)))
 
 (def ^{:dynamic true
        :doc "Set this to false to prevent coercion from setting string keys to keywords"
@@ -46,6 +53,26 @@
         (.isArray (.getClass ^Object x))
         (string? x)
         (instance? java.util.Map x))))
+
+(defn json->mongo [^String s]
+  (BasicDBObject/parse s))
+
+(defn- write-basic-db-object
+  [^BasicDBObject dbo ^Appendable out]
+  (.append out (.toJson dbo json-settings)))
+
+(extend BasicDBObject clojure.data.json/JSONWriter {:-write write-basic-db-object})
+
+(defn write-object-id
+  [^ObjectId id ^Appendable out]
+  (.append out "\"")
+  (.append out (str id))
+  (.append out "\""))
+
+(extend ObjectId json/JSONWriter {:-write write-object-id})
+
+(defn mongo->json [o]
+  (write-str o))
 
 ;;; Converting data from mongo into Clojure data objects
 
@@ -126,11 +153,11 @@
      *translations* {[:clojure :mongo  ] #'clojure->mongo
                      [:clojure :json   ] #'write-str
                      [:mongo   :clojure] #(mongo->clojure ^DBObject % ^boolean *keywordize*)
-                     [:mongo   :json   ] #(JSON/serialize %)
+                     [:mongo   :json   ] #'mongo->json
                      [:json    :clojure] #(read-str % :key-fn (if *keywordize*
                                                                 keyword
                                                                 identity))
-                     [:json    :mongo  ] #(JSON/parse %)})
+                     [:json    :mongo  ] #'json->mongo})
 
 (defn coerce
   "takes an object, a vector of keywords:
@@ -150,8 +177,9 @@
                           (f obj))
                         (throw (RuntimeException. "unsupported keyword pair"))))))
 
-(defn ^DBObject dbobject [& args]
-  "Create a DBObject from a sequence of key/value pairs, in order."
+(defn ^DBObject dbobject
+   "Create a DBObject from a sequence of key/value pairs, in order."
+  [& args]
   (let [dbo (BasicDBObject.)]
     (doseq [[k v] (partition 2 args)]
       (.put dbo
