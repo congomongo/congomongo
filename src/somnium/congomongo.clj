@@ -28,8 +28,9 @@
             [somnium.congomongo.coerce :refer [coerce coerce-fields coerce-index-fields]])
   (:import [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder
                         MongoClientURI MongoCredential
-                        DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes
-                        AggregationOptions AggregationOptions$OutputMode
+                        DB DBCollection CursorType DBObject DBRef
+                        ServerAddress ReadPreference WriteConcern
+                        AggregationOptions
                         MapReduceCommand MapReduceCommand$OutputType]
            [com.mongodb.gridfs GridFS]
            [org.bson.types ObjectId]
@@ -142,7 +143,7 @@
                                         (MongoCredential/createCredential username db (.toCharArray password))))
 
         mongo (if credential
-                (make-mongo-client addresses [credential] options)
+                (make-mongo-client addresses credential options)
                 (make-mongo-client addresses options))
 
         n-db (if db (.getDB mongo db) nil)]
@@ -262,21 +263,10 @@ When with-mongo and set-connection! interact, last one wins"
 
 (def write-concern-map
   {:acknowledged         WriteConcern/ACKNOWLEDGED
-   :fsynced              WriteConcern/FSYNCED
    :journaled            WriteConcern/JOURNALED
    :majority             WriteConcern/MAJORITY
-   :replica-acknowledged WriteConcern/REPLICA_ACKNOWLEDGED
-   :unacknowledged       WriteConcern/UNACKNOWLEDGED
-   ;; these are pre-2.10.x names for write concern:
-   :fsync-safe    WriteConcern/FSYNC_SAFE  ;; deprecated - use :fsynced
-   :journal-safe  WriteConcern/JOURNAL_SAFE ;; deprecated - use :journaled
-   :normal        WriteConcern/NORMAL ;; deprecated - use :unacknowledged
-   :replicas-safe WriteConcern/REPLICAS_SAFE ;; deprecated - use :replica-acknowledged
-   :safe          WriteConcern/SAFE ;; deprecated - use :acknowledged
-   ;; these are left for backward compatibility but are deprecated:
-   :replica-safe WriteConcern/REPLICAS_SAFE
-   :strict       WriteConcern/SAFE
-   })
+   :replica-acknowledged WriteConcern/W2
+   :unacknowledged       WriteConcern/UNACKNOWLEDGED})
 
 (defn set-write-concern
   "Sets the write concern on the connection. Setting is a key in the
@@ -349,20 +339,6 @@ When with-mongo and set-connection! interact, last one wins"
                      ^String (named collection)
                      (coerce options [:clojure :mongo])))
 
-(def query-option-map
-  {:tailable    Bytes/QUERYOPTION_TAILABLE
-   :slaveok     Bytes/QUERYOPTION_SLAVEOK
-   :oplogreplay Bytes/QUERYOPTION_OPLOGREPLAY
-   :notimeout   Bytes/QUERYOPTION_NOTIMEOUT
-   :awaitdata   Bytes/QUERYOPTION_AWAITDATA})
-
-(defn calculate-query-options
-  "Calculates the cursor's query option from a list of options"
-   [options]
-   (reduce bit-or 0 (map query-option-map (if (keyword? options)
-                                            (list options)
-                                            options))))
-
 (def ^:private read-preference-map
   "Private map of facory functions of ReadPreferences to aliases."
   {:nearest (fn nearest ([] (ReadPreference/nearest)) ([^List tags] (ReadPreference/nearest tags)))
@@ -413,6 +389,20 @@ When with-mongo and set-connection! interact, last one wins"
   "Returns the currently set read preference for a collection"
   [collection]
   (.getReadPreference (get-coll collection)))
+
+(defn set-options!
+  "sets the options on the cursor"
+  [cursor {:keys [tailable secondary-preferred slaveok oplog notimeout awaitdata]}]
+  (when tailable
+    (.cursorType cursor CursorType/Tailable))
+  (when awaitdata
+    (.cursorType cursor CursorType/TailableAwait))
+  (when (or secondary-preferred slaveok)
+    (.setReadPreference cursor (ReadPreference/secondaryPreferred)))
+  (when oplog
+    (.oplogReplay cursor true))
+  (when notimeout
+    (.noCursorTimeout cursor true)))
 
 (defn fetch
   "Fetches objects from a collection.
@@ -482,13 +472,12 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
                                         ; (with negative limit) doesn't match expectations therefore changed to keep limit as is.
           n-limit (or limit 0)
           n-sort (when sort (coerce sort [from :mongo]))
-          n-options (calculate-query-options options)
           n-preferences (cond
                           (nil? read-preferences) nil
                           (instance? ReadPreference read-preferences) read-preferences
                           :else (somnium.congomongo/read-preference read-preferences))]
       (cond
-        count? (.getCount n-col n-where n-only)
+        count? (.getCount n-col n-where)
 
         ;; The find command isn't documented so there's no nice way to build a
         ;; find command that adds read-preferences when necessary
@@ -504,10 +493,21 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
                    (.setReadPreference cursor n-preferences))
                  (when hint
                    (if (string? hint)
-                     (.hint cursor ^String hint)
+                     ;; hint no longer supports strings
+                     ;; .hintString exists for DBCollectionCountOptions but not
+                     ;; for DBCursor. It would be possible to hack support by
+                     ;; creating a DBCollectionCountOptions that is not used
+                     ;; except for setting a hint string on it and getting the
+                     ;; hint out as an object. For now follow the mongo
+                     ;; deprecation and let this be a place where we don't have
+                     ;; backwards compatibility. They have also added the string
+                     ;; hint functionality back into the non-legacy client so it
+                     ;; is possible that support will be restored via the java
+                     ;; client.
+                     (throw (IllegalArgumentException. "String hints are not currently supported. Use a seq instead."))
                      (.hint cursor ^DBObject (coerce-index-fields hint))))
-                 (when n-options
-                   (.setOptions cursor n-options))
+                 (when options
+                   (set-options! cursor options))
                  (when n-sort
                    (.sort cursor n-sort))
                  (when skip
@@ -725,7 +725,6 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
         cursor (.aggregate (get-coll coll)
                            ^List (coerce (conj ops op) [from :mongo])
                            ^AggregationOptions (-> (AggregationOptions/builder)
-                                                   (.outputMode AggregationOptions$OutputMode/CURSOR)
                                                    (.build)))]
     {:serverUsed (.toString (.getServerAddress cursor))
      :result (coerce cursor [:mongo to] :many true)

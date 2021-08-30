@@ -246,7 +246,7 @@
           uri (str "mongodb://" userpass test-db-host ":" test-db-port "/congomongotest-db-a?maxpoolsize=123&w=1&safe=true")
           a (make-connection uri)
           ^MongoClient m (:mongo a)
-          opts (.getMongoOptions m)]
+          opts (.getMongoClientOptions m)]
       (testing "make-connection parses options from URI"
         (is (= 123 (.getConnectionsPerHost opts)))
         (is (= WriteConcern/W1 (.getWriteConcern opts))))
@@ -284,15 +284,6 @@
         (testing "close-connection inside with-mongo sets mongo-config to nil"
           (close-connection a)
           (is (= nil *mongo-config*)))))))
-
-(deftest query-options
-  (are [x y] (= (calculate-query-options x) y)
-       nil 0
-       [] 0
-       [:tailable] 2
-       [:tailable :slaveok] 6
-       [:tailable :slaveok :notimeout] 22
-       :notimeout 16))
 
 (deftest fetch-with-options
   (with-test-mongo
@@ -501,7 +492,8 @@
       (add-index! :test_col [[:key1 -1]]) ;; index3
       (add-index! :test_col [:key1 [:key2 -1]]) ;; index 4
 
-      (testing "index1"
+      ;; strings supplied as hints are not currently supported
+      #_(testing "index1"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_1"))]
           (is (= "key1_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
@@ -509,7 +501,7 @@
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [:key1]))]
           (is (= "key1_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
-      (testing "index2"
+      #_(testing "index2"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_1_key2_1"))]
           (is (= "key1_1_key2_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
@@ -517,7 +509,7 @@
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [:key1 :key2]))]
           (is (= "key1_1_key2_1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
-      (testing "index3"
+      #_(testing "index3"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_-1"))]
           (is (= "key1_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
@@ -525,7 +517,7 @@
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [[:key1 -1]]))]
           (is (= "key1_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
-      (testing "index4"
+      #_(testing "index4"
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint "key1_1_key2_-1"))]
           (is (= "key1_1_key2_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName)))))
 
@@ -649,6 +641,7 @@
              "suffusion of yellow")))))
 
 
+;; TODO: this is failing on the json branch too
 (deftest test-distinct-values
   (with-test-mongo
     (insert! :distinct {:genus "Pan" :species "troglodytes" :common-name "chimpanzee"})

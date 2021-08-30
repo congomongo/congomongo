@@ -10,7 +10,7 @@
             :distribution :repo}
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/data.json "0.2.7"]
-                 [org.mongodb/mongo-java-driver "3.12.10"]
+                 [org.mongodb/mongodb-driver-legacy "4.3.1"]
                  [org.clojure/clojure "1.10.1" :scope "provided"]]
   :deploy-repositories {"releases" {:url "https://repo.clojars.org" :creds :gpg}}
   ;; if a :dev profile is added, remember to update :aliases below to
