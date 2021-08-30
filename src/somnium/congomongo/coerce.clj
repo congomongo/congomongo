@@ -19,11 +19,12 @@
 ; THE SOFTWARE.
 
 (ns somnium.congomongo.coerce
-  (:require [clojure.data.json :refer [write-str read-str]])
+  (:require [clojure.data.json :as json :refer [write-str read-str]])
   (:import [clojure.lang IPersistentMap Keyword]
            [java.util Map List Set]
            [com.mongodb DBObject BasicDBObject BasicDBList]
-           [org.bson.json JsonWriterSettings JsonMode]))
+           [org.bson.json JsonWriterSettings JsonMode]
+           [org.bson.types ObjectId]))
 
 (def ^:private json-settings
   ; Create a settings object to allow us to serialize an object with "RELAXED" JSON.
@@ -56,9 +57,22 @@
 (defn json->mongo [^String s]
   (BasicDBObject/parse s))
 
-(defn ^String mongo->json [^BasicDBObject dbo]
-  (.toJson dbo json-settings))
+(defn- write-basic-db-object
+  [^BasicDBObject dbo ^Appendable out]
+  (.append out (.toJson dbo json-settings)))
 
+(extend BasicDBObject clojure.data.json/JSONWriter {:-write write-basic-db-object})
+
+(defn write-object-id
+  [^ObjectId id ^Appendable out]
+  (.append out "\"")
+  (.append out (str id))
+  (.append out "\""))
+
+(extend ObjectId json/JSONWriter {:-write write-object-id})
+
+(defn mongo->json [o]
+  (write-str o))
 
 ;;; Converting data from mongo into Clojure data objects
 
