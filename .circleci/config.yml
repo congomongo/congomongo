@@ -9,11 +9,7 @@ jobs:
     docker:
       # specify the version you desire here
       - image: circleci/clojure:lein-2.9.5
-
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/postgres:9.4
+      - image: mongo:4.4
 
     working_directory: ~/repo
 
