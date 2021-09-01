@@ -57,14 +57,17 @@
 (defn json->mongo [^String s]
   (BasicDBObject/parse s))
 
+;; extend data.json to handle mongo types.
+;; we ignore the options argument; we do not need to set any of them.
+
 (defn- write-basic-db-object
-  [^BasicDBObject dbo ^Appendable out]
+  [^BasicDBObject dbo ^Appendable out _options]
   (.append out (.toJson dbo json-settings)))
 
 (extend BasicDBObject clojure.data.json/JSONWriter {:-write write-basic-db-object})
 
 (defn write-object-id
-  [^ObjectId id ^Appendable out]
+  [^ObjectId id ^Appendable out _options]
   (.append out "\"")
   (.append out (str id))
   (.append out "\""))

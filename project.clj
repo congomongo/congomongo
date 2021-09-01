@@ -9,7 +9,7 @@
             :url "http://www.opensource.org/licenses/mit-license.php"
             :distribution :repo}
   :min-lein-version "2.0.0"
-  :dependencies [[org.clojure/data.json "0.2.7"]
+  :dependencies [[org.clojure/data.json "2.4.0"]
                  [org.mongodb/mongo-java-driver "3.12.10"]
                  [org.clojure/clojure "1.10.1" :scope "provided"]]
   :deploy-repositories {"releases" {:url "https://repo.clojars.org" :creds :gpg}}
