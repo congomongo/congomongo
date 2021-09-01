@@ -1,3 +1,8 @@
+# Version 2.2.3 - Sep 1, 2021
+
+* Upgrade to Mongo Java Driver to 3.12.10.
+* Upgrade org.clojure/data.json to 2.4.0.
+
 # Version 2.2.2 - Aug 3, 2021
 
 Fix some reflection warnings in preparation for upgrade to MongoDB 4.x driver
