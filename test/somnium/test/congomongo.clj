@@ -145,7 +145,7 @@
   (with-test-mongo
     (with-test-user "test_user" "test_password"
       (testing "valid credentials work"
-        (let [conn (make-connection test-db :instances [{:host test-db-host :port test-db-port}]
+        (let [conn (make-connection test-db :instance {:host test-db-host :port test-db-port}
                                             :username "test_user"
                                             :password "test_password")]
           ;; Just validate that we can interact with the DB, the 3.0 Mongo driver
@@ -246,7 +246,7 @@
           uri (str "mongodb://" userpass test-db-host ":" test-db-port "/congomongotest-db-a?maxpoolsize=123&w=1&safe=true")
           a (make-connection uri)
           ^MongoClient m (:mongo a)
-          opts (.getMongoOptions m)]
+          opts (.getMongoClientOptions m)]
       (testing "make-connection parses options from URI"
         (is (= 123 (.getConnectionsPerHost opts)))
         (is (= WriteConcern/W1 (.getWriteConcern opts))))
@@ -284,15 +284,6 @@
         (testing "close-connection inside with-mongo sets mongo-config to nil"
           (close-connection a)
           (is (= nil *mongo-config*)))))))
-
-(deftest query-options
-  (are [x y] (= (calculate-query-options x) y)
-       nil 0
-       [] 0
-       [:tailable] 2
-       [:tailable :slaveok] 6
-       [:tailable :slaveok :notimeout] 22
-       :notimeout 16))
 
 (deftest fetch-with-options
   (with-test-mongo
