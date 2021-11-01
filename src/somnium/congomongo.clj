@@ -28,8 +28,9 @@
             [somnium.congomongo.coerce :refer [coerce coerce-fields coerce-index-fields]])
   (:import [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder
                         MongoClientURI MongoCredential
-                        DB DBCollection DBObject DBRef ServerAddress ReadPreference WriteConcern Bytes
-                        AggregationOptions AggregationOptions$OutputMode
+                        DB DBCollection CursorType DBObject DBRef
+                        ServerAddress ReadPreference WriteConcern
+                        AggregationOptions
                         MapReduceCommand MapReduceCommand$OutputType]
            [com.mongodb.gridfs GridFS]
            [org.bson.types ObjectId]
@@ -96,10 +97,11 @@
 
 (defn- make-mongo-client
   (^com.mongodb.MongoClient
-   [addresses creds ^MongoClientOptions options]
-    (if (> (count addresses) 1)
-      (MongoClient. ^List addresses ^List creds options)
-      (MongoClient. ^ServerAddress (first addresses) ^List creds options)))
+   [addresses credential ^MongoClientOptions options]
+   (if (pos? (count addresses))
+     (MongoClient. ^List addresses ^List [credential] options) ;; This usage is deprecated
+     (MongoClient. ^ServerAddress (first addresses)
+                   ^MongoCredential credential options)))
 
   (^com.mongodb.MongoClient
    [addresses ^MongoClientOptions options]
@@ -112,13 +114,17 @@
   server addresses and MongoClientOptions.
 
   username, password, and optionally auth-source, may be supplied for authenticated connections."
-  [db {:keys [instances options ^String username ^String password] {auth-mechanism :mechanism auth-source :source} :auth-source}]
+  [db {:keys [instances instance options ^String username ^String password] {auth-mechanism :mechanism auth-source :source} :auth-source}]
   (when (not= (nil? username) (nil? password))
     (throw (IllegalArgumentException. "Username and password must both be supplied for authenticated connections")))
+  (when (and instances instance)
+    (throw (IllegalArgumentException. "Only one of instances and instance can be supplied")))
 
   (let [addresses (map (fn [{:keys [host port] :or {host "127.0.0.1" port 27017}}]
                         (make-server-address host port))
-                       (or instances [{:host "127.0.0.1" :port 27017}]))
+                       (or instances
+                           (when instance [instance])
+                           [{:host "127.0.0.1" :port 27017}]))
 
         ^MongoClientOptions options (or options (mongo-options))
         ^MongoCredential credential (when (and username password)
@@ -142,7 +148,7 @@
                                         (MongoCredential/createCredential username db (.toCharArray password))))
 
         mongo (if credential
-                (make-mongo-client addresses [credential] options)
+                (make-mongo-client addresses credential options)
                 (make-mongo-client addresses options))
 
         n-db (if db (.getDB mongo db) nil)]
@@ -164,7 +170,8 @@
   Each instance is a map containing values for :host and/or :port.
 
   May be called with database name and optionally:
-    :instances - a list of server instances to connect to
+    :instance - a server instance to connect to
+    :instances - a list of server instances to connect to (deprecated)
     :options - a MongoClientOptions object
     :username - the username to authenticate with
     :password - the password to authenticate with
@@ -262,20 +269,20 @@ When with-mongo and set-connection! interact, last one wins"
 
 (def write-concern-map
   {:acknowledged         WriteConcern/ACKNOWLEDGED
-   :fsynced              WriteConcern/FSYNCED
+   :fsynced              WriteConcern/JOURNALED
    :journaled            WriteConcern/JOURNALED
    :majority             WriteConcern/MAJORITY
-   :replica-acknowledged WriteConcern/REPLICA_ACKNOWLEDGED
+   :replica-acknowledged WriteConcern/W2
    :unacknowledged       WriteConcern/UNACKNOWLEDGED
    ;; these are pre-2.10.x names for write concern:
-   :fsync-safe    WriteConcern/FSYNC_SAFE  ;; deprecated - use :fsynced
-   :journal-safe  WriteConcern/JOURNAL_SAFE ;; deprecated - use :journaled
-   :normal        WriteConcern/NORMAL ;; deprecated - use :unacknowledged
-   :replicas-safe WriteConcern/REPLICAS_SAFE ;; deprecated - use :replica-acknowledged
-   :safe          WriteConcern/SAFE ;; deprecated - use :acknowledged
+   :fsync-safe    WriteConcern/JOURNALED
+   :journal-safe  WriteConcern/JOURNALED
+   :normal        WriteConcern/UNACKNOWLEDGED
+   :replicas-safe WriteConcern/W2
+   :safe          WriteConcern/ACKNOWLEDGED
    ;; these are left for backward compatibility but are deprecated:
-   :replica-safe WriteConcern/REPLICAS_SAFE
-   :strict       WriteConcern/SAFE
+   :replica-safe WriteConcern/W2
+   :strict       WriteConcern/ACKNOWLEDGED
    })
 
 (defn set-write-concern
@@ -349,20 +356,6 @@ When with-mongo and set-connection! interact, last one wins"
                      ^String (named collection)
                      (coerce options [:clojure :mongo])))
 
-(def query-option-map
-  {:tailable    Bytes/QUERYOPTION_TAILABLE
-   :slaveok     Bytes/QUERYOPTION_SLAVEOK
-   :oplogreplay Bytes/QUERYOPTION_OPLOGREPLAY
-   :notimeout   Bytes/QUERYOPTION_NOTIMEOUT
-   :awaitdata   Bytes/QUERYOPTION_AWAITDATA})
-
-(defn calculate-query-options
-  "Calculates the cursor's query option from a list of options"
-   [options]
-   (reduce bit-or 0 (map query-option-map (if (keyword? options)
-                                            (list options)
-                                            options))))
-
 (def ^:private read-preference-map
   "Private map of facory functions of ReadPreferences to aliases."
   {:nearest (fn nearest ([] (ReadPreference/nearest)) ([^List tags] (ReadPreference/nearest tags)))
@@ -413,6 +406,20 @@ When with-mongo and set-connection! interact, last one wins"
   "Returns the currently set read preference for a collection"
   [collection]
   (.getReadPreference (get-coll collection)))
+
+(defn set-options!
+  "sets the options on the cursor"
+  [cursor {:keys [tailable secondary-preferred slaveok oplog notimeout awaitdata]}]
+  (when tailable
+    (.cursorType cursor CursorType/Tailable))
+  (when awaitdata
+    (.cursorType cursor CursorType/TailableAwait))
+  (when (or secondary-preferred slaveok)
+    (.setReadPreference cursor (ReadPreference/secondaryPreferred)))
+  (when oplog
+    (.oplogReplay cursor true))
+  (when notimeout
+    (.noCursorTimeout cursor true)))
 
 (defn fetch
   "Fetches objects from a collection.
@@ -482,13 +489,12 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
                                         ; (with negative limit) doesn't match expectations therefore changed to keep limit as is.
           n-limit (or limit 0)
           n-sort (when sort (coerce sort [from :mongo]))
-          n-options (calculate-query-options options)
           n-preferences (cond
                           (nil? read-preferences) nil
                           (instance? ReadPreference read-preferences) read-preferences
                           :else (somnium.congomongo/read-preference read-preferences))]
       (cond
-        count? (.getCount n-col n-where n-only)
+        count? (.getCount n-col n-where)
 
         ;; The find command isn't documented so there's no nice way to build a
         ;; find command that adds read-preferences when necessary
@@ -504,10 +510,14 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
                    (.setReadPreference cursor n-preferences))
                  (when hint
                    (if (string? hint)
+                     ;; Note: this is currently the one line that prevents
+                     ;; upgrading to the 4.3 driver. String hint does not exist
+                     ;; in that driver, but it will be added back in 4.4.
+                     ;; https://jira.mongodb.org/browse/JAVA-4281
                      (.hint cursor ^String hint)
                      (.hint cursor ^DBObject (coerce-index-fields hint))))
-                 (when n-options
-                   (.setOptions cursor n-options))
+                 (when options
+                   (set-options! cursor options))
                  (when n-sort
                    (.sort cursor n-sort))
                  (when skip
@@ -725,7 +735,6 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
         cursor (.aggregate (get-coll coll)
                            ^List (coerce (conj ops op) [from :mongo])
                            ^AggregationOptions (-> (AggregationOptions/builder)
-                                                   (.outputMode AggregationOptions$OutputMode/CURSOR)
                                                    (.build)))]
     {:serverUsed (.toString (.getServerAddress cursor))
      :result (coerce cursor [:mongo to] :many true)
