@@ -1,3 +1,8 @@
+# Version 2.3.0 - Nov 1, 2021
+
+* Remove use of deprecated MongoDB APIs
+* Add support for a single `:instance` argument `make-connection`
+
 # Version 2.2.3 - Sep 1, 2021
 
 * Upgrade to Mongo Java Driver to 3.12.10.
