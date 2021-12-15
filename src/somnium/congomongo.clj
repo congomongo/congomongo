@@ -607,9 +607,10 @@ Please, use `fetch` with `:limit 1` instead.")))
                              ;; NOTE: This is currently the one line that prevents
                              ;;       upgrading to the 4.3 driver. String `hint`
                              ;;       doesn't exist in that driver, but it will
-                             ;;       be added back in 4.4. TODO: Double-check.
+                             ;;       be added back in 4.4.
                              ;;       https://jira.mongodb.org/browse/JAVA-4281
                              (.put (.getModifiers opts) "$hint" hint)
+                             ;(.hintString opts ^String hint) ;; TODO: Use this instead.
                              (.hint opts ^DBObject (coerce-index-fields hint))))
                          (when max
                            (.max opts ^DBObject (coerce max [from :mongo])))
