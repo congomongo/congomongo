@@ -31,7 +31,10 @@
                         DB DBCollection CursorType DBObject DBRef
                         ServerAddress ReadPreference WriteConcern
                         AggregationOptions
-                        MapReduceCommand MapReduceCommand$OutputType]
+                        MapReduceCommand MapReduceCommand$OutputType
+                        DBEncoder]
+           [com.mongodb.client.model DBCollectionUpdateOptions
+                                     Collation]
            [com.mongodb.gridfs GridFS]
            [org.bson.types ObjectId]
            java.util.List
@@ -605,19 +608,33 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
    "Alters/inserts a map in a collection. Overwrites existing objects.
    The shortcut forms need a map with valid :_id and :_ns fields or
    a collection and a map with a valid :_id field."
-   {:arglists '([collection old new {:upsert true :multiple false :as :clojure :from :clojure :write-concern nil}])}
-   [coll old new & {:keys [upsert multiple as from write-concern]
+   {:arglists '([collection old new {:upsert true :multiple false :as :clojure :from :clojure
+                     :write-concern nil :bypass-document-validation nil :encoder nil :collation nil :array-filters nil}])}
+   [coll old new & {:keys [upsert multiple as from
+                           write-concern bypass-document-validation encoder collation array-filters]
                     :or {upsert true multiple false as :clojure from :clojure}}]
-   (coerce (if write-concern
-             (if-let [wc (write-concern write-concern-map)]
-               (.update ^DBCollection  (get-coll coll)
-                        ^DBObject (coerce old [from :mongo])
-                        ^DBObject (coerce new [from :mongo])
-                        upsert multiple ^WriteConcern wc))
-             (.update ^DBCollection  (get-coll coll)
-                      ^DBObject (coerce old [from :mongo])
-                      ^DBObject (coerce new [from :mongo])
-                      upsert multiple)) [:mongo as]))
+   (coerce (.update ^DBCollection  (get-coll coll)
+                    ^DBObject (coerce old [from :mongo])
+                    ^DBObject (coerce new [from :mongo])
+                    ^DBCollectionUpdateOptions
+                    (let [opts (DBCollectionUpdateOptions.)]
+                      (.upsert opts upsert)
+                      (.multi opts multiple)
+                      (when write-concern
+                        (if-let [wc (write-concern write-concern-map)]
+                          (.writeConcern opts ^WriteConcern wc)
+                          (illegal-write-concern write-concern)))
+                      (when (boolean? bypass-document-validation)
+                        (.bypassDocumentValidation opts bypass-document-validation))
+                      (when (instance? DBEncoder encoder)
+                        (.encoder opts ^DBEncoder encoder))
+                      (when (instance? Collation collation)
+                        (.collation opts ^Collation collation))
+                      (when (some? array-filters)
+                        (let [coerced-array-filters (coerce array-filters [:clojure :mongo] :many true)]
+                          (.arrayFilters opts ^List coerced-array-filters)))
+                      opts))
+           [:mongo as]))
 
 (defn fetch-and-modify
   "Finds the first document in the query and updates it.
