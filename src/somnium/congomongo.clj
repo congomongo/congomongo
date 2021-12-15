@@ -34,6 +34,7 @@
                         MapReduceCommand MapReduceCommand$OutputType
                         DBEncoder]
            [com.mongodb.client.model DBCollectionUpdateOptions
+                                     DBCollectionRemoveOptions
                                      Collation]
            [com.mongodb.gridfs GridFS]
            [org.bson.types ObjectId]
@@ -672,14 +673,22 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
 (defn destroy!
    "Removes map from collection. Takes a collection name and
     a query map"
-   {:arglists '([collection where {:from :clojure :write-concern nil}])}
-   [c q & {:keys [from write-concern]
-           :or {from :clojure}}]
-   (if write-concern
-     (if-let [wc (write-concern write-concern-map)]
-       (.remove (get-coll c) ^DBObject (coerce q [from :mongo]) ^WriteConcern wc)
-       (illegal-write-concern write-concern))
-     (.remove (get-coll c) ^DBObject (coerce q [from :mongo]))))
+   {:arglists '([collection where {:from :clojure :write-concern nil :encoder nil :collation nil}])}
+   [coll query & {:keys [from write-concern encoder collation]
+                  :or {from :clojure}}]
+   (.remove ^DBCollection (get-coll coll)
+            ^DBObject (coerce query [from :mongo])
+            ^DBCollectionRemoveOptions
+            (let [opts (DBCollectionRemoveOptions.)]
+              (when write-concern
+                (if-let [wc (write-concern write-concern-map)]
+                  (.writeConcern opts ^WriteConcern wc)
+                  (illegal-write-concern write-concern)))
+              (when (instance? DBEncoder encoder)
+                (.encoder opts ^DBEncoder encoder))
+              (when (instance? Collation collation)
+                (.collation opts ^Collation collation))
+              opts)))
 
 (defn add-index!
   "Adds an index on the collection for the specified fields if it does not exist.  Ordering of fields is
