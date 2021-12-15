@@ -708,38 +708,54 @@ Please, use `fetch` with `:limit 1` instead.")))
                 :or {from :clojure to :clojure}}]
   (insert! coll objs :from from :to to :many true :write-concern write-concern))
 
-;; should this raise an exception if _ns and _id aren't present?
 (defn update!
-   "Alters/inserts a map in a collection. Overwrites existing objects.
-   The shortcut forms need a map with valid :_id and :_ns fields or
-   a collection and a map with a valid :_id field."
-   {:arglists '([collection old new {:upsert true :multiple false :as :clojure :from :clojure
-                     :write-concern nil :bypass-document-validation nil :encoder nil :collation nil :array-filters nil}])}
-   [coll old new & {:keys [upsert multiple as from
-                           write-concern bypass-document-validation encoder collation array-filters]
-                    :or {upsert true multiple false as :clojure from :clojure}}]
-   (coerce (.update ^DBCollection  (get-coll coll)
-                    ^DBObject (coerce old [from :mongo])
-                    ^DBObject (coerce new [from :mongo])
-                    ^DBCollectionUpdateOptions
-                    (let [opts (DBCollectionUpdateOptions.)]
-                      (.upsert opts upsert)
-                      (.multi opts multiple)
-                      (when write-concern
-                        (if-let [wc (write-concern write-concern-map)]
-                          (.writeConcern opts ^WriteConcern wc)
-                          (illegal-write-concern write-concern)))
-                      (when (boolean? bypass-document-validation)
-                        (.bypassDocumentValidation opts bypass-document-validation))
-                      (when (instance? DBEncoder encoder)
-                        (.encoder opts ^DBEncoder encoder))
-                      (when (instance? Collation collation)
-                        (.collation opts ^Collation collation))
-                      (when (some? array-filters)
-                        (let [coerced-array-filters (coerce array-filters [:clojure :mongo] :many true)]
-                          (.arrayFilters opts ^List coerced-array-filters)))
-                      opts))
-           [:mongo as]))
+  "Alters/inserts a map in a collection. Overwrites existing objects.
+   The shortcut forms need a map with valid `:_id` and `:_ns` fields or
+   a collection and a map with a valid `:_id` field.
+
+   Required parameters:
+   collection     -> the database collection
+   query          -> the selection criteria for the update (a query map)
+   update         -> the modifications to apply (a modifications map)
+
+   Optional parameters include:
+   :upsert?       -> do upsert, i.e. insert if document not present (default is `true`)
+   :multiple      -> whether this will update all documents matching the query filter (default is `false`)
+   :as            -> what to return (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from          -> argument type, same options as above
+   :write-concern -> set the write concern (e.g. :normal, see the `write-concern-map` for available options)
+   :bypass-document-validation -> set the bypass document level validation flag
+   :encoder       -> set the encoder (of BSONObject to BSON)
+   :collation     -> set the collation
+   :array-filters -> set the array filters option"
+  {:arglists '([collection old new {:upsert true :multiple false :as :clojure :from :clojure
+                     :write-concern nil :bypass-document-validation nil :encoder nil :collation nil
+                     :array-filters nil}])}
+  [collection query update & {:keys [upsert multiple as from write-concern bypass-document-validation
+                                     encoder collation array-filters]
+                              :or {upsert true multiple false as :clojure from :clojure}}]
+  (coerce (.update ^DBCollection (get-coll collection)
+                   ^DBObject (coerce query [from :mongo])
+                   ^DBObject (coerce update [from :mongo])
+                   ^DBCollectionUpdateOptions
+                   (let [opts (DBCollectionUpdateOptions.)]
+                     (.upsert opts upsert)
+                     (.multi opts multiple)
+                     (when write-concern
+                       (if-let [wc (write-concern write-concern-map)]
+                         (.writeConcern opts ^WriteConcern wc)
+                         (illegal-write-concern write-concern)))
+                     (when (boolean? bypass-document-validation)
+                       (.bypassDocumentValidation opts bypass-document-validation))
+                     (when (instance? DBEncoder encoder)
+                       (.encoder opts ^DBEncoder encoder))
+                     (when (instance? Collation collation)
+                       (.collation opts ^Collation collation))
+                     (when array-filters
+                       (let [coerced-array-filters (coerce array-filters [:clojure :mongo] :many true)]
+                         (.arrayFilters opts ^List coerced-array-filters)))
+                     opts))
+          [:mongo as]))
 
 (defn fetch-and-modify
   "Finds the first document in the query and updates it.
