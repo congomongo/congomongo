@@ -28,17 +28,19 @@
             [somnium.congomongo.coerce :refer [coerce coerce-fields coerce-index-fields]])
   (:import [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder
                         MongoClientURI MongoCredential
-                        DB DBCollection CursorType DBObject DBRef
-                        ServerAddress ReadPreference WriteConcern
+                        DB DBCollection DBObject DBRef DBCursor CursorType
+                        ServerAddress ReadPreference ReadConcern WriteConcern
                         AggregationOptions
                         MapReduceCommand MapReduceCommand$OutputType
                         DBEncoder]
            [com.mongodb.client.model DBCollectionUpdateOptions
+                                     DBCollectionCountOptions
+                                     DBCollectionFindOptions
                                      Collation]
            [com.mongodb.gridfs GridFS]
            [org.bson.types ObjectId]
-           java.util.List
-           (java.util.concurrent TimeUnit)))
+           [java.util List]
+           [java.util.concurrent TimeUnit]))
 
 
 (defprotocol StringNamed
@@ -312,6 +314,18 @@ When with-mongo and set-connection! interact, last one wins"
   [write-concern]
   (throw (IllegalArgumentException. (str write-concern " is not a valid WriteConcern alias"))))
 
+(def read-concern-map
+  {:default      ReadConcern/DEFAULT
+   :local        ReadConcern/LOCAL
+   :majority     ReadConcern/MAJORITY
+   :linearizable ReadConcern/LINEARIZABLE
+   :snapshot     ReadConcern/SNAPSHOT
+   :available    ReadConcern/AVAILABLE})
+
+(defn- illegal-read-concern
+  [read-concern]
+  (throw (IllegalArgumentException. (str read-concern " is not a valid ReadConcern alias"))))
+
 ;; add some convenience fns for manipulating object-ids
 (definline object-id ^ObjectId [^String s]
   `(ObjectId. ~s))
@@ -360,7 +374,7 @@ When with-mongo and set-connection! interact, last one wins"
                      (coerce options [:clojure :mongo])))
 
 (def ^:private read-preference-map
-  "Private map of facory functions of ReadPreferences to aliases."
+  "Private map of factory functions of ReadPreferences to aliases."
   {:nearest (fn nearest ([] (ReadPreference/nearest)) ([^List tags] (ReadPreference/nearest tags)))
    :primary (fn primary ([] (ReadPreference/primary)) ([_] (throw (IllegalArgumentException. "Read preference :primary does not accept tag sets."))))
    :primary-preferred (fn primary-preferred ([] (ReadPreference/primaryPreferred)) ([^List tags] (ReadPreference/primaryPreferred tags)))
@@ -378,10 +392,9 @@ When with-mongo and set-connection! interact, last one wins"
                               (if (named? v) (name v) (str v))))]
     (com.mongodb.TagSet. ^List (map ->tag tag))))
 
-
 (defn read-preference
-  "Creates a ReadPreference from an alias and optional tag sets. Valid aliases are :nearest,
-   :primary, :primary-preferred, :secondary and :secondary-preferred."
+  "Creates a ReadPreference from an alias and optional tag sets. Valid aliases are
+   :nearest, :primary, :primary-preferred, :secondary, and :secondary-preferred."
   {:arglists '([preference {:first-tag "value", :second-tag "second-value"} {:other-tag-set "other-value"}])}
   [preference & tags]
   (if-let [pref-factory (get read-preference-map preference)]
@@ -410,9 +423,9 @@ When with-mongo and set-connection! interact, last one wins"
   [collection]
   (.getReadPreference (get-coll collection)))
 
-(defn set-options!
-  "sets the options on the cursor"
-  [cursor {:keys [tailable secondary-preferred slaveok oplog notimeout awaitdata]}]
+(defn set-cursor-options!
+  "Sets the options on the cursor"
+  [^DBCursor cursor {:keys [tailable secondary-preferred slaveok oplog notimeout awaitdata]}]
   (when tailable
     (.cursorType cursor CursorType/Tailable))
   (when awaitdata
@@ -426,36 +439,67 @@ When with-mongo and set-connection! interact, last one wins"
 
 (defn fetch
   "Fetches objects from a collection.
-   Note that MongoDB always adds the _id and _ns
-   fields to objects returned from the database.
-   Optional arguments include
-   :where    -> takes a query map
-   :only     -> takes an array of keys to retrieve
-   :as       -> what to return, defaults to :clojure, can also be :json or :mongo
-   :from     -> argument type, same options as above
-   :skip     -> number of records to skip
-   :limit    -> number of records to return
-   :one?     -> defaults to false, use fetch-one as a shortcut
-   :count?   -> defaults to false, use fetch-count as a shortcut
-   :explain? -> returns performance information on the query, instead of rows
-   :sort     -> sort the results by a specific key
-   :options  -> query options [:tailable :slaveok :oplogreplay :notimeout :awaitdata]
-   :hint     -> tell the query which index to use (name (string) or [:compound :index] (seq of keys))
-   :read-preferences -> read preferences (e.g. :primary or ReadPreference instance)
-   :max-time-ms      -> set the maximum execution time for operations"
+   Note that MongoDB always adds the `_id` and `_ns` fields to objects returned from the database.
+
+   Required parameters:
+   collection         -> the database collection
+
+   Optional parameters include:
+   :one?              -> will result in `findOne` query (defaults to false, use `fetch-one` as a shortcut)
+   :count?            -> will result in `getCount` query (defaults to false, use `fetch-count` as a shortcut)
+   :as                -> what to return (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from              -> argument type, same options as above
+   :where             -> the selection criteria using query operators (a query map)
+   :only              -> `projection`; a set of fields to return for all matching documents (an array of keys)
+   :sort              -> the sort criteria to apply to the query (`null` means an undefined order of results)
+   :skip              -> number of documents to skip
+   :limit             -> number of documents to return
+   :batch-size        -> number of documents to return per batch (by default, server chooses an appropriate)
+   :max-time-ms       -> set the maximum execution time on the server for this operation
+   :max-await-time-ms -> set the maximum await execution time on the server for this operation
+   :cursor-type       -> set the cursor type (either `NonTailable`, `Tailable`, or `TailableAwait`)
+   :no-cursor-timeout -> prevent server from timing out idle cursors after an inactivity period (10 min)
+   :oplog-replay      -> users should not set this under normal circumstances
+   :partial           -> get partial results from a sharded cluster if one or more shards are unreachable
+   :read-preference   -> set the read preference (e.g. :primary or ReadPreference instance)
+   :read-concern      -> set the read concern (e.g. :local, see the `read-concern-map` for available options)
+   :collation         -> set the collation
+   :comment           -> set the comment to the query
+   :hint              -> tell the query which index to use (name (string) or [:compound :index] (seq of keys))
+   :max               -> set the exclusive upper bound for a specific index
+   :min               -> set the minimum inclusive lower bound for a specific index
+   :return-key        -> if true the find operation will return only the index keys in the resulting documents
+   :show-record-id    -> set to true to add a field `$recordId` to the returned documents
+   :options           -> query options [:tailable :slaveok :oplogreplay :notimeout :awaitdata] (see the NOTE)
+   :explain?          -> returns performance information on the query, instead of rows
+
+   However, not all of the aforementioned optional params affect the `count?` mode, but only these:
+   `hint`, `skip`, `limit`, `max-time-ms`, `read-preference`, `read-concern`, and `collation`.
+
+   As well, the `one?` mode doesn't support `options`, `explain?`, `sort`, `limit`, or `hint`.
+
+   NOTE: The `options` use a custom data format, are unnecessary and left for backward compatibility,
+         and might be removed in the next major 'congomongo' release."
   {:arglists
-   '([collection :where :only :limit :skip :as :from :one? :count? :sort :hint :explain? :options :max-time-ms :read-preferences])}
-  [coll & {:as params}]
-  (let [{:keys [where only as from one? count? limit skip sort hint options explain? max-time-ms read-preferences]}
-        (merge {:where {} :only [] :as :clojure :from :clojure
-                 :one? false :count? false :limit 0 :skip 0 :sort nil :hint nil :options [] :explain? false}
-                *default-query-options*
-                params)]
+   '([collection {:one? false :count? false :as :clojure :from :clojure :where {} :only [] :sort nil :skip 0 :limit 0
+             :batch-size nil :max-time-ms nil :max-await-time-ms nil :cursor-type nil :no-cursor-timeout nil
+             :oplog-replay nil :partial nil :read-preference nil :read-concern nil :collation nil :comment nil
+             :hint nil :max nil :min nil :return-key nil :show-record-id nil :options [] :explain? false}])}
+  [collection & {:as params}]
+  (let [{:keys [one? count? as from where only sort skip limit
+                batch-size max-time-ms max-await-time-ms cursor-type no-cursor-timeout oplog-replay partial
+                read-preference read-preferences read-concern collation comment hint max min return-key show-record-id
+                options explain?]}
+        (merge {:one? false :count? false :as :clojure :from :clojure
+                :where {} :only [] :sort nil :skip 0 :limit 0
+                :options [] :explain? false} ;; specific to `DBCursor`
+               *default-query-options*
+               params)]
     (when (and one? sort)
-      (throw (IllegalArgumentException. "Fetch :one? (or fetch-one) can't be used with :sort.
-You should use fetch with :limit 1 instead."))); one? and sort should NEVER be called together
-    (when (and one? (or (not= [] options) (not= 0 limit) hint explain?))
-      (throw (IllegalArgumentException. "At the moment, fetch-one doesn't support options, limit, or hint"))) ;; these are allowed but not implemented here
+      (throw (IllegalArgumentException. "The `fetch-one` (`:one? true`) can't be used with `sort`.
+Please, use `fetch` with `:limit 1` instead.")))
+    (when (and one? (or (not= [] options) explain? (not= 0 limit) hint))
+      (throw (IllegalArgumentException. "The `fetch-one` doesn't support `options`, `explain?`, `limit`, or `hint`")))
     (when-not (or (nil? hint)
                   (string? hint)
                   (and (instance? clojure.lang.Sequential hint)
@@ -466,72 +510,133 @@ You should use fetch with :limit 1 instead."))); one? and sort should NEVER be c
                                          (-> % second #{1 -1})))
                                hint)))
       (throw (IllegalArgumentException. ":hint requires a string name of the index, or a seq of keywords that is the index definition")))
-    (let [n-where ^DBObject (coerce where [from :mongo])
-          n-only  (coerce-fields only)
-          n-col   (get-coll coll)
-                                        ; congomongo originally used do convert passed `limit` into negative number because mongo
-                                        ; protocol says:
-                                        ;  > If the number is negative, then the database will return that number and close the
-                                        ;  > cursor. No further results for that query can be fetched.
-                                        ; (see https://docs.mongodb.com/manual/reference/mongodb-wire-protocol/#op-query)
-                                        ;
-                                        ;  But after bumping mongo-driver from 3.0.2 to 3.2.2 we discovered that
-                                        ;  if a number of available matching records in mongo is bigger than `batchSize`
-                                        ;  (101 by default) and limit is a negative number then mongo will return only `batchSize`
-                                        ;  of results and close the cursor. Which is in agreement with mongo shell docs:
-                                        ;   > A negative limit is similar to a positive limit but closes the cursor after
-                                        ;   > returning a single batch of results. As such, with a negative limit, if the
-                                        ;   > limited result set does not fit into a single batch, the number of documents
-                                        ;   > received will be less than the specified limit. By passing a negative limit,
-                                        ;   > the client indicates to the server that it will not ask for a subsequent batch
-                                        ;   > via getMore.
-                                        ;  (see https://docs.mongodb.com/manual/reference/method/cursor.limit/#negative-values)
-                                        ;
-                                        ; Maybe protocol description implies that number can't be bigger than a `batchSize`
-                                        ; or maybe protocol has been changed and docs aren't updated. Anyway current behaviour
-                                        ; (with negative limit) doesn't match expectations therefore changed to keep limit as is.
+
+    (let [n-where (coerce where [from :mongo])
+          n-only  (when only (coerce-fields only))
+          n-coll  (get-coll collection)
+          ;; Congomongo originally used do convert passed `limit` into negative number because
+          ;; Mongo protocol says:
+          ;;  > If the number is negative, then the database will return that number and close
+          ;;  > the cursor. No further results for that query can be fetched.
+          ;; (see https://docs.mongodb.com/manual/reference/mongodb-wire-protocol/#op-query)
+          ;;
+          ;; But after bumping mongo-driver from 3.0.2 to 3.2.2 we discovered that if a number
+          ;; of available matching documents in Mongo is bigger than `batchSize` (101 by default)
+          ;; and `limit` is a negative number then Mongo will return only `batchSize`
+          ;; of results and close the cursor. Which is in agreement with Mongo shell docs:
+          ;;  > A negative limit is similar to a positive limit but closes the cursor after
+          ;;  > returning a single batch of results. As such, with a negative limit, if the
+          ;;  > limited result set does not fit into a single batch, the number of documents
+          ;;  > received will be less than the specified limit. By passing a negative limit,
+          ;;  > the client indicates to the server that it will not ask for a subsequent batch
+          ;;  > via getMore.
+          ;; (see https://docs.mongodb.com/manual/reference/method/cursor.limit/#negative-values)
+          ;;
+          ;; Maybe protocol description implies that number can't be bigger than a `batchSize`
+          ;; or maybe protocol has been changed and docs aren't updated. Anyway, the current
+          ;; behaviour (with negative `limit`) doesn't match expectations, therefore changed
+          ;; to keep `limit` as is.
           n-limit (or limit 0)
-          n-sort (when sort (coerce sort [from :mongo]))
-          n-preferences (cond
-                          (nil? read-preferences) nil
-                          (instance? ReadPreference read-preferences) read-preferences
-                          :else (somnium.congomongo/read-preference read-preferences))]
-      (cond
-        count? (.getCount n-col n-where)
+          ;; TODO: Backward compatibility issue. Can't drop these `read-preferences` which had
+          ;;       this extra 's' in the end. Remove on the next major 'congomongo' release.
+          read-preference (or read-preference read-preferences)
+          ;; TODO: Requires smth. like `set-collection-read-preference!` to be able to pass tags.
+          n-preference (cond
+                         (nil? read-preference) nil
+                         (instance? ReadPreference read-preference) read-preference
+                         :else (somnium.congomongo/read-preference read-preference))
+          read-concern (when read-concern
+                         (or (read-concern read-concern-map)
+                             (illegal-read-concern read-concern)))]
+      (if count?
+        (.getCount ^DBCollection n-coll
+                   ^DBObject n-where
+                   ^DBCollectionCountOptions
+                   (let [opts (DBCollectionCountOptions.)]
+                     (when hint
+                       (if (string? hint)
+                         (.hintString opts ^String hint)
+                         (.hint opts ^DBObject (coerce-index-fields hint))))
+                     (when (int? skip)
+                       (.skip opts ^int skip))
+                     (when (int? n-limit)
+                       (.limit opts ^int n-limit))
+                     (when (int? max-time-ms)
+                       (.maxTime opts ^long max-time-ms TimeUnit/MILLISECONDS))
+                     (when n-preference
+                       (.readPreference opts ^ReadPreference n-preference))
+                     (when read-concern
+                       (.readConcern opts ^ReadConcern read-concern))
+                     (when (instance? Collation collation)
+                       (.collation opts ^Collation collation))
+                     opts))
 
-        ;; The find command isn't documented so there's no nice way to build a
-        ;; find command that adds read-preferences when necessary
-        one?   (if-let [m (if (not (nil? n-preferences))
-                            (.findOne ^DBCollection n-col ^DBObject n-where ^DBObject n-only ^ReadPreference n-preferences)
-                            (.findOne ^DBCollection n-col ^DBObject n-where ^DBObject n-only))]
-                 (coerce m [:mongo as]) nil)
+        (let [findOpts (let [opts (DBCollectionFindOptions.)]
+                         (when sort
+                           (.sort opts ^DBObject (coerce sort [from :mongo])))
+                         (when (int? skip)
+                           (.skip opts ^int skip))
+                         (when (int? n-limit)
+                           (.limit opts ^int n-limit))
+                         (when (int? batch-size)
+                           (.batchSize opts ^int batch-size))
+                         (when n-only
+                           (.projection opts ^DBObject n-only))
+                         (when (int? max-time-ms)
+                           (.maxTime opts ^long max-time-ms TimeUnit/MILLISECONDS))
+                         (when (int? max-await-time-ms)
+                           (.maxAwaitTime opts ^long max-await-time-ms TimeUnit/MILLISECONDS))
+                         (when (instance? CursorType cursor-type)
+                           (.cursorType opts ^CursorType cursor-type))
+                         (when (boolean? no-cursor-timeout)
+                           (.noCursorTimeout opts no-cursor-timeout))
+                         (when (boolean? oplog-replay)
+                           (.oplogReplay opts oplog-replay))
+                         (when (boolean? partial)
+                           (.showRecordId opts partial))
+                         (when n-preference
+                           (.readPreference opts ^ReadPreference n-preference))
+                         (when read-concern
+                           (.readConcern opts ^ReadConcern read-concern))
+                         (when (instance? Collation collation)
+                           (.collation opts ^Collation collation))
+                         (when (string? comment)
+                           (.comment opts ^String comment))
+                         (when hint
+                           (if (string? hint)
+                             ;; NOTE: This is currently the one line that prevents
+                             ;;       upgrading to the 4.3 driver. String `hint`
+                             ;;       doesn't exist in that driver, but it will
+                             ;;       be added back in 4.4. TODO: Double-check.
+                             ;;       https://jira.mongodb.org/browse/JAVA-4281
+                             (.put (.getModifiers opts) "$hint" hint)
+                             (.hint opts ^DBObject (coerce-index-fields hint))))
+                         (when max
+                           (.max opts ^DBObject (coerce max [from :mongo])))
+                         (when min
+                           (.min opts ^DBObject (coerce min [from :mongo])))
+                         (when (boolean? return-key)
+                           (.returnKey opts return-key))
+                         (when (boolean? show-record-id)
+                           (.showRecordId opts show-record-id))
+                         opts)]
+          (if one?
+            (when-some [res (.findOne ^DBCollection n-coll
+                                      ^DBObject n-where
+                                      ^DBCollectionFindOptions findOpts)]
+              (coerce res [:mongo as]))
 
-        :else  (when-let [cursor (.find n-col
-                                        n-where
-                                        n-only)]
-                 (when n-preferences
-                   (.setReadPreference cursor n-preferences))
-                 (when hint
-                   (if (string? hint)
-                     ;; Note: this is currently the one line that prevents
-                     ;; upgrading to the 4.3 driver. String hint does not exist
-                     ;; in that driver, but it will be added back in 4.4.
-                     ;; https://jira.mongodb.org/browse/JAVA-4281
-                     (.hint cursor ^String hint)
-                     (.hint cursor ^DBObject (coerce-index-fields hint))))
-                 (when options
-                   (set-options! cursor options))
-                 (when n-sort
-                   (.sort cursor n-sort))
-                 (when skip
-                   (.skip cursor skip))
-                 (when n-limit
-                   (.limit cursor n-limit))
-                 (when max-time-ms
-                   (.maxTime cursor max-time-ms TimeUnit/MILLISECONDS))
-                 (if explain?
-                   (coerce (.explain cursor) [:mongo as] :many false)
-                   (coerce cursor [:mongo as] :many true)))))))
+            (when-let [cursor (.find ^DBCollection n-coll
+                                     ^DBObject n-where
+                                     ^DBCollectionFindOptions findOpts)]
+              ;; TODO: Backward compatibility issue. Can't drop these `options`,
+              ;;       because they use a custom data format. Remove on the next
+              ;;       major 'congomongo' release.
+              (when options
+                (set-cursor-options! cursor options))
+              (if explain?
+                (coerce (.explain ^DBCursor cursor) [:mongo as] :many false)
+                (coerce cursor [:mongo as] :many true)))))))))
 
 (defn fetch-one [col & options]
   (apply fetch col (concat options '[:one? true])))
