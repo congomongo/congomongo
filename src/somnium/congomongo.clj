@@ -445,33 +445,33 @@ When with-mongo and set-connection! interact, last one wins"
    collection         -> the database collection
 
    Optional parameters include:
-   :one?              -> will result in `findOne` query (defaults to false, use `fetch-one` as a shortcut)
-   :count?            -> will result in `getCount` query (defaults to false, use `fetch-count` as a shortcut)
-   :as                -> what to return (defaults to `:clojure`, can also be `:json` or `:mongo`)
-   :from              -> argument type, same options as above
-   :where             -> the selection criteria using query operators (a query map)
-   :only              -> `projection`; a set of fields to return for all matching documents (an array of keys)
-   :sort              -> the sort criteria to apply to the query (`null` means an undefined order of results)
-   :skip              -> number of documents to skip
-   :limit             -> number of documents to return
-   :batch-size        -> number of documents to return per batch (by default, server chooses an appropriate)
-   :max-time-ms       -> set the maximum execution time on the server for this operation
-   :max-await-time-ms -> set the maximum await execution time on the server for this operation
-   :cursor-type       -> set the cursor type (either `NonTailable`, `Tailable`, or `TailableAwait`)
-   :no-cursor-timeout -> prevent server from timing out idle cursors after an inactivity period (10 min)
-   :oplog-replay      -> users should not set this under normal circumstances
-   :partial           -> get partial results from a sharded cluster if one or more shards are unreachable
-   :read-preference   -> set the read preference (e.g. :primary or ReadPreference instance)
-   :read-concern      -> set the read concern (e.g. :local, see the `read-concern-map` for available options)
-   :collation         -> set the collation
-   :comment           -> set the comment to the query
-   :hint              -> tell the query which index to use (name (string) or [:compound :index] (seq of keys))
-   :max               -> set the exclusive upper bound for a specific index
-   :min               -> set the minimum inclusive lower bound for a specific index
-   :return-key        -> if true the find operation will return only the index keys in the resulting documents
-   :show-record-id    -> set to true to add a field `$recordId` to the returned documents
-   :options           -> query options [:tailable :slaveok :oplogreplay :notimeout :awaitdata] (see the NOTE)
-   :explain?          -> returns performance information on the query, instead of rows
+   :one?               -> will result in `findOne` query (defaults to false, use `fetch-one` as a shortcut)
+   :count?             -> will result in `getCount` query (defaults to false, use `fetch-count` as a shortcut)
+   :as                 -> what to return (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from               -> argument type, same options as above
+   :where              -> the selection criteria using query operators (a query map)
+   :only               -> `projection`; a set of fields to return for all matching documents (an array of keys)
+   :sort               -> the sort criteria to apply to the query (`null` means an undefined order of results)
+   :skip               -> number of documents to skip
+   :limit              -> number of documents to return
+   :batch-size         -> number of documents to return per batch (by default, server chooses an appropriate)
+   :max-time-ms        -> set the maximum execution time on the server for this operation
+   :max-await-time-ms  -> set the maximum await execution time on the server for this operation
+   :cursor-type        -> set the cursor type (either `NonTailable`, `Tailable`, or `TailableAwait`)
+   :no-cursor-timeout? -> prevent server from timing out idle cursors after an inactivity period (10 min)
+   :oplog-replay?      -> users should not set this under normal circumstances
+   :partial?           -> get partial results from a sharded cluster if one or more shards are unreachable
+   :read-preference    -> set the read preference (e.g. :primary or ReadPreference instance)
+   :read-concern       -> set the read concern (e.g. :local, see the `read-concern-map` for available options)
+   :collation          -> set the collation
+   :comment            -> set the comment to the query
+   :hint               -> tell the query which index to use (name (string) or [:compound :index] (seq of keys))
+   :max                -> set the exclusive upper bound for a specific index
+   :min                -> set the minimum inclusive lower bound for a specific index
+   :return-key?        -> if true the find operation will return only the index keys in the resulting documents
+   :show-record-id?    -> set to true to add a field `$recordId` to the returned documents
+   :explain?           -> returns performance information on the query, instead of rows
+   :options            -> query options [:tailable :slaveok :oplogreplay :notimeout :awaitdata] (see the NOTE)
 
    However, not all of the aforementioned optional params affect the `count?` mode, but only these:
    `hint`, `skip`, `limit`, `max-time-ms`, `read-preference`, `read-concern`, and `collation`.
@@ -482,17 +482,17 @@ When with-mongo and set-connection! interact, last one wins"
          and might be removed in the next major 'congomongo' release."
   {:arglists
    '([collection {:one? false :count? false :as :clojure :from :clojure :where {} :only [] :sort nil :skip 0 :limit 0
-             :batch-size nil :max-time-ms nil :max-await-time-ms nil :cursor-type nil :no-cursor-timeout nil
-             :oplog-replay nil :partial nil :read-preference nil :read-concern nil :collation nil :comment nil
-             :hint nil :max nil :min nil :return-key nil :show-record-id nil :options [] :explain? false}])}
+             :batch-size nil :max-time-ms nil :max-await-time-ms nil :cursor-type nil :no-cursor-timeout? nil
+             :oplog-replay? nil :partial? nil :read-preference nil :read-concern nil :collation nil :comment nil
+             :hint nil :max nil :min nil :return-key? nil :show-record-id? nil :explain? false :options []}])}
   [collection & {:as params}]
   (let [{:keys [one? count? as from where only sort skip limit
-                batch-size max-time-ms max-await-time-ms cursor-type no-cursor-timeout oplog-replay partial
-                read-preference read-preferences read-concern collation comment hint max min return-key show-record-id
-                options explain?]}
+                batch-size max-time-ms max-await-time-ms cursor-type no-cursor-timeout? oplog-replay? partial?
+                read-preference read-preferences read-concern collation comment hint max min return-key? show-record-id?
+                explain? options]}
         (merge {:one? false :count? false :as :clojure :from :clojure
                 :where {} :only [] :sort nil :skip 0 :limit 0
-                :options [] :explain? false} ;; specific to `DBCursor`
+                :explain? false :options []} ;; specific to `DBCursor`
                *default-query-options*
                params)]
     (when (and one? sort)
@@ -588,12 +588,12 @@ Please, use `fetch` with `:limit 1` instead.")))
                            (.maxAwaitTime opts ^long max-await-time-ms TimeUnit/MILLISECONDS))
                          (when (instance? CursorType cursor-type)
                            (.cursorType opts ^CursorType cursor-type))
-                         (when (boolean? no-cursor-timeout)
-                           (.noCursorTimeout opts no-cursor-timeout))
-                         (when (boolean? oplog-replay)
-                           (.oplogReplay opts oplog-replay))
-                         (when (boolean? partial)
-                           (.showRecordId opts partial))
+                         (when (boolean? no-cursor-timeout?)
+                           (.noCursorTimeout opts ^boolean no-cursor-timeout?))
+                         (when (boolean? oplog-replay?)
+                           (.oplogReplay opts ^boolean oplog-replay?))
+                         (when (boolean? partial?)
+                           (.showRecordId opts ^boolean partial?))
                          (when n-preference
                            (.readPreference opts ^ReadPreference n-preference))
                          (when read-concern
@@ -616,10 +616,10 @@ Please, use `fetch` with `:limit 1` instead.")))
                            (.max opts ^DBObject (coerce max [from :mongo])))
                          (when min
                            (.min opts ^DBObject (coerce min [from :mongo])))
-                         (when (boolean? return-key)
-                           (.returnKey opts return-key))
-                         (when (boolean? show-record-id)
-                           (.showRecordId opts show-record-id))
+                         (when (boolean? return-key?)
+                           (.returnKey opts ^boolean return-key?))
+                         (when (boolean? show-record-id?)
+                           (.showRecordId opts ^boolean show-record-id?))
                          opts)]
           (if one?
             (when-some [res (.findOne ^DBCollection n-coll
