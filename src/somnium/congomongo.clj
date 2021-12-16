@@ -437,6 +437,7 @@ When with-mongo and set-connection! interact, last one wins"
     (.oplogReplay cursor true))
   (when notimeout
     (.noCursorTimeout cursor true)))
+(def set-options! set-cursor-options!)
 
 (defn fetch
   "Fetches objects from a collection.
