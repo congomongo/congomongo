@@ -32,7 +32,7 @@
                         ServerAddress ReadPreference ReadConcern WriteConcern
                         AggregationOptions
                         MapReduceCommand MapReduceCommand$OutputType
-                        DBEncoder]
+                        InsertOptions DBEncoder]
            [com.mongodb.client.model DBCollectionUpdateOptions
                                      DBCollectionCountOptions
                                      DBCollectionFindOptions
@@ -690,20 +690,48 @@ Please, use `fetch` with `:limit 1` instead.")))
             [:mongo as])))
 
 (defn insert!
-  "Inserts a map into collection. Will not overwrite existing maps.
-   Takes optional from and to keyword arguments. To insert
-   as a side-effect only specify :to as nil."
-  {:arglists '([coll obj {:many false :from :clojure :to :clojure :write-concern nil}])}
-  [coll obj & {:keys [from to many write-concern]
-               :or {from :clojure to :clojure many false}}]
-  (let [coerced-obj (coerce obj [from :mongo] :many many)
-        list-obj (if many coerced-obj (list coerced-obj))
-        res (if write-concern
-              (if-let [wc (write-concern write-concern-map)]
-                (.insert ^DBCollection (get-coll coll) ^List list-obj ^WriteConcern wc)
-                (illegal-write-concern write-concern))
-              (.insert ^DBCollection (get-coll coll) ^List list-obj))]
-    (coerce coerced-obj [:mongo to] :many many)))
+  "Insert document(s) into a collection. If the collection does not exists on the server, then it will be created.
+   If the new document does not contain an '_id' field, it will be added. Will not overwrite existing documents.
+
+   Required parameters:
+   collection         -> the database collection
+   obj                -> a document or a collection/sequence of documents to insert
+
+   Optional parameters include:
+   :many?             -> whether this will insert multiple documents (default is `false`)
+   :as                -> what to return (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from              -> argument type, same options as above
+   :write-concern     -> set the write concern (e.g. :normal, see the `write-concern-map` for available options)
+   :continue-on-error -> whether documents will continue to be inserted after a failure to insert one
+                         (most commonly due to a duplicate key error; default value is false)
+   :bypass-document-validation -> set the bypass document level validation flag
+   :encoder           -> set the encoder (of BSONObject to BSON)
+
+   NOTE: To insert as a side-effect only, specify `:as` as `nil`."
+  {:arglists '([collection obj {:many? false :as :clojure :from :clojure
+                 :write-concern nil :continue-on-error nil :bypass-document-validation nil :encoder nil}])}
+  [collection obj & {:keys [many? as from
+                            many to ;; TODO: For backward compatibility. Remove later.
+                            write-concern continue-on-error bypass-document-validation encoder]
+                     :or {many? false as :clojure from :clojure} :as params}]
+  (let [coerced-obj (coerce obj [from :mongo] :many (or many many?))
+        list-obj (if (or many many?) coerced-obj (list coerced-obj))]
+    (.insert ^DBCollection (get-coll collection)
+             ^List list-obj
+             ^InsertOptions
+             (let [opts (InsertOptions.)]
+               (when write-concern
+                 (if-let [wc (write-concern write-concern-map)]
+                   (.writeConcern opts ^WriteConcern wc)
+                   (illegal-write-concern write-concern)))
+               (when (boolean? continue-on-error)
+                 (.continueOnError opts ^boolean continue-on-error))
+               (when (boolean? bypass-document-validation)
+                 (.bypassDocumentValidation opts ^boolean bypass-document-validation))
+               (when (instance? DBEncoder encoder)
+                 (.dbEncoder opts ^DBEncoder encoder))
+               opts))
+    (coerce coerced-obj [:mongo (if (contains? params :to) to as)] :many many)))
 
 (defn mass-insert!
   {:arglists '([coll objs {:from :clojure :to :clojure}])}
