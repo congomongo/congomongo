@@ -42,13 +42,14 @@
            [com.mongodb.gridfs GridFS]
            [org.bson.types ObjectId]
            [java.util List]
-           [java.util.concurrent TimeUnit]))
+           [java.util.concurrent TimeUnit]
+           [clojure.lang Named Sequential]))
 
-
+;; TODO: Remove as an unnecessary complexity. Just use `name`.
 (defprotocol StringNamed
   (named [s] "convenience for interchangeably handling keywords, symbols, and strings"))
 (extend-protocol StringNamed
-  clojure.lang.Named
+  Named
   (named [s] (name s))
   Object
   (named [s] s))
@@ -385,7 +386,7 @@ When with-mongo and set-connection! interact, last one wins"
 
 (defn- named?
   [x]
-  (instance? clojure.lang.Named x))
+  (instance? Named x))
 
 (defn ->tagset
   [tag]
@@ -438,14 +439,14 @@ When with-mongo and set-connection! interact, last one wins"
     (.oplogReplay cursor true))
   (when notimeout
     (.noCursorTimeout cursor true)))
-(def set-options! set-cursor-options!)
+(def set-options! set-cursor-options!) ;; TODO: Backward compatibility. Remove later on?
 
 (defn fetch
   "Fetches objects from a collection.
    Note that MongoDB always adds the `_id` and `_ns` fields to objects returned from the database.
 
    Required parameters:
-   collection         -> the database collection
+   collection         -> the database collection name (string, keyword, or symbol)
 
    Optional parameters include:
    :one?               -> will result in `findOne` query (defaults to false, use `fetch-one` as a shortcut)
@@ -505,9 +506,9 @@ Please, use `fetch` with `:limit 1` instead.")))
       (throw (IllegalArgumentException. "The `fetch-one` doesn't support `options`, `explain?`, `limit`, or `hint`")))
     (when-not (or (nil? hint)
                   (string? hint)
-                  (and (instance? clojure.lang.Sequential hint)
+                  (and (instance? Sequential hint)
                        (every? #(or (keyword? %)
-                                    (and (instance? clojure.lang.Sequential %)
+                                    (and (instance? Sequential %)
                                          (= 2 (count %))
                                          (-> % first keyword?)
                                          (-> % second #{1 -1})))
@@ -718,7 +719,7 @@ Please, use `fetch` with `:limit 1` instead.")))
    a collection and a map with a valid `:_id` field.
 
    Required parameters:
-   collection     -> the database collection
+   collection     -> the database collection name (string, keyword, or symbol)
    query          -> the selection criteria for the update (a query map)
    update         -> the modifications to apply (a modifications map)
 
@@ -762,7 +763,7 @@ Please, use `fetch` with `:limit 1` instead.")))
                      opts))
           [:mongo as]))
 
-(defn fetch-and-modify
+(defn fetch-and-modify!
   "Atomically modifies and returns a single document.
    Selects the first document matching the `query` and removes/updates it.
    By default, the returned document does not include the modifications made on the update.
@@ -829,12 +830,13 @@ Please, use `fetch` with `:limit 1` instead.")))
                                   (.arrayFilters opts ^List coerced-af)))
                               opts))
             [:mongo as])))
+(def fetch-and-modify fetch-and-modify!) ;; TODO: Backward compatibility. Remove later on?
 
 (defn destroy!
   "Removes map from a collection.
 
    Required parameters:
-   collection     -> the database collection
+   collection     -> the database collection name (string, keyword, or symbol)
    query          -> the deletion criteria using query operators (a query map),
                      omit or pass an empty `query` to delete all documents in the collection
 
