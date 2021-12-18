@@ -453,13 +453,14 @@ When with-mongo and set-connection! interact, last one wins"
    :as                 -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
    :from               -> arguments (`where`, `sort`, `max`, `min`) format (same default/options as for `:as`)
    :where              -> the selection criteria using query operators (a query map)
-   :only               -> `projection`; a set of fields to return for all matching documents (an array of keys)
+   :only               -> `projection`; a subset of fields to return for matching documents (an array of keys)
    :sort               -> the sort criteria to apply to the query (`null` means an undefined order of results)
    :skip               -> number of documents to skip
    :limit              -> number of documents to return
    :batch-size         -> number of documents to return per batch (by default, server chooses an appropriate)
-   :max-time-ms        -> set the maximum execution time on the server for this operation
-   :max-await-time-ms  -> set the maximum await execution time on the server for this operation
+   :max-time-ms        -> set the maximum server execution time for this operation (default is `0`, no limit)
+   :max-await-time-ms  -> set the maximum amount of time for the server to wait on new documents to satisfy
+                          a tailable cursor query (only applies to a `TailableAwait` cursor type)
    :cursor-type        -> set the cursor type (either `NonTailable`, `Tailable`, or `TailableAwait`)
    :no-cursor-timeout? -> prevent server from timing out idle cursors after an inactivity period (10 min)
    :oplog-replay?      -> users should not set this under normal circumstances
@@ -514,9 +515,8 @@ Please, use `fetch` with `:limit 1` instead.")))
                                hint)))
       (throw (IllegalArgumentException. ":hint requires a string name of the index, or a seq of keywords that is the index definition")))
 
-    (let [n-where (coerce where [from :mongo])
-          n-only  (when only (coerce-fields only))
-          n-coll  (get-coll collection)
+    (let [db-coll (get-coll collection)
+          query   (coerce where [from :mongo])
           ;; Congomongo originally used do convert passed `limit` into negative number because
           ;; Mongo protocol says:
           ;;  > If the number is negative, then the database will return that number and close
@@ -539,12 +539,12 @@ Please, use `fetch` with `:limit 1` instead.")))
           ;; or maybe protocol has been changed and docs aren't updated. Anyway, the current
           ;; behaviour (with negative `limit`) doesn't match expectations, therefore changed
           ;; to keep `limit` as is.
-          n-limit (or limit 0)
+          limit (or limit 0)
           ;; TODO: Backward compatibility issue. Can't drop these `read-preferences` which had
           ;;       this extra 's' in the end. Remove on the next major 'congomongo' release.
           read-preference (or read-preference read-preferences)
           ;; TODO: Requires smth. like `set-collection-read-preference!` to be able to pass tags.
-          n-preference (cond
+          r-preference (cond
                          (nil? read-preference) nil
                          (instance? ReadPreference read-preference) read-preference
                          :else (somnium.congomongo/read-preference read-preference))
@@ -552,8 +552,8 @@ Please, use `fetch` with `:limit 1` instead.")))
                          (or (read-concern read-concern-map)
                              (illegal-read-concern read-concern)))]
       (if count?
-        (.getCount ^DBCollection n-coll
-                   ^DBObject n-where
+        (.getCount ^DBCollection db-coll
+                   ^DBObject query
                    ^DBCollectionCountOptions
                    (let [opts (DBCollectionCountOptions.)]
                      (when hint
@@ -562,12 +562,12 @@ Please, use `fetch` with `:limit 1` instead.")))
                          (.hint opts ^DBObject (coerce-index-fields hint))))
                      (when (int? skip)
                        (.skip opts ^int skip))
-                     (when (int? n-limit)
-                       (.limit opts ^int n-limit))
+                     (when (int? limit)
+                       (.limit opts ^int limit))
                      (when (int? max-time-ms)
                        (.maxTime opts ^long max-time-ms TimeUnit/MILLISECONDS))
-                     (when n-preference
-                       (.readPreference opts ^ReadPreference n-preference))
+                     (when r-preference
+                       (.readPreference opts ^ReadPreference r-preference))
                      (when read-concern
                        (.readConcern opts ^ReadConcern read-concern))
                      (when (instance? Collation collation)
@@ -579,12 +579,12 @@ Please, use `fetch` with `:limit 1` instead.")))
                            (.sort opts ^DBObject (coerce sort [from :mongo])))
                          (when (int? skip)
                            (.skip opts ^int skip))
-                         (when (int? n-limit)
-                           (.limit opts ^int n-limit))
+                         (when (int? limit)
+                           (.limit opts ^int limit))
                          (when (int? batch-size)
                            (.batchSize opts ^int batch-size))
-                         (when n-only
-                           (.projection opts ^DBObject n-only))
+                         (when only
+                           (.projection opts ^DBObject (coerce-fields only)))
                          (when (int? max-time-ms)
                            (.maxTime opts ^long max-time-ms TimeUnit/MILLISECONDS))
                          (when (int? max-await-time-ms)
@@ -597,8 +597,8 @@ Please, use `fetch` with `:limit 1` instead.")))
                            (.oplogReplay opts ^boolean oplog-replay?))
                          (when (boolean? partial?)
                            (.showRecordId opts ^boolean partial?))
-                         (when n-preference
-                           (.readPreference opts ^ReadPreference n-preference))
+                         (when r-preference
+                           (.readPreference opts ^ReadPreference r-preference))
                          (when read-concern
                            (.readConcern opts ^ReadConcern read-concern))
                          (when (instance? Collation collation)
@@ -625,13 +625,13 @@ Please, use `fetch` with `:limit 1` instead.")))
                            (.showRecordId opts ^boolean show-record-id?))
                          opts)]
           (if one?
-            (when-some [res (.findOne ^DBCollection n-coll
-                                      ^DBObject n-where
+            (when-some [res (.findOne ^DBCollection db-coll
+                                      ^DBObject query
                                       ^DBCollectionFindOptions findOpts)]
               (coerce res [:mongo as]))
 
-            (when-let [cursor (.find ^DBCollection n-coll
-                                     ^DBObject n-where
+            (when-let [cursor (.find ^DBCollection db-coll
+                                     ^DBObject query
                                      ^DBCollectionFindOptions findOpts)]
               ;; TODO: Backward compatibility issue. Can't drop these `options`,
               ;;       because they use a custom data format. Remove on the next
@@ -694,7 +694,7 @@ Please, use `fetch` with `:limit 1` instead.")))
   [collection field-name & {:keys [as from where read-preference read-concern collation]
                             :or {as :clojure from :clojure where nil}}]
   (let [;; TODO: Requires smth. like `set-collection-read-preference!` to be able to pass tags.
-        n-preference (cond
+        r-preference (cond
                        (nil? read-preference) nil
                        (instance? ReadPreference read-preference) read-preference
                        :else (somnium.congomongo/read-preference read-preference))
@@ -707,8 +707,8 @@ Please, use `fetch` with `:limit 1` instead.")))
                        (let [opts (DBCollectionDistinctOptions.)]
                          (when where
                            (.filter opts ^DBObject (coerce where [from :mongo])))
-                         (when n-preference
-                           (.readPreference opts ^ReadPreference n-preference))
+                         (when r-preference
+                           (.readPreference opts ^ReadPreference r-preference))
                          (when read-concern
                            (.readConcern opts ^ReadConcern read-concern))
                          (when (instance? Collation collation)
@@ -783,8 +783,8 @@ Please, use `fetch` with `:limit 1` instead.")))
                      (when (instance? Collation collation)
                        (.collation opts ^Collation collation))
                      (when array-filters
-                       (let [coerced-array-filters (coerce array-filters [:clojure :mongo] :many true)]
-                         (.arrayFilters opts ^List coerced-array-filters)))
+                       (let [coerced-af (coerce array-filters [:clojure :mongo] :many true)]
+                         (.arrayFilters opts ^List coerced-af)))
                      opts))
           [:mongo as]))
 
