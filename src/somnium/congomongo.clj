@@ -37,6 +37,7 @@
                                      DBCollectionCountOptions
                                      DBCollectionFindOptions
                                      DBCollectionRemoveOptions
+                                     DBCollectionDistinctOptions
                                      Collation]
            [com.mongodb.gridfs GridFS]
            [org.bson.types ObjectId]
@@ -449,8 +450,8 @@ When with-mongo and set-connection! interact, last one wins"
    Optional parameters include:
    :one?               -> will result in `findOne` query (defaults to false, use `fetch-one` as a shortcut)
    :count?             -> will result in `getCount` query (defaults to false, use `fetch-count` as a shortcut)
-   :as                 -> what to return (defaults to `:clojure`, can also be `:json` or `:mongo`)
-   :from               -> argument type, same options as above
+   :as                 -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from               -> arguments (`where`, `sort`, `max`, `min`) format (same default/options as for `:as`)
    :where              -> the selection criteria using query operators (a query map)
    :only               -> `projection`; a set of fields to return for all matching documents (an array of keys)
    :sort               -> the sort criteria to apply to the query (`null` means an undefined order of results)
@@ -673,20 +674,46 @@ Please, use `fetch` with `:limit 1` instead.")))
                 (apply fetcher args)))))
 
 (defn distinct-values
-  "Queries a collection for the distinct values of a given key.
-   Returns a vector of the values by default (but see the :as keyword argument).
-   The key (a String) can refer to a nested object, using dot notation, e.g., \"foo.bar.baz\".
+  "Finds the distinct values for a specified field across a collection.
+   Returns a vector of these values, possibly formatted (according to the `:as` param logic).
 
-   Optional arguments include
-   :where  -> a query object.  If supplied, distinct values from the result of the query on the collection (rather than from the entire collection) are returned.
-   :from   -> specifies what form a supplied :where query is in (:clojure, :json, or :mongo).  Defaults to :clojure.  Has no effect if there is no :where query.
-   :as     -> results format (:clojure, :json, or :mongo).  Defaults to :clojure."
-  {:arglists
-   '([collection key :where :from :as])}
-  [coll ^String k & {:keys [where from as]
-             :or {where {} from :clojure as :clojure}}]
-  (let [^DBObject query (coerce where [from :mongo])]
-    (coerce (.distinct ^DBCollection (get-coll coll) k query)
+   Required parameters:
+   collection       -> the database collection
+   field-name       -> the field for which to return the distinct values
+                       (may be of a nested document; use the \"dot notation\" for this, e.g. \"foo.bar.baz\")
+
+   Optional parameters include:
+   :as              -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from            -> arguments (`where`) format (same default/options as for `:as`; no effect w/o `:where`)
+   :where           -> the selection query to determine the subset of documents for distinct values retrieval
+   :read-preference -> set the read preference (e.g. :primary or ReadPreference instance)
+   :read-concern    -> set the read concern (e.g. :local, see the `read-concern-map` for available options)
+   :collation       -> set the collation"
+  {:arglists '([collection field-name {:as :clojure :from :clojure :where nil
+                        :read-preference nil :read-concern nil :collation nil}])}
+  [collection field-name & {:keys [as from where read-preference read-concern collation]
+                            :or {as :clojure from :clojure where nil}}]
+  (let [;; TODO: Requires smth. like `set-collection-read-preference!` to be able to pass tags.
+        n-preference (cond
+                       (nil? read-preference) nil
+                       (instance? ReadPreference read-preference) read-preference
+                       :else (somnium.congomongo/read-preference read-preference))
+        read-concern (when read-concern
+                       (or (read-concern read-concern-map)
+                           (illegal-read-concern read-concern)))]
+    (coerce (.distinct ^DBCollection (get-coll collection)
+                       ^String field-name
+                       ^DBCollectionDistinctOptions
+                       (let [opts (DBCollectionDistinctOptions.)]
+                         (when where
+                           (.filter opts ^DBObject (coerce where [from :mongo])))
+                         (when n-preference
+                           (.readPreference opts ^ReadPreference n-preference))
+                         (when read-concern
+                           (.readConcern opts ^ReadConcern read-concern))
+                         (when (instance? Collation collation)
+                           (.collation opts ^Collation collation))
+                         opts))
             [:mongo as])))
 
 (defn insert!
@@ -724,8 +751,8 @@ Please, use `fetch` with `:limit 1` instead.")))
    Optional parameters include:
    :upsert?       -> do upsert, i.e. insert if document not present (default is `true`)
    :multiple?     -> whether this will update all documents matching the query filter (default is `false`)
-   :as            -> what to return (defaults to `:clojure`, can also be `:json` or `:mongo`)
-   :from          -> argument type, same options as above
+   :as            -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from          -> arguments (`query`, `update`) format (same default and options as for `:as`)
    :write-concern -> set the write concern (e.g. :normal, see the `write-concern-map` for available options)
    :bypass-document-validation -> set the bypass document level validation flag
    :encoder       -> set the encoder (of BSONObject to BSON)
@@ -803,7 +830,7 @@ Please, use `fetch` with `:limit 1` instead.")))
                      omit or pass an empty `query` to delete all documents in the collection
 
    Optional parameters include:
-   :from          -> what is the argument type (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from          -> arguments (`query`) format (defaults to `:clojure`, can also be `:json` or `:mongo`)
    :write-concern -> set the write concern (e.g. :normal, see the `write-concern-map` for available options)
    :encoder       -> set the encoder (of BSONObject to BSON)
    :collation     -> set the collation"
