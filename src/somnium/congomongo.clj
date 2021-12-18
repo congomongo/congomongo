@@ -690,7 +690,8 @@ Please, use `fetch` with `:limit 1` instead.")))
             [:mongo as])))
 
 (defn insert!
-  "Insert document(s) into a collection. If the collection does not exists on the server, then it will be created.
+  "Inserts document(s) into a collection.
+   If the collection does not exists on the server, then it will be created.
    If the new document does not contain an '_id' field, it will be added. Will not overwrite existing documents.
 
    Required parameters:
@@ -699,8 +700,8 @@ Please, use `fetch` with `:limit 1` instead.")))
 
    Optional parameters include:
    :many?             -> whether this will insert multiple documents (default is `false`)
-   :as                -> what to return (defaults to `:clojure`, can also be `:json` or `:mongo`)
-   :from              -> argument type, same options as above
+   :as                -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from              -> arguments (`obj`) format (same default and options as for `:as`)
    :write-concern     -> set the write concern (e.g. :normal, see the `write-concern-map` for available options)
    :continue-on-error -> whether documents will continue to be inserted after a failure to insert one
                          (most commonly due to a duplicate key error; default value is false)
