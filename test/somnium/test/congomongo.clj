@@ -680,7 +680,8 @@
 
 (deftest insert-for-side-effects-only
   (with-test-mongo
-    (is (nil? (insert! :beers {:beer "Franziskaner" :wheaty true} :to nil)))))
+    (is (nil? (insert! :beers {:beer "Franziskaner" :wheaty true} :to nil)))
+    (is (nil? (insert! :beers {:beer "Franziskaner" :wheaty true} :as nil)))))
 
 (deftest basic-indexing
   (with-test-mongo
