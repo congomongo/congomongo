@@ -37,18 +37,20 @@
                                      DBCollectionCountOptions
                                      DBCollectionFindOptions
                                      DBCollectionRemoveOptions
+                                     DBCollectionFindAndModifyOptions
                                      Collation]
            [com.mongodb.gridfs GridFS]
            [org.bson.types ObjectId]
            [java.lang.reflect Method Modifier]
            [java.util List]
-           [java.util.concurrent TimeUnit]))
+           [java.util.concurrent TimeUnit]
+           [clojure.lang Named Sequential]))
 
-
+;; TODO: Remove as an unnecessary complexity. Just use `name`.
 (defprotocol StringNamed
   (named [s] "convenience for interchangeably handling keywords, symbols, and strings"))
 (extend-protocol StringNamed
-  clojure.lang.Named
+  Named
   (named [s] (name s))
   Object
   (named [s] s))
@@ -375,7 +377,7 @@ When with-mongo and set-connection! interact, last one wins"
 
 (defn- named?
   [x]
-  (instance? clojure.lang.Named x))
+  (instance? Named x))
 
 (defn ->tagset
   [tag]
@@ -428,14 +430,14 @@ When with-mongo and set-connection! interact, last one wins"
     (.oplogReplay cursor true))
   (when notimeout
     (.noCursorTimeout cursor true)))
-(def set-options! set-cursor-options!)
+(def set-options! set-cursor-options!) ;; TODO: Backward compatibility. Remove later on?
 
 (defn fetch
   "Fetches objects from a collection.
    Note that MongoDB always adds the `_id` and `_ns` fields to objects returned from the database.
 
    Required parameters:
-   collection         -> the database collection
+   collection         -> the database collection name (string, keyword, or symbol)
 
    Optional parameters include:
    :one?               -> will result in `findOne` query (defaults to false, use `fetch-one` as a shortcut)
@@ -495,9 +497,9 @@ Please, use `fetch` with `:limit 1` instead.")))
       (throw (IllegalArgumentException. "The `fetch-one` doesn't support `options`, `explain?`, `limit`, or `hint`")))
     (when-not (or (nil? hint)
                   (string? hint)
-                  (and (instance? clojure.lang.Sequential hint)
+                  (and (instance? Sequential hint)
                        (every? #(or (keyword? %)
-                                    (and (instance? clojure.lang.Sequential %)
+                                    (and (instance? Sequential %)
                                          (= 2 (count %))
                                          (-> % first keyword?)
                                          (-> % second #{1 -1})))
@@ -737,7 +739,7 @@ Please, use `fetch` with `:limit 1` instead.")))
    a collection and a map with a valid `:_id` field.
 
    Required parameters:
-   collection     -> the database collection
+   collection     -> the database collection name (string, keyword, or symbol)
    query          -> the selection criteria for the update (a query map)
    update         -> the modifications to apply (a modifications map)
 
@@ -781,44 +783,80 @@ Please, use `fetch` with `:limit 1` instead.")))
                      opts))
           [:mongo as]))
 
-(defn fetch-and-modify
-  "Finds the first document in the query and updates it.
-   Parameters:
-       coll         -> the collection
-       where        -> query to match
-       update       -> update to apply
-       :only        -> fields to be returned
-       :sort        -> sort to apply before picking first document
-       :remove?     -> if true, document found will be removed
-       :return-new? -> if true, the updated document is returned,
-                       otherwise the old document is returned
-                       (or it would be lost forever)
-       :upsert?     -> do upsert (insert if document not present)
-       :max-time-ms -> set the maximum execution time for operations"
-  {:arglists '([collection where update {:only nil :sort nil :remove? false
-                                         :return-new? false :upsert? false :max-time-ms 0 :from :clojure :as :clojure}])}
-  [coll where update & {:as params}]
-  (let [{:keys [only sort remove? return-new? upsert? from as max-time-ms]}
-        (merge {:only nil :sort nil :remove? false
-                :return-new? false :upsert? false
-                :max-time-ms 0 :from :clojure :as :clojure}
+(defn fetch-and-modify!
+  "Atomically modifies and returns a single document.
+   Selects the first document matching the `query` and removes/updates it.
+   By default, the returned document does not include the modifications made on the update.
+
+   Required parameters:
+   collection          -> the database collection name (string, keyword, or symbol)
+   query               -> the selection criteria for the modification (a query map)
+   update              -> the modifications to apply to the selected document (a modifications map)
+
+   Optional parameters include:
+   :remove?            -> if `true`, removes the selected document
+   :return-new?        -> if `true`, returns the modified document rather than the original
+   :upsert?            -> if `true`, operation creates a new document if the query returns no documents
+   :as                 -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from               -> arguments (`query`, `update`, `sort`) format (same default/options as for `:as`)
+   :only               -> `projection`; a subset of fields to return for the selected document (an array of keys)
+   :sort               -> determines which document will be modified if the query selects multiple documents
+   :bypass-document-validation -> set the bypass document level validation flag
+   :max-time-ms        -> set the maximum server execution time for this operation (default is `0`, no limit)
+   :write-concern      -> set the write concern (e.g. :normal, see the `write-concern-map` for available options)
+   :collation          -> set the collation
+   :array-filters      -> set the array filters option
+
+   NOTE: An `update` parameter cannot be `nil` unless is passed along with the `:remove? true`."
+  {:arglists
+   '([collection query update {:as :clojure :from :clojure :remove? false :return-new? false :upsert? false
+                          :only nil :sort nil :bypass-document-validation nil :max-time-ms nil :write-concern nil
+                          :collation nil :array-filters nil}])}
+  [collection query update & {:as params}]
+  (let [{:keys [as from remove? return-new? upsert? only sort
+                bypass-document-validation max-time-ms write-concern collation array-filters]}
+        (merge {:as :clojure :from :clojure :remove? false :return-new? false :upsert? false
+                :only nil :sort nil :max-time-ms 0}
                *default-query-options*
                params)]
-      (coerce (.findAndModify ^DBCollection (get-coll coll)
-                              ^DBObject (coerce where [from :mongo])
-                              ^DBObject (coerce-fields only)
-                              ^DBObject (coerce sort [from :mongo])
-                              remove?
-                              ^DBObject (coerce update [from :mongo])
-                              return-new? upsert?
-                              max-time-ms TimeUnit/MILLISECONDS) [:mongo as])))
-
+    (coerce (.findAndModify ^DBCollection (get-coll collection)
+                            ^DBObject (coerce query [from :mongo])
+                            ^DBCollectionFindAndModifyOptions
+                            (let [opts (DBCollectionFindAndModifyOptions.)]
+                              (when update
+                                (.update opts ^DBObject (coerce update [from :mongo])))
+                              (when (boolean? remove?)
+                                (.remove opts ^boolean remove?))
+                              (when (boolean? return-new?)
+                                (.returnNew opts ^boolean return-new?))
+                              (when (boolean? upsert?)
+                                (.upsert opts ^boolean upsert?))
+                              (when only
+                                (.projection opts ^DBObject (coerce-fields only)))
+                              (when sort
+                                (.sort opts ^DBObject (coerce sort [from :mongo])))
+                              (when (boolean? bypass-document-validation)
+                                (.bypassDocumentValidation opts ^boolean bypass-document-validation))
+                              (when (int? max-time-ms)
+                                (.maxTime opts ^long max-time-ms TimeUnit/MILLISECONDS))
+                              (when write-concern
+                                (if-let [wc (write-concern write-concern-map)]
+                                  (.writeConcern opts ^WriteConcern wc)
+                                  (illegal-write-concern write-concern)))
+                              (when (instance? Collation collation)
+                                (.collation opts ^Collation collation))
+                              (when array-filters
+                                (let [coerced-af (coerce array-filters [:clojure :mongo] :many true)]
+                                  (.arrayFilters opts ^List coerced-af)))
+                              opts))
+            [:mongo as])))
+(def fetch-and-modify fetch-and-modify!) ;; TODO: Backward compatibility. Remove later on?
 
 (defn destroy!
   "Removes map from a collection.
 
    Required parameters:
-   collection     -> the database collection
+   collection     -> the database collection name (string, keyword, or symbol)
    query          -> the deletion criteria using query operators (a query map),
                      omit or pass an empty `query` to delete all documents in the collection
 
