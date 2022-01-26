@@ -920,17 +920,36 @@ Please, use `fetch` with `:limit 1` instead.")))
      :result (coerce cursor [:mongo to] :many true)
      :ok 1.0}))
 
-(defn command
-  "Executes a database command."
-  {:arglists '([cmd {:options nil :from :clojure :to :clojure}])}
-  [cmd & {:keys [options from to]
-          :or {options nil from :clojure to :clojure}}]
+(defn command!
+  "Executes a database command.
+
+   The MongoDB command interface provides access to all non CRUD database operations: authentication;
+   user, role and session management; replication and sharding; database administration, diagnostics
+   and auditing — are all accomplished with commands. All \"User Commands\" are supported as well.
+   See [Database Commands](https://docs.mongodb.com/manual/reference/command/) for the full list.
+
+   Required parameters:
+   cmd              -> a string representation of the command to be executed
+
+   Optional parameters include:
+   :as              -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from            -> arguments (`cmd`) format (same default and options as for `:as`)
+   :read-preference -> set the read preference (e.g. :primary or ReadPreference instance);
+                       determines where to execute the given command; this will only be applied
+                       for a subset of commands (see the `DB#getCommandReadPreference`)
+   :encoder         -> set the encoder that knows how to serialise the command"
+  {:arglists '([cmd {:as :clojure :from :clojure :read-preference nil :encoder nil}])}
+  [cmd & {:keys [as from read-preference encoder
+                 to] ;; TODO: For backward compatibility. Remove later.
+          :or {as :clojure from :clojure} :as params}]
   (let [db (get-db *mongo-config*)
-        coerced ^DBObject (coerce cmd [from :mongo])]
-    (coerce (if options
-              (.command db coerced (int options))
-              (.command db coerced))
-            [:mongo to])))
+        r-preference (or read-preference (.getReadPreference db))]
+    (coerce (.command db
+                      ^DBObject (coerce cmd [from :mongo])
+                      ^ReadPreference r-preference
+                      ^DBEncoder encoder)
+            [:mongo (if (contains? params :to) to as)])))
+(def command command!)
 
 (defn drop-database!
  "drops a database from the mongo server"
