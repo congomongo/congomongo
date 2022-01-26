@@ -1,3 +1,9 @@
+# Version 2.4.0 - Jan 26, 2022
+
+* Updated implementation to support DBCollection API 3.4
+* Consistent argument naming using `:upsert?`, `:many?` and others consistently
+* Consistent method naming `fetch-and-modify!` and `command!`
+
 # Version 2.3.0 - Nov 1, 2021
 
 * Remove use of deprecated MongoDB APIs
