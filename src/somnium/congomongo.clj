@@ -32,34 +32,30 @@
                         ServerAddress ReadPreference ReadConcern WriteConcern
                         AggregationOptions
                         MapReduceCommand MapReduceCommand$OutputType
-                        DBEncoder]
+                        InsertOptions DBEncoder]
            [com.mongodb.client.model DBCollectionUpdateOptions
                                      DBCollectionCountOptions
                                      DBCollectionFindOptions
                                      DBCollectionRemoveOptions
                                      DBCollectionDistinctOptions
+                                     DBCollectionFindAndModifyOptions
                                      Collation]
            [com.mongodb.gridfs GridFS]
            [org.bson.types ObjectId]
+           [java.lang.reflect Method Modifier]
            [java.util List]
-           [java.util.concurrent TimeUnit]))
+           [java.util.concurrent TimeUnit]
+           [clojure.lang Named Sequential]))
 
-
+;; TODO: Remove as an unnecessary complexity. Just use `name`.
 (defprotocol StringNamed
   (named [s] "convenience for interchangeably handling keywords, symbols, and strings"))
 (extend-protocol StringNamed
-  clojure.lang.Named
+  Named
   (named [s] (name s))
   Object
   (named [s] s))
 
-(def ^{:private true
-       :doc "To avoid yet another level of indirection via reflection, use
-             wrapper functions for field setters for each type. MongoClientOptions
-             only has int and boolean fields."}
-      type-to-setter
-  {:int (fn [^java.lang.reflect.Field field ^MongoClientOptions options value] (.setInt field options value))
-   :boolean (fn [^java.lang.reflect.Field field ^MongoClientOptions options value] (.setBoolean field options value))})
 
 (defn- field->kw
   "Convert camelCase identifier string to hyphen-separated keyword."
@@ -69,12 +65,12 @@
 (def ^:private builder-map
   "A map from keywords to builder invocation functions."
   ;; Be aware that using reflection directly here will also issue Clojure reflection warnings.
-  (let [is-builder-method? (fn [^java.lang.reflect.Method f]
+  (let [is-builder-method? (fn [^Method f]
                              (let [m (.getModifiers f)]
-                               (and (java.lang.reflect.Modifier/isPublic m)
-                                    (not (java.lang.reflect.Modifier/isStatic m))
+                               (and (Modifier/isPublic m)
+                                    (not (Modifier/isStatic m))
                                     (= MongoClientOptions$Builder (.getReturnType f)))))
-        method-name (fn [^java.lang.reflect.Method f] (.getName f))
+        method-name (fn [^Method f] (.getName f))
         builder-call (fn [^MongoClientOptions$Builder m]
                        (eval (list 'fn '[o v]
                                    (list (symbol (str "." m)) 'o 'v))))
@@ -86,49 +82,46 @@
     (into {} method-lookups)))
 
 (defn mongo-options
-  "Return MongoClientOptions, populated by any specified options. e.g.,
-     (mongo-options :auto-connect-retry true)"
+  "Returns the `MongoClientOptions`, populated by any specified options,
+   e.g. `(mongo-options :auto-connect-retry true)`."
   [& options]
   (let [option-map (apply hash-map options)
         builder-call (fn [b [k v]]
                        (if-let [f (k builder-map)]
                          (f b v)
                          (throw (IllegalArgumentException.
-                                 (str k " is not a valid MongoClientOptions$Builder argument")))))]
+                                  (str k " is not a valid MongoClientOptions$Builder argument")))))]
     (.build ^MongoClientOptions$Builder (reduce builder-call (MongoClientOptions$Builder.) option-map))))
 
 (defn- make-server-address
-  "Convenience to make a ServerAddress without reflection warnings."
+  "Convenience to make a `ServerAddress` without reflection warnings."
   [^String host ^Integer port]
   (ServerAddress. host port))
 
-(defn- make-mongo-client
-  (^com.mongodb.MongoClient
-   [addresses credential ^MongoClientOptions options]
-   (if (pos? (count addresses))
-     (MongoClient. ^List addresses ^List [credential] options) ;; This usage is deprecated
-     (MongoClient. ^ServerAddress (first addresses)
-                   ^MongoCredential credential options)))
-
-  (^com.mongodb.MongoClient
-   [addresses ^MongoClientOptions options]
-    (if (> (count addresses) 1)
-      (MongoClient. ^List addresses options)
-      (MongoClient. ^ServerAddress (first addresses) options))))
+(defn- ^MongoClient make-mongo-client
+  ([addresses ^MongoCredential credential ^MongoClientOptions options]
+   (if (next addresses)
+     (MongoClient. ^List addresses credential options)
+     (MongoClient. ^ServerAddress (first addresses) credential options)))
+  ([addresses ^MongoClientOptions options]
+   (if (next addresses)
+     (MongoClient. ^List addresses options)
+     (MongoClient. ^ServerAddress (first addresses) options))))
 
 (defn- make-connection-args
-  "Makes a connection with passed database name, [{:host host, :port port}]
-  server addresses and MongoClientOptions.
+  "Makes a connection to MongoDB with the passed `db-name` (which may be `nil`) and optional params.
 
-  username, password, and optionally auth-source, may be supplied for authenticated connections."
-  [db {:keys [instances instance options ^String username ^String password] {auth-mechanism :mechanism auth-source :source} :auth-source}]
+   NOTE: The `username` and `password` must (and `auth-source` may) be supplied for authenticated connections.
+         When `auth-source` is omitted, the `db-name` becomes mandatory (for a DB where the user is defined)."
+  [^String db-name {:keys [instances instance options ^String username ^String password]
+                    {auth-mechanism :mechanism auth-source :source} :auth-source}]
   (when (not= (nil? username) (nil? password))
     (throw (IllegalArgumentException. "Username and password must both be supplied for authenticated connections")))
   (when (and instances instance)
-    (throw (IllegalArgumentException. "Only one of instances and instance can be supplied")))
+    (throw (IllegalArgumentException. "Only either `instances` or `instance` can be supplied, not both of them")))
 
   (let [addresses (map (fn [{:keys [host port] :or {host "127.0.0.1" port 27017}}]
-                        (make-server-address host port))
+                         (make-server-address host port))
                        (or instances
                            (when instance [instance])
                            [{:host "127.0.0.1" :port 27017}]))
@@ -152,62 +145,62 @@
                                         (throw (UnsupportedOperationException. (str auth-mechanism " is not supported.")))
 
                                         :else
-                                        (MongoCredential/createCredential username db (.toCharArray password))))
-
-        mongo (if credential
-                (make-mongo-client addresses credential options)
-                (make-mongo-client addresses options))
-
-        n-db (if db (.getDB mongo db) nil)]
-      {:mongo mongo :db n-db}))
+                                        (MongoCredential/createCredential username db-name (.toCharArray password))))
+        mongo-client (if credential
+                       (make-mongo-client addresses credential options)
+                       (make-mongo-client addresses options))]
+      {:mongo mongo-client
+       :db    (when db-name (.getDB mongo-client db-name))}))
 
 (defn- make-connection-uri
-  "Makes a connection with a Mongo URI, authenticating if username and password are passed"
-  [db]
-  (let [^MongoClientURI mongouri (MongoClientURI. db)
-        ^MongoClient client (MongoClient. mongouri)
-        ^String db (.getDatabase mongouri)
-        conn {:mongo client :db (.getDB client db)}]
-    conn))
+  "Makes a connection to MongoDB with the passed URI, authenticating if `username` and `password` are specified."
+  [^String uri]
+  (let [^MongoClientURI mongo-client-uri (MongoClientURI. uri)
+        ^MongoClient mongo-client (MongoClient. mongo-client-uri)
+        ^String db-name (.getDatabase mongo-client-uri)]
+    {:mongo mongo-client
+     :db    (when db-name (.getDB mongo-client db-name))}))
 
 (defn make-connection
-  "Connects to one or more mongo instances, returning a connection
-  that can be used with set-connection! and with-mongo.
+  "Connects to one or more MongoDB instances.
+   Returns a connection that can be used for `set-connection!` and `with-mongo`.
 
-  Each instance is a map containing values for :host and/or :port.
+   This fn accepts the following parameters:
 
-  May be called with database name and optionally:
-    :instance - a server instance to connect to
-    :instances - a list of server instances to connect to (deprecated)
-    :options - a MongoClientOptions object
-    :username - the username to authenticate with
-    :password - the password to authenticate with
-    :auth-source - the authentication source for authenticated connections in form:
-      {:mechanism mechanism :source source}
-      Supported authentication mechanisms:
-        :plain
-        :scram-1
-        :scram-256
+   1. A `db-name` (string, keyword, or symbol) for the database name, and an optional `args` map:
+      :instance    -> a MongoDB server instance to connect to
+      :instances   -> a list of server instances to connect to (DEPRECATED)
+      :options     -> a `MongoClientOptions` object with various settings to control
+                      the behavior of a created `MongoClient`
+      :username    -> the username to authenticate with
+      :password    -> the password to authenticate with
+      :auth-source -> the authentication source for authenticated connections in the form
+                      of a `{:mechanism <auth-mechanism>, :source <auth-source>}` map,
+                      where supported mechanisms = `:plain`, `:scram-1`, `:scram-256`.
 
-  If instances are not specified a connection is made to 127.0.0.1:27017
+      Each `instance` is a map containing values for `:host` and/or `:port`.
+      The default values are: for host — `127.0.0.1`, for port — `27017`.
+      If no instance is specified, a connection is made to a default one.
 
-  Username and password must be supplied for authenticated connections.
+      The `username` and `password` must (and `auth-source` may) be supplied for authenticated connections.
+      When `auth-source` is omitted, the `db-name` becomes mandatory (for a DB where the user is defined).
 
-  A MongoClientURI string is also supported and must be prefixed with mongodb://
-  or mongodb+srv://. If username and password are specified the connection will
-  be authenticated."
-  {:arglists '([db :instances [{:host host, :port port}]
-                   :options mongo-options
-                   :username username
-                   :password password
-                   :auth-source {:mechanism mechanism :source source}]
+   2. A `mongo-client-uri` (string) is also supported.
+      It must be prefixed with \"mongodb://\" or \"mongodb+srv://\" to be distinguishable from the DB name.
+
+      When a URI string is passed as the first parameter, the optional `args` are ignored.
+
+      If `username` and `password` are specified in the URI, the connection will be authenticated."
+  {:arglists '([db-name {:instance {:host host :port port} :instances instance+ :options mongo-options
+                     :username username :password password :auth-source {:mechanism mechanism :source source}}]
                [mongo-client-uri])}
-  [db & {:as args}]
-  (let [^String dbname (named db)]
-    (if (or (.startsWith dbname "mongodb://")
-            (.startsWith dbname "mongodb+srv://"))
-      (make-connection-uri dbname)
-      (make-connection-args dbname args))))
+  [db-name-or-mongo-client-uri & {:as args}]
+  ;; FIXME: The `named` doesn't always return a String. Drop the whole thing and use `clojure.core/name` here.
+  (let [^String str (named db-name-or-mongo-client-uri)]
+    (if (or (.startsWith str "mongodb://")
+            (.startsWith str "mongodb+srv://"))
+      (make-connection-uri str)
+      (make-connection-args str args))))
 
 (defn connection?
   "Returns truth if the argument is a map specifying an active connection."
@@ -385,7 +378,7 @@ When with-mongo and set-connection! interact, last one wins"
 
 (defn- named?
   [x]
-  (instance? clojure.lang.Named x))
+  (instance? Named x))
 
 (defn ->tagset
   [tag]
@@ -438,14 +431,14 @@ When with-mongo and set-connection! interact, last one wins"
     (.oplogReplay cursor true))
   (when notimeout
     (.noCursorTimeout cursor true)))
-(def set-options! set-cursor-options!)
+(def set-options! set-cursor-options!) ;; TODO: Backward compatibility. Remove later on?
 
 (defn fetch
   "Fetches objects from a collection.
    Note that MongoDB always adds the `_id` and `_ns` fields to objects returned from the database.
 
    Required parameters:
-   collection         -> the database collection
+   collection         -> the database collection name (string, keyword, or symbol)
 
    Optional parameters include:
    :one?               -> will result in `findOne` query (defaults to false, use `fetch-one` as a shortcut)
@@ -506,9 +499,9 @@ Please, use `fetch` with `:limit 1` instead.")))
       (throw (IllegalArgumentException. "The `fetch-one` doesn't support `options`, `explain?`, `limit`, or `hint`")))
     (when-not (or (nil? hint)
                   (string? hint)
-                  (and (instance? clojure.lang.Sequential hint)
+                  (and (instance? Sequential hint)
                        (every? #(or (keyword? %)
-                                    (and (instance? clojure.lang.Sequential %)
+                                    (and (instance? Sequential %)
                                          (= 2 (count %))
                                          (-> % first keyword?)
                                          (-> % second #{1 -1})))
@@ -717,20 +710,49 @@ Please, use `fetch` with `:limit 1` instead.")))
             [:mongo as])))
 
 (defn insert!
-  "Inserts a map into collection. Will not overwrite existing maps.
-   Takes optional from and to keyword arguments. To insert
-   as a side-effect only specify :to as nil."
-  {:arglists '([coll obj {:many false :from :clojure :to :clojure :write-concern nil}])}
-  [coll obj & {:keys [from to many write-concern]
-               :or {from :clojure to :clojure many false}}]
-  (let [coerced-obj (coerce obj [from :mongo] :many many)
-        list-obj (if many coerced-obj (list coerced-obj))
-        res (if write-concern
-              (if-let [wc (write-concern write-concern-map)]
-                (.insert ^DBCollection (get-coll coll) ^List list-obj ^WriteConcern wc)
-                (illegal-write-concern write-concern))
-              (.insert ^DBCollection (get-coll coll) ^List list-obj))]
-    (coerce coerced-obj [:mongo to] :many many)))
+  "Inserts document(s) into a collection.
+   If the collection does not exists on the server, then it will be created.
+   If the new document does not contain an '_id' field, it will be added. Will not overwrite existing documents.
+
+   Required parameters:
+   collection         -> the database collection
+   obj                -> a document or a collection/sequence of documents to insert
+
+   Optional parameters include:
+   :many?             -> whether this will insert multiple documents (default is `false`)
+   :as                -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from              -> arguments (`obj`) format (same default and options as for `:as`)
+   :write-concern     -> set the write concern (e.g. :normal, see the `write-concern-map` for available options)
+   :continue-on-error -> whether documents will continue to be inserted after a failure to insert one
+                         (most commonly due to a duplicate key error; default value is false)
+   :bypass-document-validation -> set the bypass document level validation flag
+   :encoder           -> set the encoder (of BSONObject to BSON)
+
+   NOTE: To insert as a side-effect only, specify `:as` as `nil`."
+  {:arglists '([collection obj {:many? false :as :clojure :from :clojure
+                 :write-concern nil :continue-on-error nil :bypass-document-validation nil :encoder nil}])}
+  [collection obj & {:keys [many? as from
+                            many to ;; TODO: For backward compatibility. Remove later.
+                            write-concern continue-on-error bypass-document-validation encoder]
+                     :or {many? false as :clojure from :clojure} :as params}]
+  (let [coerced-obj (coerce obj [from :mongo] :many (or many many?))
+        list-obj (if (or many many?) coerced-obj (list coerced-obj))]
+    (.insert ^DBCollection (get-coll collection)
+             ^List list-obj
+             ^InsertOptions
+             (let [opts (InsertOptions.)]
+               (when write-concern
+                 (if-let [wc (write-concern write-concern-map)]
+                   (.writeConcern opts ^WriteConcern wc)
+                   (illegal-write-concern write-concern)))
+               (when (boolean? continue-on-error)
+                 (.continueOnError opts ^boolean continue-on-error))
+               (when (boolean? bypass-document-validation)
+                 (.bypassDocumentValidation opts ^boolean bypass-document-validation))
+               (when (instance? DBEncoder encoder)
+                 (.dbEncoder opts ^DBEncoder encoder))
+               opts))
+    (coerce coerced-obj [:mongo (if (contains? params :to) to as)] :many many)))
 
 (defn mass-insert!
   {:arglists '([coll objs {:from :clojure :to :clojure}])}
@@ -744,7 +766,7 @@ Please, use `fetch` with `:limit 1` instead.")))
    a collection and a map with a valid `:_id` field.
 
    Required parameters:
-   collection     -> the database collection
+   collection     -> the database collection name (string, keyword, or symbol)
    query          -> the selection criteria for the update (a query map)
    update         -> the modifications to apply (a modifications map)
 
@@ -788,44 +810,80 @@ Please, use `fetch` with `:limit 1` instead.")))
                      opts))
           [:mongo as]))
 
-(defn fetch-and-modify
-  "Finds the first document in the query and updates it.
-   Parameters:
-       coll         -> the collection
-       where        -> query to match
-       update       -> update to apply
-       :only        -> fields to be returned
-       :sort        -> sort to apply before picking first document
-       :remove?     -> if true, document found will be removed
-       :return-new? -> if true, the updated document is returned,
-                       otherwise the old document is returned
-                       (or it would be lost forever)
-       :upsert?     -> do upsert (insert if document not present)
-       :max-time-ms -> set the maximum execution time for operations"
-  {:arglists '([collection where update {:only nil :sort nil :remove? false
-                                         :return-new? false :upsert? false :max-time-ms 0 :from :clojure :as :clojure}])}
-  [coll where update & {:as params}]
-  (let [{:keys [only sort remove? return-new? upsert? from as max-time-ms]}
-        (merge {:only nil :sort nil :remove? false
-                :return-new? false :upsert? false
-                :max-time-ms 0 :from :clojure :as :clojure}
+(defn fetch-and-modify!
+  "Atomically modifies and returns a single document.
+   Selects the first document matching the `query` and removes/updates it.
+   By default, the returned document does not include the modifications made on the update.
+
+   Required parameters:
+   collection          -> the database collection name (string, keyword, or symbol)
+   query               -> the selection criteria for the modification (a query map)
+   update              -> the modifications to apply to the selected document (a modifications map)
+
+   Optional parameters include:
+   :remove?            -> if `true`, removes the selected document
+   :return-new?        -> if `true`, returns the modified document rather than the original
+   :upsert?            -> if `true`, operation creates a new document if the query returns no documents
+   :as                 -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from               -> arguments (`query`, `update`, `sort`) format (same default/options as for `:as`)
+   :only               -> `projection`; a subset of fields to return for the selected document (an array of keys)
+   :sort               -> determines which document will be modified if the query selects multiple documents
+   :bypass-document-validation -> set the bypass document level validation flag
+   :max-time-ms        -> set the maximum server execution time for this operation (default is `0`, no limit)
+   :write-concern      -> set the write concern (e.g. :normal, see the `write-concern-map` for available options)
+   :collation          -> set the collation
+   :array-filters      -> set the array filters option
+
+   NOTE: An `update` parameter cannot be `nil` unless is passed along with the `:remove? true`."
+  {:arglists
+   '([collection query update {:as :clojure :from :clojure :remove? false :return-new? false :upsert? false
+                          :only nil :sort nil :bypass-document-validation nil :max-time-ms nil :write-concern nil
+                          :collation nil :array-filters nil}])}
+  [collection query update & {:as params}]
+  (let [{:keys [as from remove? return-new? upsert? only sort
+                bypass-document-validation max-time-ms write-concern collation array-filters]}
+        (merge {:as :clojure :from :clojure :remove? false :return-new? false :upsert? false
+                :only nil :sort nil :max-time-ms 0}
                *default-query-options*
                params)]
-      (coerce (.findAndModify ^DBCollection (get-coll coll)
-                              ^DBObject (coerce where [from :mongo])
-                              ^DBObject (coerce-fields only)
-                              ^DBObject (coerce sort [from :mongo])
-                              remove?
-                              ^DBObject (coerce update [from :mongo])
-                              return-new? upsert?
-                              max-time-ms TimeUnit/MILLISECONDS) [:mongo as])))
-
+    (coerce (.findAndModify ^DBCollection (get-coll collection)
+                            ^DBObject (coerce query [from :mongo])
+                            ^DBCollectionFindAndModifyOptions
+                            (let [opts (DBCollectionFindAndModifyOptions.)]
+                              (when update
+                                (.update opts ^DBObject (coerce update [from :mongo])))
+                              (when (boolean? remove?)
+                                (.remove opts ^boolean remove?))
+                              (when (boolean? return-new?)
+                                (.returnNew opts ^boolean return-new?))
+                              (when (boolean? upsert?)
+                                (.upsert opts ^boolean upsert?))
+                              (when only
+                                (.projection opts ^DBObject (coerce-fields only)))
+                              (when sort
+                                (.sort opts ^DBObject (coerce sort [from :mongo])))
+                              (when (boolean? bypass-document-validation)
+                                (.bypassDocumentValidation opts ^boolean bypass-document-validation))
+                              (when (int? max-time-ms)
+                                (.maxTime opts ^long max-time-ms TimeUnit/MILLISECONDS))
+                              (when write-concern
+                                (if-let [wc (write-concern write-concern-map)]
+                                  (.writeConcern opts ^WriteConcern wc)
+                                  (illegal-write-concern write-concern)))
+                              (when (instance? Collation collation)
+                                (.collation opts ^Collation collation))
+                              (when array-filters
+                                (let [coerced-af (coerce array-filters [:clojure :mongo] :many true)]
+                                  (.arrayFilters opts ^List coerced-af)))
+                              opts))
+            [:mongo as])))
+(def fetch-and-modify fetch-and-modify!) ;; TODO: Backward compatibility. Remove later on?
 
 (defn destroy!
   "Removes map from a collection.
 
    Required parameters:
-   collection     -> the database collection
+   collection     -> the database collection name (string, keyword, or symbol)
    query          -> the deletion criteria using query operators (a query map),
                      omit or pass an empty `query` to delete all documents in the collection
 
@@ -927,17 +985,36 @@ Please, use `fetch` with `:limit 1` instead.")))
      :result (coerce cursor [:mongo to] :many true)
      :ok 1.0}))
 
-(defn command
-  "Executes a database command."
-  {:arglists '([cmd {:options nil :from :clojure :to :clojure}])}
-  [cmd & {:keys [options from to]
-          :or {options nil from :clojure to :clojure}}]
+(defn command!
+  "Executes a database command.
+
+   The MongoDB command interface provides access to all non CRUD database operations: authentication;
+   user, role and session management; replication and sharding; database administration, diagnostics
+   and auditing — are all accomplished with commands. All \"User Commands\" are supported as well.
+   See [Database Commands](https://docs.mongodb.com/manual/reference/command/) for the full list.
+
+   Required parameters:
+   cmd              -> a string representation of the command to be executed
+
+   Optional parameters include:
+   :as              -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from            -> arguments (`cmd`) format (same default and options as for `:as`)
+   :read-preference -> set the read preference (e.g. :primary or ReadPreference instance);
+                       determines where to execute the given command; this will only be applied
+                       for a subset of commands (see the `DB#getCommandReadPreference`)
+   :encoder         -> set the encoder that knows how to serialise the command"
+  {:arglists '([cmd {:as :clojure :from :clojure :read-preference nil :encoder nil}])}
+  [cmd & {:keys [as from read-preference encoder
+                 to] ;; TODO: For backward compatibility. Remove later.
+          :or {as :clojure from :clojure} :as params}]
   (let [db (get-db *mongo-config*)
-        coerced ^DBObject (coerce cmd [from :mongo])]
-    (coerce (if options
-              (.command db coerced (int options))
-              (.command db coerced))
-            [:mongo to])))
+        r-preference (or read-preference (.getReadPreference db))]
+    (coerce (.command db
+                      ^DBObject (coerce cmd [from :mongo])
+                      ^ReadPreference r-preference
+                      ^DBEncoder encoder)
+            [:mongo (if (contains? params :to) to as)])))
+(def command command!)
 
 (defn drop-database!
  "drops a database from the mongo server"
