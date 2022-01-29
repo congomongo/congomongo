@@ -992,7 +992,8 @@ Please, use `fetch` with `:limit 1` instead.")))
   {:arglists '([collection op & ops {:as :clojure :from :clojure :read-preference nil :batch-size nil
                       :allow-disk-use? nil :max-time-ms nil :bypass-document-validation? nil :collation nil}])}
   [collection op & ops-and-params]
-  (let [[ops params] (split-with (complement keyword?) ops-and-params)
+  (let [[ops params-seq] (split-with (complement keyword?) ops-and-params)
+        params (apply hash-map params-seq)
         {:keys [as from
                 to ;; TODO: For backward compatibility. Remove later.
                 read-preference batch-size allow-disk-use? max-time-ms bypass-document-validation? collation]
