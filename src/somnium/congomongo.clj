@@ -31,7 +31,8 @@
                         DB DBCollection DBObject DBRef DBCursor CursorType
                         ServerAddress ReadPreference ReadConcern WriteConcern
                         AggregationOptions
-                        MapReduceCommand MapReduceCommand$OutputType
+                        MapReduceCommand MapReduceCommand$OutputType MapReduceOutput
+                        Tag TagSet
                         InsertOptions DBEncoder]
            [com.mongodb.client.model DBCollectionUpdateOptions
                                      DBCollectionCountOptions
@@ -40,7 +41,7 @@
                                      DBCollectionDistinctOptions
                                      DBCollectionFindAndModifyOptions
                                      Collation]
-           [com.mongodb.gridfs GridFS]
+           [com.mongodb.gridfs GridFS GridFSDBFile GridFSInputFile]
            [org.bson.types ObjectId]
            [java.lang.reflect Method Modifier]
            [java.util List]
@@ -409,16 +410,17 @@
   (throw (IllegalArgumentException. (str read-concern " is not a valid ReadConcern alias"))))
 
 
-;; fns for manipulating `ObjectId`s
+;; ObjectId-related conveniences
 
 (definline object-id ^ObjectId [^String s]
   `(ObjectId. ~s))
 
-;; Make ObjectIds printable under *print-dup*, hiding the
-;; implementation-dependent ObjectId class
-(defmethod print-dup ObjectId [^ObjectId x ^java.io.Writer w]
+;; Make ObjectIds printable under *print-dup*,
+;; hiding the implementation-dependent ObjectId class
+(defmethod print-dup ObjectId [^ObjectId x ^Writer w]
   (.write w (str "#=" `(object-id ~(.toString x)))))
 
+;; TODO: The called method was DEPRECATED. Drop it while providing a substitution?
 (defn get-timestamp
   "Pulls the timestamp from an `ObjectId` or a map with a valid `ObjectId` in `:_id`."
   [obj]
@@ -439,9 +441,9 @@
 (defn ->tagset
   [tag]
   (letfn [(->tag [[k v]]
-            (com.mongodb.Tag. (if (named? k) (name k) (str k))
-                              (if (named? v) (name v) (str v))))]
-    (com.mongodb.TagSet. ^List (map ->tag tag))))
+            (Tag. (if (named? k) (name k) (str k))
+                  (if (named? v) (name v) (str v))))]
+    (TagSet. ^List (map ->tag tag))))
 
 (defn read-preference
   "Creates a ReadPreference from an alias and optional tag sets. Valid aliases are
@@ -475,7 +477,7 @@
   (.getReadPreference (get-coll collection)))
 
 
-;; eager fetching utilities
+;; DBRef-related & eager fetching conveniences
 
 (defn db-ref
   "Convenience `DBRef` constructor."
@@ -507,7 +509,9 @@
 
 ;; collection operations
 
-(defn set-cursor-options!
+;; - fetches
+
+(defn- set-cursor-options!
   "Sets the options on the cursor"
   [^DBCursor cursor {:keys [tailable secondary-preferred slaveok oplog notimeout awaitdata]}]
   (when tailable
@@ -736,6 +740,8 @@ Please, use `fetch` with `:limit 1` instead.")))
 (defn fetch-by-ids [col ids & options]
   (apply fetch col (concat options [:where {:_id {:$in ids}}])))
 
+;; - distinct values
+
 (defn distinct-values
   "Finds the distinct values for a specified field across a collection.
    Returns a vector of these values, possibly formatted (according to the `:as` param logic).
@@ -778,6 +784,8 @@ Please, use `fetch` with `:limit 1` instead.")))
                            (.collation opts ^Collation collation))
                          opts))
             [:mongo as])))
+
+;; - inserts
 
 (defn insert!
   "Inserts document(s) into a collection.
@@ -829,6 +837,8 @@ Please, use `fetch` with `:limit 1` instead.")))
   [coll objs & {:keys [from to write-concern]
                 :or {from :clojure to :clojure}}]
   (insert! coll objs :from from :to to :many true :write-concern write-concern))
+
+;; - updates
 
 (defn update!
   "Alters/inserts a map in a collection. Overwrites existing objects.
@@ -949,6 +959,8 @@ Please, use `fetch` with `:limit 1` instead.")))
             [:mongo as])))
 (def fetch-and-modify fetch-and-modify!) ;; TODO: Backward compatibility. Remove later on?
 
+;; - destroys
+
 (defn destroy!
   "Removes map from a collection.
 
@@ -978,6 +990,8 @@ Please, use `fetch` with `:limit 1` instead.")))
              (when (instance? Collation collation)
                (.collation opts ^Collation collation))
              opts)))
+
+;; - aggregations
 
 (defn aggregate
   "Executes a pipeline of operations using the Aggregation Framework.
@@ -1105,9 +1119,9 @@ Please, use `fetch` with `:limit 1` instead.")))
   [bucket]
   `(GridFS. (get-db *mongo-config*) ^String (named ~bucket)))
 
-;; TODO: question: keep the camelCase keyword for :contentType?
 ;; The naming of :contentType is ugly, but consistent with that
 ;; returned by GridFSFile
+;; TODO: Rename the `:contentType` to `:content-type` acc. to Clojure naming conventions.
 (defn insert-file!
   "Insert file data into a GridFS. Data should be either a File,
    InputStream or byte array.
@@ -1119,7 +1133,7 @@ Please, use `fetch` with `:limit 1` instead.")))
   {:arglists '([fs data {:filename nil :contentType nil :metadata nil}])}
   [fs data & {:keys [^String filename ^String contentType ^DBObject metadata _id]
               :or {filename nil contentType nil metadata nil _id nil}}]
-  (let [^com.mongodb.gridfs.GridFSInputFile f (.createFile ^GridFS (get-gridfs fs) data)]
+  (let [^GridFSInputFile f (.createFile ^GridFS (get-gridfs fs) data)]
     (if filename (.setFilename f ^String filename))
     (if contentType (.setContentType f contentType))
     (if metadata (.setMetaData f (coerce metadata [:clojure :mongo])))
@@ -1164,7 +1178,7 @@ Please, use `fetch` with `:limit 1` instead.")))
    should be either an OutputStream, File, or the String path for a file."
   [fs file out]
   ;; since .findOne is overloaded and coerce returns different types, we cannot remove the reflection warning:
-  (if-let [^com.mongodb.gridfs.GridFSDBFile f (.findOne ^GridFS (get-gridfs fs) ^DBObject (coerce file [:clojure :mongo]))]
+  (if-let [^GridFSDBFile f (.findOne ^GridFS (get-gridfs fs) ^DBObject (coerce file [:clojure :mongo]))]
     ;; since .writeTo is overloaded and we can pass different types, we cannot remove the reflection warning:
     (.writeTo f out)))
 
@@ -1172,8 +1186,11 @@ Please, use `fetch` with `:limit 1` instead.")))
   "Returns an InputStream from the GridFS file specified"
   [fs file]
   ;; since .findOne is overloaded and coerce returns different types, we cannot remove the reflection warning:
-  (if-let [^com.mongodb.gridfs.GridFSDBFile f (.findOne ^GridFS (get-gridfs fs) ^DBObject (coerce file [:clojure :mongo]))]
+  (if-let [^GridFSDBFile f (.findOne ^GridFS (get-gridfs fs) ^DBObject (coerce file [:clojure :mongo]))]
     (.getInputStream f)))
+
+
+;; Map-Reduce
 
 (defn- mapreduce-type
   [k]
@@ -1203,18 +1220,22 @@ Please, use `fetch` with `:limit 1` instead.")))
 
   Optional Arguments
   :out-from    -> indicates what form the out parameter is specified in (:clojure, :json, or :mongo).  Defaults to :clojure.
-  :query       -> a query map against collection; if this is specified, the map-reduce job is run on the result of this query instead of on the collection as a whole.
+  :query       -> a query map against collection; if this is specified, the map-reduce job is run on the result of this query
+                  instead of on the collection as a whole.
   :query-from  -> if query is supplied, specifies what form it is in (:clojure, :json, or :mongo).  Defaults to :clojure.
   :sort        -> if you want query sorted (for optimization), specify a map of sort clauses here.
   :sort-from   -> if sort is supplied, specifies what form it is in (:clojure, :json, or :mongo).  Defaults to :clojure.
-  :limit       -> the number of objects to return from a query collection (defaults to 0; that is, everything).  This pertains to query, NOT the result of the overall map-reduce job!
-  :finalize    -> a finalizaton function (JavaScript, as a String).  Should take two arguments: a key and a single value (not an array of values).
-  :scope       -> a scope object; variables in the object will be available in the global scope of map, reduce, and finalize functions.
+  :limit       -> the number of objects to return from a query collection (defaults to 0; that is, everything).
+                  This pertains to query, NOT the result of the overall map-reduce job!
+  :finalize    -> a finalization function (JavaScript, as a String).  Should take two arguments: a key and a single value
+                  (not an array of values).
+  :scope       -> a scope object; variables in the object will be available in the global scope of map, reduce, and finalize fns.
   :scope-from  -> if scope is supplied, specifies what form it is in (:clojure, :json, or :mongo).  Defaults to :clojure.
-  :output      -> if you want the resulting documents from the map-reduce job, specify :documents; otherwise, if you want the name of the result collection as a keyword, specify :collection.
-                  Defaults to :documents.  If the value of 'out' is {:inline 1}, you will get documents, regardless of what you actually put here.
-  :as          -> if :output is set to :documents, determines the form the results take (:clojure, :json, or :mongo) (has no effect if :output is set to :collection; that is always returned as a Clojure keyword).
-"
+  :output      -> if you want the resulting documents from the map-reduce job, specify :documents; otherwise, if you want
+                  the name of the result collection as a keyword, specify :collection.  Defaults to :documents.
+                  If the value of 'out' is {:inline 1}, you will get documents, regardless of what you actually put here.
+  :as          -> if :output is set to :documents, determines the form the results take (:clojure, :json, or :mongo)
+                  (has no effect if :output is set to :collection; that is always returned as a Clojure keyword)"
   {:arglists
    '([collection mapfn reducefn out :out-from :query :query-from :sort :sort-from :limit :finalize :scope :scope-from :output :as])}
   [collection mapfn reducefn out & {:keys [out-from query query-from sort sort-from limit finalize scope scope-from output as]
@@ -1250,7 +1271,7 @@ Please, use `fetch` with `:limit 1` instead.")))
     (when scope
       (.setScope mr-command (coerce scope [scope-from :mongo])))
 
-    (let [^com.mongodb.MapReduceOutput result (.mapReduce (get-coll collection) mr-command)]
+    (let [^MapReduceOutput result (.mapReduce (get-coll collection) mr-command)]
       (if (or (= output :documents)
               (= (coerce out [out-from :clojure])
                  {:inline 1}))
