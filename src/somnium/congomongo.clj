@@ -56,6 +56,11 @@
   Object
   (named [s] s))
 
+(defn- named? [x]
+  (instance? Named x))
+
+
+;; the `make-connection` and helpers
 
 (defn- field->kw
   "Convert camelCase identifier string to hyphen-separated keyword."
@@ -202,21 +207,26 @@
       (make-connection-uri str)
       (make-connection-args str args))))
 
+
+;; connection-related fns
+
 (defn connection?
-  "Returns truth if the argument is a map specifying an active connection."
+  "Returns `true` if the argument is a map specifying an active connection.
+   Otherwise, returns `false`."
   [x]
-  (and (map? x)
-       (contains? x :db)
-       (:mongo x)))
+  (boolean (and (map? x)
+                (contains? x :db)
+                (:mongo x))))
 
 (defn ^DB get-db
-  "Returns the current connection. Throws exception if there isn't one."
+  "Returns a `DB` object for the passed connection.
+   Throws exception if there isn't one."
   [conn]
   (assert (connection? conn))
   (:db conn))
 
 (defn close-connection
-  "Closes the connection, and unsets it as the active connection if necessary"
+  "Closes the `conn` and unsets it as the active connection if necessary."
   [conn]
   (assert (connection? conn))
   (if (= conn *mongo-config*)
@@ -225,47 +235,121 @@
       (alter-var-root #'*mongo-config* (constantly nil))))
   (.close ^MongoClient (:mongo conn)))
 
-(defmacro with-mongo
-  "Makes conn the active connection in the enclosing scope.
-
-  When with-mongo and set-connection! interact, last one wins"
-  [conn & body]
-  `(do
-     (let [c# ~conn]
-       (assert (connection? c#))
-       (binding [*mongo-config* c#]
-         ~@body))))
-
-(defmacro with-db
-  "Make dbname the active database in the enclosing scope.
-
-  When with-db and set-database! interact, last one wins."
-  [dbname & body]
-  `(let [^DB db# (.getDB ^MongoClient (:mongo *mongo-config*) (name ~dbname))]
-     (binding [*mongo-config* (assoc *mongo-config* :db db#)]
-       ~@body)))
-
-(defmacro with-default-query-options
-  [options & body]
-  `(do
-     (binding [*default-query-options* ~options]
-       ~@body)))
-
 (defn set-connection!
-  "Makes the connection active. Takes a connection created by make-connection.
+  "Makes the passed `connection` an active one.
+   Takes a connection created by the `make-connection`.
 
-When with-mongo and set-connection! interact, last one wins"
+   NOTE: When `with-mongo` and `set-connection!` interact, last one wins."
   [connection]
   (alter-var-root #'*mongo-config*
                   (constantly connection)
                   (when (thread-bound? #'*mongo-config*)
                     (set! *mongo-config* connection))))
 
+
+;; database-related fns
+
+(defn databases
+  "Lists database names on the MongoDB server."
+  []
+  (seq (.listDatabaseNames ^MongoClient (:mongo *mongo-config*))))
+
+(defn drop-database!
+  "Drops a database from the MongoDB server."
+  [db-name]
+  (when-some [db (.getDB ^MongoClient (:mongo *mongo-config*)
+                         ^String (named db-name))]
+    (.dropDatabase db)))
+
+(defn set-database!
+  "Atomically alters the current database."
+  [db-name]
+  (if-let [db (.getDB ^MongoClient (:mongo *mongo-config*)
+                      ^String (named db-name))]
+    (alter-var-root #'*mongo-config* merge {:db db})
+    (throw (RuntimeException.
+             (str "database with name " db-name " does not exist.")))))
+
+
+;; handy scoping macros
+
+(defmacro with-mongo
+  "Makes the passed `connection` an active one in the enclosing scope.
+
+   NOTE: When `with-mongo` and `set-connection!` interact, last one wins."
+  [connection & body]
+  `(let [conn# ~connection]
+     (assert (connection? conn#))
+     (binding [*mongo-config* conn#]
+       ~@body)))
+
+(defmacro with-db
+  "Makes the `db-name` an active database in the enclosing scope.
+
+   NOTE: When `with-db` and `set-database!` interact, last one wins."
+  [db-name & body]
+  `(let [^DB db# (.getDB ^MongoClient (:mongo *mongo-config*)
+                         (name ~db-name))]
+     (binding [*mongo-config* (assoc *mongo-config* :db db#)]
+       ~@body)))
+
+;; TODO: Introduce these `*default-query-options*` overrides to other fns.
+(defmacro with-default-query-options
+  "Sets `options` as the default query options in the enclosing scope.
+
+   These options override a function-specific default parameter values,
+   but get overridden themselves by the params passed to a function.
+
+   NOTE: So far, only `fetch` and `fetch-and-modify` fns support these options."
+  [options & body]
+  `(binding [*default-query-options* ~options]
+     ~@body))
+
+
+;; collections-related fns
+
 (definline ^DBCollection get-coll
   "Returns a DBCollection object"
   [collection]
   `(.getCollection (get-db *mongo-config*)
      ^String (named ~collection)))
+
+(defn collections
+  "Returns the set of collections stored in the current database"
+  []
+  (seq (.getCollectionNames (get-db *mongo-config*))))
+
+(defn drop-coll!
+  [collection]
+  "Permanently deletes a collection. Use with care."
+  (.drop ^DBCollection (.getCollection (get-db *mongo-config*)
+                                       ^String (named collection))))
+
+(defn collection-exists?
+  "Query whether the named collection has been created within the DB."
+  [collection]
+  (.collectionExists (get-db *mongo-config*)
+                     ^String (named collection)))
+
+(defn create-collection!
+  "Explicitly create a collection with the given name, which must not already exist.
+
+   Most users will not need this function, and will instead allow
+   MongoDB to implicitly create collections when they are written
+   to. This function exists primarily to allow the creation of capped
+   collections, and so supports the following keyword arguments:
+
+   :capped -> boolean: if the collection is capped
+   :size   -> int: collection size (in bytes)
+   :max    -> int: max number of documents."
+  {:arglists '([collection {:capped false :size 0 :max 0}])}
+  [collection & {:as options}]
+  (.createCollection (get-db *mongo-config*)
+                     ^String (named collection)
+                     (coerce options [:clojure :mongo])))
+
+
+;; write concerns
 
 (def write-concern-map
   {:acknowledged         WriteConcern/ACKNOWLEDGED
@@ -309,6 +393,9 @@ When with-mongo and set-connection! interact, last one wins"
   [write-concern]
   (throw (IllegalArgumentException. (str write-concern " is not a valid WriteConcern alias"))))
 
+
+;; read concerns
+
 (def read-concern-map
   {:default      ReadConcern/DEFAULT
    :local        ReadConcern/LOCAL
@@ -321,7 +408,9 @@ When with-mongo and set-connection! interact, last one wins"
   [read-concern]
   (throw (IllegalArgumentException. (str read-concern " is not a valid ReadConcern alias"))))
 
-;; add some convenience fns for manipulating object-ids
+
+;; fns for manipulating `ObjectId`s
+
 (definline object-id ^ObjectId [^String s]
   `(ObjectId. ~s))
 
@@ -331,42 +420,13 @@ When with-mongo and set-connection! interact, last one wins"
   (.write w (str "#=" `(object-id ~(.toString x)))))
 
 (defn get-timestamp
-  "Pulls the timestamp from an ObjectId or a map with a valid ObjectId in :_id."
+  "Pulls the timestamp from an `ObjectId` or a map with a valid `ObjectId` in `:_id`."
   [obj]
   (when-let [^ObjectId id (if (instance? ObjectId obj) obj (:_id obj))]
     (.getTime id)))
 
-(defn db-ref
-  "Convenience DBRef constructor."
-  [ns id]
-  (DBRef. ^String (named ns)
-          ^Object id))
 
-(defn db-ref? [x]
-  (instance? DBRef x))
-
-(defn collection-exists?
-  "Query whether the named collection has been created within the DB."
-  [collection]
-  (.collectionExists (get-db *mongo-config*)
-                     ^String (named collection)))
-(defn create-collection!
-  "Explicitly create a collection with the given name, which must not already exist.
-
-   Most users will not need this function, and will instead allow
-   MongoDB to implicitly create collections when they are written
-   to. This function exists primarily to allow the creation of capped
-   collections, and so supports the following keyword arguments:
-
-   :capped -> boolean: if the collection is capped
-   :size   -> int: collection size (in bytes)
-   :max    -> int: max number of documents."
-  {:arglists
-   '([collection :capped :size :max])}
-  [collection & {:keys [capped size max] :as options}]
-  (.createCollection (get-db *mongo-config*)
-                     ^String (named collection)
-                     (coerce options [:clojure :mongo])))
+;; read preferences
 
 (def ^:private read-preference-map
   "Private map of factory functions of ReadPreferences to aliases."
@@ -375,10 +435,6 @@ When with-mongo and set-connection! interact, last one wins"
    :primary-preferred (fn primary-preferred ([] (ReadPreference/primaryPreferred)) ([^List tags] (ReadPreference/primaryPreferred tags)))
    :secondary (fn secondary ([] (ReadPreference/secondary)) ([^List tags] (ReadPreference/secondary tags)))
    :secondary-preferred (fn secondary-preferred ([] (ReadPreference/secondaryPreferred)) ([^List tags] (ReadPreference/secondaryPreferred tags)))})
-
-(defn- named?
-  [x]
-  (instance? Named x))
 
 (defn ->tagset
   [tag]
@@ -417,6 +473,39 @@ When with-mongo and set-connection! interact, last one wins"
   "Returns the currently set read preference for a collection"
   [collection]
   (.getReadPreference (get-coll collection)))
+
+
+;; eager fetching utilities
+
+(defn db-ref
+  "Convenience `DBRef` constructor."
+  [ns id]
+  (DBRef. ^String (named ns)
+          ^Object id))
+
+(defn db-ref? [x]
+  (instance? DBRef x))
+
+(defn with-ref-fetching
+  "Returns a decorated fetcher fn which eagerly loads `db-ref`s."
+  [fetcher]
+  (fn [& args]
+    (let [as (or (second (drop-while (partial not= :as) args))
+                 :clojure)
+          f  (fn [[k v]]
+               [k (if (db-ref? v)
+                    (let [v ^DBRef v
+                          coll (get-coll (.getCollectionName v))]
+                      (coerce (.findOne coll (.getId v)) [:mongo as]))
+                    v)])]
+      (postwalk (fn [x]
+                  (if (map? x)
+                    (into {} (map f x))
+                    x))
+                (apply fetcher args)))))
+
+
+;; collection operations
 
 (defn set-cursor-options!
   "Sets the options on the cursor"
@@ -641,30 +730,11 @@ Please, use `fetch` with `:limit 1` instead.")))
 (defn fetch-count [col & options]
   (apply fetch col (concat options '[:count? true])))
 
-;; add fetch-by-id fn
 (defn fetch-by-id [col id & options]
   (apply fetch col (concat options [:one? true :where {:_id id}])))
 
 (defn fetch-by-ids [col ids & options]
   (apply fetch col (concat options [:where {:_id {:$in ids}}])))
-
-(defn with-ref-fetching
-  "Returns a decorated fetcher fn which eagerly loads db-refs."
-  [fetcher]
-  (fn [& args]
-    (let [as (or (second (drop-while (partial not= :as) args))
-                 :clojure)
-          f  (fn [[k v]]
-               [k (if (db-ref? v)
-                    (let [v ^DBRef v
-                          coll (get-coll (.getCollectionName v))]
-                      (coerce (.findOne coll (.getId v)) [:mongo as]))
-                    v)])]
-      (postwalk (fn [x]
-                  (if (map? x)
-                    (into {} (map f x))
-                    x))
-                (apply fetcher args)))))
 
 (defn distinct-values
   "Finds the distinct values for a specified field across a collection.
@@ -909,62 +979,6 @@ Please, use `fetch` with `:limit 1` instead.")))
                (.collation opts ^Collation collation))
              opts)))
 
-(defn add-index!
-  "Adds an index on the collection for the specified fields if it does not exist.  Ordering of fields is
-   significant; an index on [:a :b] is not the same as an index on [:b :a].
-
-   By default, all fields are indexed in ascending order.  To index a field in descending order, specify it as
-   a vector with a direction signifier (i.e., -1), like so:
-
-   [:a [:b -1] :c]
-
-   This will generate an index on:
-
-      :a ascending, :b descending, :c ascending
-
-   Similarly, [[:a 1] [:b -1] :c] will generate the same index (\"1\" indicates ascending order, the default).
-
-    Options include:
-    :name   -> defaults to the system-generated default
-    :unique -> defaults to false
-    :sparse -> defaults to false
-    :background -> defaults to false
-    :partial-filter-expression -> defauls to no filter expression"
-   {:arglists '([collection fields {:name nil :unique false :sparse false :partial-filter-expression nil}])}
-   [c f & {:keys [name unique sparse background partial-filter-expression]
-           :or {name nil unique false sparse false background false}}]
-   (-> (get-coll c)
-       (.createIndex (coerce-index-fields f) ^DBObject (coerce (merge {:unique unique :sparse sparse :background background}
-                                                                       (if name {:name name})
-                                                                       (if partial-filter-expression
-                                                                         {:partialFilterExpression partial-filter-expression}))
-                                                                [:clojure :mongo]))))
-(defn drop-index!
-  "Drops an index on the collection for the specified fields.
-
-  `index` may be a vector representing the key(s) of the index (see somnium.congomongo/add-index! for the
-  expected format).  It may also be a String or Keyword, in which case it is taken to be the name of the
-  index to be deleted.
-
-  Due to how the underlying MongoDB driver works, if you defined an index with a custom name, you *must*
-  delete the index using that name, and not the keys."
-  [coll index]
-  (if (vector? index)
-    (.dropIndex (get-coll coll) (coerce-index-fields index))
-    (.dropIndex (get-coll coll) ^String (coerce index [:clojure :mongo]))))
-
-(defn drop-all-indexes!
-  "Drops all indexes from a collection"
-  [coll]
-  (.dropIndexes (get-coll coll)))
-
-(defn get-indexes
-  "Get index information on collection"
-  {:arglists '([collection :as (:clojure)])}
-   [coll & {:keys [as]
-            :or {as :clojure}}]
-   (map #(into {} %) (.getIndexInfo (get-coll coll))))
-
 (defn aggregate
   "Executes a pipeline of operations using the Aggregation Framework.
    Returns map {:serverUsed ... :result ... :ok ...}
@@ -984,6 +998,9 @@ Please, use `fetch` with `:limit 1` instead.")))
     {:serverUsed (.toString (.getServerAddress cursor))
      :result (coerce cursor [:mongo to] :many true)
      :ok 1.0}))
+
+
+;; database commands
 
 (defn command!
   "Executes a database command.
@@ -1016,42 +1033,79 @@ Please, use `fetch` with `:limit 1` instead.")))
             [:mongo (if (contains? params :to) to as)])))
 (def command command!)
 
-(defn drop-database!
- "drops a database from the mongo server"
- [title]
- (.dropDatabase ^MongoClient (:mongo *mongo-config*) ^String (named title)))
 
-(defn set-database!
-  "atomically alters the current database"
-  [title]
-  (if-let [db (.getDB ^MongoClient (:mongo *mongo-config*) ^String (named title))]
-    (alter-var-root #'*mongo-config* merge {:db db})
-    (throw (RuntimeException. (str "database with title " title " does not exist.")))))
+;; collection indexes
 
-;;;; go ahead and have these return seqs
+(defn get-indexes
+  "Get indexes information on a collection."
+  {:arglists '([collection :as (:clojure)])}
+  [coll & {:keys [as]
+           :or {as :clojure}}]
+  (map #(into {} %) (.getIndexInfo (get-coll coll))))
 
-(defn databases
-  "List databases on the mongo server" []
-  (seq (.getDatabaseNames ^MongoClient (:mongo *mongo-config*))))
+(defn add-index!
+  "Adds an index on the collection for the specified fields if it does not exist.
+   Ordering of fields is significant; an index on `[:a :b]` is not the same as an index on `[:b :a]`.
 
-(defn collections
-  "Returns the set of collections stored in the current database" []
-  (seq (.getCollectionNames (get-db *mongo-config*))))
+   By default, all fields are indexed in ascending order. To index a field in descending order,
+   specify it as a vector with a direction signifier (i.e. `-1`), like so:
 
-(defn drop-coll!
-  [collection]
-  "Permanently deletes a collection. Use with care."
-  (.drop ^DBCollection (.getCollection (get-db *mongo-config*)
-                                       ^String (named collection))))
+   `[:a [:b -1] :c]`
 
-;;;; GridFS, contributed by Steve Purcell
-;;;; question: keep the camelCase keyword for :contentType ?
+   This will generate an index on:
+
+   `:a ascending, :b descending, :c ascending`
+
+   Similarly, `[[:a 1] [:b -1] :c]` will generate the same index (`1` indicates ascending order,
+   the default).
+
+   Optional parameters include:
+   :name                      -> defaults to the system-generated default
+   :unique                    -> defaults to `false`
+   :sparse                    -> defaults to `false`
+   :background                -> defaults to `false`
+   :partial-filter-expression -> defaults to no filter expression"
+  {:arglists '([collection fields {:name nil :unique false :sparse false :partial-filter-expression nil}])}
+  [c f & {:keys [name unique sparse background partial-filter-expression]
+          :or {name nil unique false sparse false background false}}]
+  (-> (get-coll c)
+      (.createIndex (coerce-index-fields f)
+                    ^DBObject
+                    (coerce (merge {:unique unique :sparse sparse :background background}
+                                   (if name {:name name})
+                                   (if partial-filter-expression
+                                     {:partialFilterExpression partial-filter-expression}))
+                            [:clojure :mongo]))))
+
+(defn drop-index!
+  "Drops an index on the collection for the specified fields.
+
+   The `index` may be a vector representing the key(s) of the index (see `somnium.congomongo/add-index!`
+   for the expected format).
+
+   It may also be a string/keyword, in which case it is taken to be the name of the index to be dropped.
+
+   Due to how the underlying MongoDB driver works, if you defined an index with a custom name, you MUST
+   delete the index using that name, and not the keys."
+  [coll index]
+  (if (vector? index)
+    (.dropIndex (get-coll coll) (coerce-index-fields index))
+    (.dropIndex (get-coll coll) ^String (coerce index [:clojure :mongo]))))
+
+(defn drop-all-indexes!
+  "Drops all indexes on the collection."
+  [coll]
+  (.dropIndexes (get-coll coll)))
+
+
+;; GridFS (contributed by Steve Purcell)
 
 (definline ^GridFS get-gridfs
   "Returns a GridFS object for the named bucket"
   [bucket]
   `(GridFS. (get-db *mongo-config*) ^String (named ~bucket)))
 
+;; TODO: question: keep the camelCase keyword for :contentType?
 ;; The naming of :contentType is ugly, but consistent with that
 ;; returned by GridFSFile
 (defn insert-file!
