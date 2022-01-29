@@ -967,22 +967,61 @@ Please, use `fetch` with `:limit 1` instead.")))
 
 (defn aggregate
   "Executes a pipeline of operations using the Aggregation Framework.
-   Returns map {:serverUsed ... :result ... :ok ...}
-   :serverUsed - string representing server address
-   :result     - the result of the aggregation (if successful)
-   :ok         - 1.0 for success
-   Requires MongoDB 2.2!"
-  {:arglists '([coll op & ops {:from :clojure :to :clojure}])}
-  [coll op & ops-and-from-to]
-  (let [ops (take-while (complement keyword?) ops-and-from-to)
-        from-and-to (drop-while (complement keyword?) ops-and-from-to)
-        {:keys [from to] :or {from :clojure to :clojure}} from-and-to
-        cursor (.aggregate (get-coll coll)
+
+   Required parameters:
+   collection       -> the database collection name (string, keyword, or symbol)
+   op               -> the 1st (and, possibly, only) operation to be performed in the aggregation pipeline
+
+   Optional parameters include:
+   :ops             -> other operations (2nd, 3rd, etc.) to be performed in the aggregation pipeline
+   :as              -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from            -> arguments (`op` and optional `ops`) format (same default/options as for `:as`)
+   :read-preference -> set the read preference (e.g. :primary or ReadPreference instance)
+   :batch-size      -> set the size of batches to use when iterating over results (by default, server-chosen)
+   :allow-disk-use? -> set whether to enable external sort capabilities (i.e. whether or not aggregation stages
+                       can write data to temporary files); if set to `false`, a `$sort` stage produces an error
+                       if the operation consumes 10 percent or more RAM
+   :max-time-ms     -> set the max server execution time for the aggregation command (default is `0`, no limit)
+   :bypass-document-validation? -> set the bypass document level validation flag
+   :collation       -> set the collation
+
+   Returns a map with the following keys:
+   :serverUsed      -> a string representing the server address
+   :result          -> the result of the aggregation (if successful)
+   :ok              -> 1.0 for success"
+  {:arglists '([collection op & ops {:as :clojure :from :clojure :read-preference nil :batch-size nil
+                      :allow-disk-use? nil :max-time-ms nil :bypass-document-validation? nil :collation nil}])}
+  [collection op & ops-and-params]
+  (let [[ops params] (split-with (complement keyword?) ops-and-params)
+        {:keys [as from
+                to ;; TODO: For backward compatibility. Remove later.
+                read-preference batch-size allow-disk-use? max-time-ms bypass-document-validation? collation]
+         :or {as :clojure from :clojure}} params
+        ;; TODO: Requires smth. like `set-collection-read-preference!` to be able to pass tags.
+        r-preference (cond
+                       (nil? read-preference) nil
+                       (instance? ReadPreference read-preference) read-preference
+                       :else (somnium.congomongo/read-preference read-preference))
+        cursor (.aggregate ^DBCollection (get-coll collection)
                            ^List (coerce (conj ops op) [from :mongo])
-                           ^AggregationOptions (-> (AggregationOptions/builder)
-                                                   (.build)))]
+                           ^AggregationOptions
+                           (let [opts-builder (AggregationOptions/builder)]
+                             (when (int? batch-size)
+                               (.batchSize opts-builder ^int batch-size))
+                             (when (boolean? allow-disk-use?)
+                               (.allowDiskUse opts-builder ^boolean allow-disk-use?))
+                             (when (int? max-time-ms)
+                               (.maxTime opts-builder ^long max-time-ms TimeUnit/MILLISECONDS))
+                             (when (boolean? bypass-document-validation?)
+                               (.bypassDocumentValidation opts-builder ^boolean bypass-document-validation?))
+                             (when (instance? Collation collation)
+                               (.collation opts-builder ^Collation collation))
+                             (.build opts-builder))
+                           (or r-preference (get-collection-read-preference collection)))]
     {:serverUsed (.toString (.getServerAddress cursor))
-     :result (coerce cursor [:mongo to] :many true)
+     :result (coerce cursor
+                     [:mongo (if (contains? params :to) to as)]
+                     :many true)
      :ok 1.0}))
 
 (defn command!
