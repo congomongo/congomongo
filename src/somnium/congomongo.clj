@@ -712,28 +712,28 @@ Please, use `fetch` with `:limit 1` instead.")))
 (defn insert!
   "Inserts document(s) into a collection.
    If the collection does not exists on the server, then it will be created.
-   If the new document does not contain an '_id' field, it will be added. Will not overwrite existing documents.
+   If the new document does not contain an `_id` field, it will be added. Will not overwrite existing documents.
 
    Required parameters:
-   collection         -> the database collection
-   obj                -> a document or a collection/sequence of documents to insert
+   collection          -> the database collection
+   obj                 -> a document or a collection/sequence of documents to insert
 
    Optional parameters include:
-   :many?             -> whether this will insert multiple documents (default is `false`)
-   :as                -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
-   :from              -> arguments (`obj`) format (same default and options as for `:as`)
-   :write-concern     -> set the write concern (e.g. :normal, see the `write-concern-map` for available options)
-   :continue-on-error -> whether documents will continue to be inserted after a failure to insert one
-                         (most commonly due to a duplicate key error; default value is false)
-   :bypass-document-validation -> set the bypass document level validation flag
-   :encoder           -> set the encoder (of BSONObject to BSON)
+   :many?              -> whether this will insert multiple documents (default is `false`)
+   :as                 -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from               -> arguments (`obj`) format (same default and options as for `:as`)
+   :write-concern      -> set the write concern (e.g. :normal, see the `write-concern-map` for available options)
+   :continue-on-error? -> whether documents will continue to be inserted after a failure to insert one
+                          (most commonly due to a duplicate key error; default value is false)
+   :bypass-document-validation? -> set the bypass document level validation flag
+   :encoder            -> set the encoder (of BSONObject to BSON)
 
    NOTE: To insert as a side-effect only, specify `:as` as `nil`."
   {:arglists '([collection obj {:many? false :as :clojure :from :clojure
-                 :write-concern nil :continue-on-error nil :bypass-document-validation nil :encoder nil}])}
+                 :write-concern nil :continue-on-error? nil :bypass-document-validation? nil :encoder nil}])}
   [collection obj & {:keys [many? as from
                             many to ;; TODO: For backward compatibility. Remove later.
-                            write-concern continue-on-error bypass-document-validation encoder]
+                            write-concern continue-on-error? bypass-document-validation? encoder]
                      :or {many? false as :clojure from :clojure} :as params}]
   (let [coerced-obj (coerce obj [from :mongo] :many (or many many?))
         list-obj (if (or many many?) coerced-obj (list coerced-obj))]
@@ -745,25 +745,54 @@ Please, use `fetch` with `:limit 1` instead.")))
                  (if-let [wc (write-concern write-concern-map)]
                    (.writeConcern opts ^WriteConcern wc)
                    (illegal-write-concern write-concern)))
-               (when (boolean? continue-on-error)
-                 (.continueOnError opts ^boolean continue-on-error))
-               (when (boolean? bypass-document-validation)
-                 (.bypassDocumentValidation opts ^boolean bypass-document-validation))
+               (when (boolean? continue-on-error?)
+                 (.continueOnError opts ^boolean continue-on-error?))
+               (when (boolean? bypass-document-validation?)
+                 (.bypassDocumentValidation opts ^boolean bypass-document-validation?))
                (when (instance? DBEncoder encoder)
                  (.dbEncoder opts ^DBEncoder encoder))
                opts))
     (coerce coerced-obj [:mongo (if (contains? params :to) to as)] :many many)))
 
 (defn mass-insert!
-  {:arglists '([coll objs {:from :clojure :to :clojure}])}
-  [coll objs & {:keys [from to write-concern]
-                :or {from :clojure to :clojure}}]
-  (insert! coll objs :from from :to to :many true :write-concern write-concern))
+  "Inserts multiple documents into a collection.
+   If the collection does not exists on the server, then it will be created.
+   If a new document does not contain an `_id` field, it will be added. Will not overwrite existing documents.
+
+   Required parameters:
+   collection          -> the database collection
+   objs                -> a collection/sequence of documents to insert
+
+   Optional parameters include:
+   :as                 -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
+   :from               -> arguments (`obj`) format (same default and options as for `:as`)
+   :write-concern      -> set the write concern (e.g. :normal, see the `write-concern-map` for available options)
+   :continue-on-error? -> whether documents will continue to be inserted after a failure to insert one
+                          (most commonly due to a duplicate key error; default value is false)
+   :bypass-document-validation? -> set the bypass document level validation flag
+   :encoder            -> set the encoder (of BSONObject to BSON)
+
+   NOTE: To insert as a side-effect only, specify `:as` as `nil`."
+  {:arglists '([collection objs {:as :clojure :from :clojure
+                  :write-concern nil :continue-on-error? nil :bypass-document-validation? nil :encoder nil}])}
+  [collection objs & {:keys [as from
+                             to ;; TODO: For backward compatibility. Remove later.
+                             write-concern continue-on-error? bypass-document-validation? encoder]
+                      :or {as :clojure from :clojure} :as params}]
+  (insert! collection
+           objs
+           :many? true
+           :as (if (contains? params :to) to as)
+           :from from
+           :write-concern write-concern
+           :continue-on-error? continue-on-error?
+           :bypass-document-validation? bypass-document-validation?
+           :encoder encoder))
 
 (defn update!
   "Alters/inserts a map in a collection. Overwrites existing objects.
-   The shortcut forms need a map with valid `:_id` and `:_ns` fields or
-   a collection and a map with a valid `:_id` field.
+   The shortcut forms need a map with valid `_id` and `_ns` fields or
+   a collection and a map with a valid `_id` field.
 
    Required parameters:
    collection     -> the database collection name (string, keyword, or symbol)
@@ -776,14 +805,14 @@ Please, use `fetch` with `:limit 1` instead.")))
    :as            -> return value format (defaults to `:clojure`, can also be `:json` or `:mongo`)
    :from          -> arguments (`query`, `update`) format (same default and options as for `:as`)
    :write-concern -> set the write concern (e.g. :normal, see the `write-concern-map` for available options)
-   :bypass-document-validation -> set the bypass document level validation flag
+   :bypass-document-validation? -> set the bypass document level validation flag
    :encoder       -> set the encoder (of BSONObject to BSON)
    :collation     -> set the collation
    :array-filters -> set the array filters option"
   {:arglists '([collection old new {:upsert? true :multiple? false :as :clojure :from :clojure
-                     :write-concern nil :bypass-document-validation nil :encoder nil :collation nil
+                     :write-concern nil :bypass-document-validation? nil :encoder nil :collation nil
                      :array-filters nil}])}
-  [collection query update & {:keys [upsert? multiple? as from write-concern bypass-document-validation
+  [collection query update & {:keys [upsert? multiple? as from write-concern bypass-document-validation?
                                      upsert multiple ;; TODO: For backward compatibility. Remove later.
                                      encoder collation array-filters]
                               :or {upsert? true multiple? false as :clojure from :clojure}}]
@@ -798,8 +827,8 @@ Please, use `fetch` with `:limit 1` instead.")))
                        (if-let [wc (write-concern write-concern-map)]
                          (.writeConcern opts ^WriteConcern wc)
                          (illegal-write-concern write-concern)))
-                     (when (boolean? bypass-document-validation)
-                       (.bypassDocumentValidation opts ^boolean bypass-document-validation))
+                     (when (boolean? bypass-document-validation?)
+                       (.bypassDocumentValidation opts ^boolean bypass-document-validation?))
                      (when (instance? DBEncoder encoder)
                        (.encoder opts ^DBEncoder encoder))
                      (when (instance? Collation collation)
@@ -828,7 +857,7 @@ Please, use `fetch` with `:limit 1` instead.")))
    :from               -> arguments (`query`, `update`, `sort`) format (same default/options as for `:as`)
    :only               -> `projection`; a subset of fields to return for the selected document (an array of keys)
    :sort               -> determines which document will be modified if the query selects multiple documents
-   :bypass-document-validation -> set the bypass document level validation flag
+   :bypass-document-validation? -> set the bypass document level validation flag
    :max-time-ms        -> set the maximum server execution time for this operation (default is `0`, no limit)
    :write-concern      -> set the write concern (e.g. :normal, see the `write-concern-map` for available options)
    :collation          -> set the collation
@@ -837,11 +866,11 @@ Please, use `fetch` with `:limit 1` instead.")))
    NOTE: An `update` parameter cannot be `nil` unless is passed along with the `:remove? true`."
   {:arglists
    '([collection query update {:as :clojure :from :clojure :remove? false :return-new? false :upsert? false
-                          :only nil :sort nil :bypass-document-validation nil :max-time-ms nil :write-concern nil
+                          :only nil :sort nil :bypass-document-validation? nil :max-time-ms nil :write-concern nil
                           :collation nil :array-filters nil}])}
   [collection query update & {:as params}]
   (let [{:keys [as from remove? return-new? upsert? only sort
-                bypass-document-validation max-time-ms write-concern collation array-filters]}
+                bypass-document-validation? max-time-ms write-concern collation array-filters]}
         (merge {:as :clojure :from :clojure :remove? false :return-new? false :upsert? false
                 :only nil :sort nil :max-time-ms 0}
                *default-query-options*
@@ -862,8 +891,8 @@ Please, use `fetch` with `:limit 1` instead.")))
                                 (.projection opts ^DBObject (coerce-fields only)))
                               (when sort
                                 (.sort opts ^DBObject (coerce sort [from :mongo])))
-                              (when (boolean? bypass-document-validation)
-                                (.bypassDocumentValidation opts ^boolean bypass-document-validation))
+                              (when (boolean? bypass-document-validation?)
+                                (.bypassDocumentValidation opts ^boolean bypass-document-validation?))
                               (when (int? max-time-ms)
                                 (.maxTime opts ^long max-time-ms TimeUnit/MILLISECONDS))
                               (when write-concern
