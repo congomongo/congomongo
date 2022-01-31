@@ -1,4 +1,4 @@
-CongoMongo [![ClojarsVersionRelease](https://img.shields.io/clojars/v/congomongo)](https://clojars.org/congomongo) [![ClojarsDownloads](https://img.shields.io/clojars/dt/congomongo)](https://clojars.org/congomongo) [![congomongo](https://circleci.com/gh/congomongo/congomongo.svg?style=shield)](https://circleci.com/gh/congomongo/congomongo)
+CongoMongo [![ClojarsVersionRelease](https://img.shields.io/clojars/v/congomongo)](https://clojars.org/congomongo) [![ClojarsDownloads](https://img.shields.io/clojars/dt/congomongo)](https://clojars.org/congomongo) [![CircleCI](https://circleci.com/gh/congomongo/congomongo/tree/master.svg?style=svg)](https://circleci.com/gh/congomongo/congomongo/tree/master)
 ===========
 
 What?
