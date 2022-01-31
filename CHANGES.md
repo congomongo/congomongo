@@ -1,3 +1,10 @@
+# Version 2.5.0 - Jan 31, 2022
+
+* Re-implement `aggregate` w/ `AggregationOptions`.
+* Improve logical structure of main file.
+* Add `cljfmt` plugin for consistent formatting.
+* Make map-reduce tests resilient to sorting differences on different platforms and MongoDB versions.
+
 # Version 2.4.0 - Jan 26, 2022
 
 * Updated implementation to support DBCollection API 3.4
