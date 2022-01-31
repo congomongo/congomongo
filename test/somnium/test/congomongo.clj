@@ -1020,7 +1020,8 @@
     (insert! :test-group {:fruit "pineapples" :count 2})
     (let [bananas-count (aggregate :test-group
             {:$match {:fruit "bananas"}}
-            {:$group {:_id "$fruit" :count {:$sum "$count"}}})
+            {:$group {:_id "$fruit" :count {:$sum "$count"}}}
+            :as :clojure)
           all-count-keyf (aggregate :test-group
             {:$group {:_id "$fruit" :count {:$sum "$count"}}}
             {:$project {:_id false :fruit "$_id" :items "$count"}}
