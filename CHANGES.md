@@ -1,4 +1,4 @@
-# Version 2.5.0 - Jan 31, 2022
+# Version 2.5.1 - Jan 31, 2022
 
 * Re-implement `aggregate` w/ `AggregationOptions`.
 * Improve logical structure of main file.
