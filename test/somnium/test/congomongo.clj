@@ -637,6 +637,29 @@
                             :where {:_id point-id}))
              "suffusion of yellow")))))
 
+(deftest upsert-one
+  (with-test-mongo
+    (update! :points
+             {:x 25}
+             {:$set {:y 42}})
+    (is (= (:x (fetch-one :points :where {:y 42})) 25))))
+
+(deftest upsert-false-deprecated-param-name
+  (with-test-mongo
+    (update! :points
+             {:x 28}
+             {:$set {:y 82}}
+             :upsert false)
+    (is (nil? (fetch-one :points :where {:y 82})))))
+
+(deftest upsert-false-correct-param-name
+  (with-test-mongo
+    (update! :points
+             {:x 29}
+             {:$set {:y 92}}
+             :upsert? false)
+    (is (nil? (fetch-one :points :where {:y 92})))))
+
 (deftest test-distinct-values
   (with-test-mongo
     (insert! :distinct {:genus "Pan" :species "troglodytes" :common-name "chimpanzee"})

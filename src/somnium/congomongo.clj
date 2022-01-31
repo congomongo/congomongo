@@ -890,7 +890,7 @@ Please, use `fetch` with `:limit 1` instead.")))
                    ^DBObject (coerce update [from :mongo])
                    ^DBCollectionUpdateOptions
                    (let [opts (DBCollectionUpdateOptions.)]
-                     (.upsert opts ^boolean (or upsert upsert?))
+                     (.upsert opts ^boolean (if (nil? upsert) upsert? upsert))
                      (.multi opts ^boolean (or multiple multiple?))
                      (when write-concern
                        (if-let [wc (write-concern write-concern-map)]
