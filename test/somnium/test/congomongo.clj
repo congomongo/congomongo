@@ -9,10 +9,10 @@
   (:import [java.nio.charset Charset]
            [java.security MessageDigest]
            [com.mongodb DB DBCollection DBObject BasicDBObject BasicDBObjectBuilder
-                        MongoClient MongoException DuplicateKeyException MongoCommandException
-                        Tag TagSet
-                        ReadPreference
-                        WriteConcern MongoExecutionTimeoutException]
+            MongoClient MongoException DuplicateKeyException MongoCommandException
+            Tag TagSet
+            ReadPreference
+            WriteConcern MongoExecutionTimeoutException]
            [org.bson.types ObjectId]))
 
 (deftest coercions
@@ -41,8 +41,7 @@
             (= [from to] [:mongo :json]); padding difference
             (is (= (read-str actual) (read-str expected)) [from to])
             :else
-            (is (= actual expected) [from to])
-      ))))
+            (is (= actual expected) [from to])))))
 
 (def test-db-host (get (System/getenv) "MONGOHOST" "127.0.0.1"))
 (def test-db-port (Integer/parseInt (get (System/getenv) "MONGOPORT" "27017")))
@@ -60,8 +59,8 @@
 
 (defn setup! []
   (set-connection! (make-connection test-db :instances [{:host test-db-host :port test-db-port}]
-                                            :username test-db-user
-                                            :password test-db-pass))
+                                    :username test-db-user
+                                    :password test-db-pass))
   (drop-test-collections!))
 
 (defn teardown! []
@@ -75,9 +74,9 @@
   `(do
      (setup!)
      (try
-      ~@body
-      (finally
-        (teardown!)))))
+       ~@body
+       (finally
+         (teardown!)))))
 
 (defn- version
   [db]
@@ -96,11 +95,11 @@
                            (str a b)))
         ->bytes (fn [s] (.getBytes s (Charset/forName "UTF-8")))
         digest-bytes (.digest
-                        (doto (MessageDigest/getInstance "MD5")
-                              (.reset)
-                              (.update (->bytes username))
-                              (.update (->bytes ":mongo:"))
-                              (.update (->bytes passphrase))))]
+                      (doto (MessageDigest/getInstance "MD5")
+                        (.reset)
+                        (.update (->bytes username))
+                        (.update (->bytes ":mongo:"))
+                        (.update (->bytes passphrase))))]
     (apply str (map #(get hex-strings (bit-and 0xff %)) digest-bytes))))
 
 (defn- create-test-user
@@ -122,45 +121,45 @@
   [username password & body]
   `(let [username# ~username
          password# ~password]
-    (try
-      (cond
-        (= "2.2" (subs (version test-db) 0 3))
+     (try
+       (cond
+         (= "2.2" (subs (version test-db) 0 3))
         ;; 2.2 uses a different user creation algorithm to 2.4
-        (is false "Not implemented for 2.2 databases")
+         (is false "Not implemented for 2.2 databases")
 
-        (= "2.4" (subs (version test-db) 0 3))
+         (= "2.4" (subs (version test-db) 0 3))
         ;; 2.4 mongodb doesn't have a command to create users. Manually hash
         ;; the password and insert directly
-        (insert! :system.users {:user username#
-                                :pwd (mongo-hash username# password#)
-                                :roles ["readWrite"]})
+         (insert! :system.users {:user username#
+                                 :pwd (mongo-hash username# password#)
+                                 :roles ["readWrite"]})
 
-        :else
-        (create-test-user *mongo-config* username# password# {"role" "readWrite", "db" test-db}))
-      ~@body
-      (finally
-        (drop-test-user *mongo-config* username#)))))
+         :else
+         (create-test-user *mongo-config* username# password# {"role" "readWrite", "db" test-db}))
+       ~@body
+       (finally
+         (drop-test-user *mongo-config* username#)))))
 
 (deftest authentication-works
   (with-test-mongo
     (with-test-user "test_user" "test_password"
       (testing "valid credentials work"
         (let [conn (make-connection test-db :instance {:host test-db-host :port test-db-port}
-                                            :username "test_user"
-                                            :password "test_password")]
+                                    :username "test_user"
+                                    :password "test_password")]
           ;; Just validate that we can interact with the DB, the 3.0 Mongo driver
           ;; has removed any way to check if a connection is authenticated.
           (with-mongo conn
             (insert! :thingies {:foo 1})
             (is (= 1 (:foo (fetch-one :thingies :where {:foo 1}))))
 
-          (close-connection conn))))
+            (close-connection conn))))
 
       (testing "invalid credentials throw"
         (let [conn (make-connection test-db :instances [{:host test-db-host :port test-db-port}]
-                                            :options (mongo-options :server-selection-timeout 1000)
-                                            :username "not_a_valid_user"
-                                            :password "not_a_valid_password")]
+                                    :options (mongo-options :server-selection-timeout 1000)
+                                    :username "not_a_valid_user"
+                                    :password "not_a_valid_password")]
           (is (thrown? MongoException
                        (with-mongo conn
                          (insert! :thingies {:foo 1}))))
@@ -175,7 +174,7 @@
             (insert! :thingies {:foo 1})
             (is (= 1 (:foo (fetch-one :thingies :where {:foo 1}))))
 
-          (close-connection conn))))
+            (close-connection conn))))
 
       (testing "bad credentials in a MongoURI"
         ;; This adds a 30 second wait to the test suite when using the 3.0 driver.
@@ -219,10 +218,10 @@
 
   (testing "Username/password combinations"
     (is (thrown-with-msg? IllegalArgumentException #"Username and password must both be supplied"
-          (make-connection test-db :username "foo" :password nil)))
+                          (make-connection test-db :username "foo" :password nil)))
 
     (is (thrown-with-msg? IllegalArgumentException #"Username and password must both be supplied"
-          (make-connection test-db :username nil :password "bar")))
+                          (make-connection test-db :username nil :password "bar")))
 
     (is (make-connection test-db :username nil :password nil))))
 
@@ -230,9 +229,9 @@
   (with-test-mongo
     ;; set some non-default option values
     (let [a (make-connection "congomongotest-db-a" :instances [{:host test-db-host :port test-db-port}]
-                                                   :options (mongo-options :connect-timeout 500
-                                                                           :write-concern (:acknowledged write-concern-map)))
-         ^MongoClient m (:mongo a)
+                             :options (mongo-options :connect-timeout 500
+                                                     :write-concern (:acknowledged write-concern-map)))
+          ^MongoClient m (:mongo a)
           opts (.getMongoClientOptions m)]
       ;; check non-default options attached to Mongo object
       (is (= 500 (.getConnectTimeout opts)))
@@ -252,7 +251,7 @@
         (is (= WriteConcern/W1 (.getWriteConcern opts))))
       (with-mongo a
         (testing "make-connection accepts Mongo URI"
-                (is (= "congomongotest-db-a" (.getName ^DB (*mongo-config* :db)))))))))
+          (is (= "congomongotest-db-a" (.getName ^DB (*mongo-config* :db)))))))))
 
 (deftest with-mongo-database
   (with-test-mongo
@@ -260,9 +259,9 @@
       (with-mongo a
         (with-db "congomongotest-db-b"
           (testing "with-mongo uses new database"
-                   (is (= "congomongotest-db-b" (.getName ^DB (*mongo-config* :db))))))
+            (is (= "congomongotest-db-b" (.getName ^DB (*mongo-config* :db))))))
         (testing "with-mongo uses connection db "
-                 (is (= "congomongotest-db-a" (.getName ^DB (*mongo-config* :db)))))))))
+          (is (= "congomongotest-db-a" (.getName ^DB (*mongo-config* :db)))))))))
 
 (deftest with-mongo-interactions
   (with-test-mongo
@@ -380,8 +379,8 @@
   (with-test-mongo
     (let [unsorted [3 10 7 0 2]]
       (mass-insert! :points
-                  (for [i unsorted]
-                    {:x i}))
+                    (for [i unsorted]
+                      {:x i}))
       (is (= (map :x (fetch :points :sort {:x 1})) (sort unsorted)))
       (is (= (map :x (fetch :points :sort {:x -1})) (reverse (sort unsorted)))))))
 
@@ -389,8 +388,8 @@
   (with-test-mongo
     (let [unsorted [3 10 7 0 2]]
       (mass-insert! :points
-                  (for [i unsorted j unsorted]
-                    {:x i :y j}))
+                    (for [i unsorted j unsorted]
+                      {:x i :y j}))
       (is (= (map :x (fetch :points :sort (coerce-ordered-fields [:x :y]))) (mapcat (partial repeat (count unsorted)) (sort unsorted))))
       (is (= (map :y (fetch :points :sort (coerce-ordered-fields [:x :y]))) (apply concat (repeat (count unsorted) (sort unsorted)))))
       (is (= (map :x (fetch :points :sort (coerce-ordered-fields [:x [:y -1]]))) (mapcat (partial repeat (count unsorted)) (sort unsorted))))
@@ -439,9 +438,9 @@
       (insert! :with-only data)
       (are [data-keys select-clause] (= (select-keys data data-keys)
                                         (fetch-one :with-only :only select-clause))
-           [:_id :foo] [:foo]
-           [:foo :bar] {:_id false}
-           [:_id :bar] {:foo false}))))
+        [:_id :foo] [:foo]
+        [:foo :bar] {:_id false}
+        [:_id :bar] {:foo false}))))
 
 (deftest fetch-with-limit-more-than-batchsize
   (with-test-mongo
@@ -524,7 +523,6 @@
         (let [plan (-> (fetch :test_col :where {:key1 1} :explain? true :hint [:key1 [:key2 -1]]))]
           (is (= "key1_1_key2_-1" (-> plan :queryPlanner :winningPlan :inputStage :indexName))))))))
 
-
 (deftest fetch-by-id-of-any-type
   (with-test-mongo
     (insert! :by-id {:_id "Blarney" :val "Stone"})
@@ -590,16 +588,16 @@
         (is (= "Jane Doe" (-> eager-result :cursor :firstBatch first :user :name)))))))
 
 `(deftest databases-test
-  (with-test-mongo
-    (let [test-db2 "congomongotestdb-part-deux"]
+   (with-test-mongo
+     (let [test-db2 "congomongotestdb-part-deux"]
 
-      (is (= test-db (.getName (*mongo-config* :db)))
-          "default DB exists")
-      (set-database! test-db2)
+       (is (= test-db (.getName (*mongo-config* :db)))
+           "default DB exists")
+       (set-database! test-db2)
 
-      (is (= test-db2 (.getName (*mongo-config* :db)))
-          "changed DB exists")
-      (drop-database! test-db2))))
+       (is (= test-db2 (.getName (*mongo-config* :db)))
+           "changed DB exists")
+       (drop-database! test-db2))))
 
 (defn make-points!
   ([]
@@ -639,7 +637,6 @@
                             :where {:_id point-id}))
              "suffusion of yellow")))))
 
-
 (deftest test-distinct-values
   (with-test-mongo
     (insert! :distinct {:genus "Pan" :species "troglodytes" :common-name "chimpanzee"})
@@ -664,6 +661,7 @@
 
 ;; ;; mass insert chokes on excessively large inserts
 ;; ;; will need to implement some sort of chunking algorithm
+
 
 (deftest mass-insert
   (with-test-mongo
@@ -701,7 +699,6 @@
                      (= (get i "name")
                         index)))]
     (first (filter selector (get-indexes coll)))))
-
 
 (deftest complex-indexing
   (with-test-mongo
@@ -785,7 +782,6 @@
       (drop-index! test-collection index-name)
       (is (nil? (get-index test-collection index-name))))))
 
-
 (defrecord Foo [a b])
 
 (deftest can-insert-records-as-maps
@@ -827,7 +823,7 @@
     (let [f (insert-file! :testfs (.getBytes "nuts")
                           :metadata {:calories 50, :opinion "tasty"})]
       (is (= "tasty" (get-in f [:metadata :opinion])))
-      (is (= f (fetch-one-file :testfs :where { :metadata.opinion "tasty" }))))))
+      (is (= f (fetch-one-file :testfs :where {:metadata.opinion "tasty"}))))))
 
 (deftest gridfs-insert-with-id
   (with-test-mongo
@@ -835,7 +831,7 @@
           f (insert-file! :testfs (.getBytes "nuts")
                           :_id file-id)]
       (is (= file-id (get f :_id)))
-      (is (= f (fetch-one-file :testfs :where { :_id file-id }))))))
+      (is (= f (fetch-one-file :testfs :where {:_id file-id}))))))
 
 (deftest gridfs-write-file-to
   (with-test-mongo
@@ -853,7 +849,7 @@
 
 (defn- gen-tempfile []
   (let [tmp (doto
-                (java.io.File/createTempFile "test" ".data")
+             (java.io.File/createTempFile "test" ".data")
               (.deleteOnExit))]
     (with-open [w (java.io.FileOutputStream. tmp)]
       (doseq [i (range 2048)]
@@ -870,10 +866,9 @@
 
 (deftest test-roundtrip-vector
   (with-test-mongo
-    (insert! :stuff {:name "name" :vector [ "foo" "bar"]})
+    (insert! :stuff {:name "name" :vector ["foo" "bar"]})
     (let [return (fetch-one :stuff :where {:name "name"})]
       (is (vector? (:vector return))))))
-
 
 (deftest test-roundtrip-keywords
   (with-test-mongo
@@ -881,7 +876,7 @@
                                              :thatns/this 4}})
     (let [return (fetch-one :stuff :where {:name "name"})]
       (is (= 1 (get-in return [:some-map :myns/this]))
-          (= 4 (get-in return [:some-map :thatns/this])) ))))
+          (= 4 (get-in return [:some-map :thatns/this]))))))
 
 ;; Note: with Clojure 1.3.0, 1.0 != 1 and the JS stuff returns floating point numbers instead
 ;; of integers so I've changed the tests to use floats in the expected values - except for the
@@ -913,10 +908,10 @@
           }"
           target-collection :monkey-shopping-list]
       ;; See that the base case works
-      (is (= (map-reduce :mr mapfn reducefn target-collection)
-             (seq [{:_id "bananas" :value {:count 3.0}}
-                   {:_id "pineapples" :value {:count 6.0}}
-                   {:_id "plantains" :value {:count 5.0}}])))
+      (is (= (into #{} (map-reduce :mr mapfn reducefn target-collection))
+             #{{:_id "bananas" :value {:count 3.0}}
+               {:_id "pineapples" :value {:count 6.0}}
+               {:_id "plantains" :value {:count 5.0}}}))
       ;; Make sure we get the collection name back, too
       (is (= (map-reduce :mr mapfn reducefn target-collection :output :collection)
              target-collection))
@@ -926,64 +921,63 @@
       ;; Replace existing data in target collection
       (drop-coll! target-collection)
       (insert! target-collection {:dummy-data true}) ;; we should not find this!
-      (is (= (map-reduce :mr mapfn reducefn {:replace target-collection})
-             (seq [{:_id "bananas" :value {:count 3.0}}
-                   {:_id "pineapples" :value {:count 6.0}}
-                   {:_id "plantains" :value {:count 5.0}}])))
+      (is (= (into #{} (map-reduce :mr mapfn reducefn {:replace target-collection}))
+             #{{:_id "bananas" :value {:count 3.0}}
+               {:_id "pineapples" :value {:count 6.0}}
+               {:_id "plantains" :value {:count 5.0}}}))
 
       ;; Merge data in the target collection
       (drop-coll! target-collection)
       (insert! target-collection {:_id "macadamia nuts" :value {:count 1000000}})
-      (is (= (map-reduce :mr mapfn reducefn {:merge target-collection})
-             (seq [{:_id "macadamia nuts" :value {:count 1000000}}
-                   {:_id "bananas" :value {:count 3.0}}
-                   {:_id "pineapples" :value {:count 6.0}}
-                   {:_id "plantains" :value {:count 5.0}}])))
+      (is (= (into #{} (map-reduce :mr mapfn reducefn {:merge target-collection}))
+             #{{:_id "macadamia nuts" :value {:count 1000000}}
+               {:_id "bananas" :value {:count 3.0}}
+               {:_id "pineapples" :value {:count 6.0}}
+               {:_id "plantains" :value {:count 5.0}}}))
 
       ;; Reduce with existing data
       (drop-coll! target-collection)
       (insert! target-collection {:_id "bananas" :value {:count 10}})
-      (is (= (map-reduce :mr mapfn reducefn {:reduce target-collection})
-             (seq [{:_id "bananas" :value {:count 13.0}}
-                   {:_id "pineapples" :value {:count 6.0}}
-                   {:_id "plantains" :value {:count 5.0}}])))
+      (is (= (into #{} (map-reduce :mr mapfn reducefn {:reduce target-collection}))
+             #{{:_id "bananas" :value {:count 13.0}}
+               {:_id "pineapples" :value {:count 6.0}}
+               {:_id "plantains" :value {:count 5.0}}}))
 
       ;; inline data (no output collection)
-      (is (= (map-reduce :mr mapfn reducefn {:inline 1})
-             (seq [{:_id "bananas" :value {:count 3.0}}
-                   {:_id "pineapples" :value {:count 6.0}}
-                   {:_id "plantains" :value {:count 5.0}}])))
+      (is (= (into #{} (map-reduce :mr mapfn reducefn {:inline 1}))
+             #{{:_id "bananas" :value {:count 3.0}}
+               {:_id "pineapples" :value {:count 6.0}}
+               {:_id "plantains" :value {:count 5.0}}}))
 
       ;; inline output ignores if you ask for an output collection name instead
-      (is (= (map-reduce :mr mapfn reducefn {:inline 1} :output :collection)
-             (seq [{:_id "bananas" :value {:count 3.0}}
-                   {:_id "pineapples" :value {:count 6.0}}
-                   {:_id "plantains" :value {:count 5.0}}])))
+      (is (= (into #{} (map-reduce :mr mapfn reducefn {:inline 1} :output :collection))
+             #{{:_id "bananas" :value {:count 3.0}}
+               {:_id "pineapples" :value {:count 6.0}}
+               {:_id "plantains" :value {:count 5.0}}}))
 
       ;; Check limit
-      (is (= (map-reduce :mr mapfn reducefn target-collection :limit 2)
-             (seq [{:_id "bananas" :value {:count 3.0}}])))
+      (is (= (into #{} (map-reduce :mr mapfn reducefn target-collection :limit 2))
+             #{{:_id "bananas" :value {:count 3.0}}}))
       ;; Check sort
       ;; sort requires an index to work?
       (add-index! :mr [:fruit])
-      (is (= (map-reduce :mr mapfn reducefn target-collection :sort {:fruit -1} :limit 2)
-             (seq [{:_id "plantains" :value {:count 5.0}}])))
+      (is (= (into #{} (map-reduce :mr mapfn reducefn target-collection :sort {:fruit -1} :limit 2))
+             #{{:_id "plantains" :value {:count 5.0}}}))
       ;; check query
-      (is (= (map-reduce :mr mapfn reducefn target-collection :query {:fruit "pineapples"})
-             (seq [{:_id "pineapples" :value {:count 6.0}}])))
+      (is (= (into #{} (map-reduce :mr mapfn reducefn target-collection :query {:fruit "pineapples"}))
+             #{{:_id "pineapples" :value {:count 6.0}}}))
       ;; check finalize
-      (is (= (map-reduce :mr mapfn reducefn target-collection
-                         :finalize "function(key, value){return 'There are ' + value.count + ' ' + key}")
-             (seq [{:_id "bananas" :value "There are 3 bananas"}
-                   {:_id "pineapples" :value "There are 6 pineapples"}
-                   {:_id "plantains" :value "There are 5 plantains"}])))
+      (is (= (into #{} (map-reduce :mr mapfn reducefn target-collection
+                         :finalize "function(key, value){return 'There are ' + value.count + ' ' + key}"))
+             #{{:_id "bananas" :value "There are 3 bananas"}
+               {:_id "pineapples" :value "There are 6 pineapples"}
+               {:_id "plantains" :value "There are 5 plantains"}}))
       ;; check scope
-      (is (= (map-reduce :mr mapfn-with-scope reducefn target-collection
-                         :scope {:adj "tasty"})
-             (seq [{:_id "tasty bananas" :value {:count 3.0}}
-                   {:_id "tasty pineapples" :value {:count 6.0}}
-                   {:_id "tasty plantains" :value {:count 5.0}}])))
-      )))
+      (is (= (into #{} (map-reduce :mr mapfn-with-scope reducefn target-collection
+                         :scope {:adj "tasty"}))
+             #{{:_id "tasty bananas" :value {:count 3.0}}
+               {:_id "tasty pineapples" :value {:count 6.0}}
+               {:_id "tasty plantains" :value {:count 5.0}}})))))
 
 (deftest dup-key-exception-works
   (with-test-mongo
@@ -999,8 +993,8 @@
       (try
         (insert! :dup-key-coll obj :write-concern :acknowledged)
         (is false "Did not get a duplicate key error")
-       (catch Exception e
-         (is true)))
+        (catch Exception e
+          (is true)))
       ;; with write concern of :unacknowledged, this should succeed too
       ;; because the error is not detected / thrown
       (try
@@ -1011,7 +1005,7 @@
 
 (deftest test-aggregate-command
   (with-test-mongo
-    (drop-coll! :test-group )
+    (drop-coll! :test-group)
     (insert! :test-group {:fruit "bananas" :count 1})
     (insert! :test-group {:fruit "bananas" :count 2})
     (insert! :test-group {:fruit "plantains" :count 3})
@@ -1019,18 +1013,17 @@
     (insert! :test-group {:fruit "pineapples" :count 4})
     (insert! :test-group {:fruit "pineapples" :count 2})
     (let [bananas-count (aggregate :test-group
-            {:$match {:fruit "bananas"}}
-            {:$group {:_id "$fruit" :count {:$sum "$count"}}}
-            :as :clojure)
+                                   {:$match {:fruit "bananas"}}
+                                   {:$group {:_id "$fruit" :count {:$sum "$count"}}}
+                                   :as :clojure)
           all-count-keyf (aggregate :test-group
-            {:$group {:_id "$fruit" :count {:$sum "$count"}}}
-            {:$project {:_id false :fruit "$_id" :items "$count"}}
-            {:$sort {:fruit 1}})]
+                                    {:$group {:_id "$fruit" :count {:$sum "$count"}}}
+                                    {:$project {:_id false :fruit "$_id" :items "$count"}}
+                                    {:$sort {:fruit 1}})]
       (is (= (:result bananas-count)
-            [{:_id "bananas", :count 3}]))
+             [{:_id "bananas", :count 3}]))
       (is (= (:result all-count-keyf)
-            [{:items 3, :fruit "bananas"} {:items 6, :fruit "pineapples"} {:items 5, :fruit "plantains"}])))))
-
+             [{:items 3, :fruit "bananas"} {:items 6, :fruit "pineapples"} {:items 5, :fruit "plantains"}])))))
 
 (deftest test-read-preference
   (let [f-tag (TagSet. (Tag. "location" "nearby"))
@@ -1046,20 +1039,19 @@
       (ReadPreference/secondary) :secondary nil
       (ReadPreference/secondary f-tag) :secondary [{:location "nearby"}]
       (ReadPreference/secondary [f-tag r-tags]) :secondary [{:location "nearby"} {:rack :bottom}]
-      (ReadPreference/secondaryPreferred) :secondary-preferred nil
-      )))
+      (ReadPreference/secondaryPreferred) :secondary-preferred nil)))
 
 (deftest get-and-set-collection-read-preference
   (with-test-mongo
-    (create-collection! :with-preferences )
-    (set-collection-read-preference! :with-preferences :nearest )
-    (is (= (ReadPreference/nearest) (get-collection-read-preference :with-preferences )))))
+    (create-collection! :with-preferences)
+    (set-collection-read-preference! :with-preferences :nearest)
+    (is (= (ReadPreference/nearest) (get-collection-read-preference :with-preferences)))))
 
 (deftest get-and-set-collection-write-concern
   (with-test-mongo
-    (create-collection! :with-write-concern )
-    (set-collection-write-concern! :with-write-concern :unacknowledged )
-    (is (= WriteConcern/UNACKNOWLEDGED (get-collection-write-concern :with-write-concern )))))
+    (create-collection! :with-write-concern)
+    (set-collection-write-concern! :with-write-concern :unacknowledged)
+    (is (= WriteConcern/UNACKNOWLEDGED (get-collection-write-concern :with-write-concern)))))
 
 (deftest deferred-collection-creation-does-not-throw
   ;; See https://jira.mongodb.org/browse/JAVA-1970
@@ -1085,12 +1077,11 @@
 
       (let [index-info (coerce (get-indexes :test_col)
                                [:mongo :clojure]
-                               :many? true) ]
+                               :many? true)]
         ;; default _id index and the two created above
         (is (= 3 (count index-info)))
         (is (set/subset? #{"key1_1" "key1_-1"}
                          (set (map :name index-info))))))))
-
 
 (deftest test-json-serialization
   (with-test-mongo
@@ -1102,10 +1093,10 @@
               "count" 1}
              (select-keys parsed ["fruit" "count"]))))
     (insert! :json-test
-            
+
              (clojure.data.json/write-str
               {:fruit "apples" :count 2})
-             
+
              :from :json)
     (let [fruits (->>
                   (fetch :json-test :as :json)

@@ -19,8 +19,8 @@
 ; THE SOFTWARE.
 
 (ns
-  ^{:author "Jeff Sapp"}
-  somnium.congomongo.error
+ ^{:author "Jeff Sapp"}
+ somnium.congomongo.error
   (:require [somnium.congomongo.config :refer [*mongo-config*]])
   (:import [com.mongodb DB]))
 

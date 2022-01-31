@@ -36,7 +36,7 @@
 (def ^{:dynamic true
        :doc "Set this to false to prevent coercion from setting string keys to keywords"
        :tag 'boolean}
-      *keywordize* true)
+  *keywordize* true)
 
 ;; seqable? is present in Clojure 1.9.0
 (if-let [ccs (resolve 'clojure.core/seqable?)]
@@ -96,11 +96,11 @@
 (extend-protocol ConvertibleFromMongo
   Map
   (mongo->clojure [^Map m keywordize]
-                  (assocs->clojure (.entrySet m) keywordize))
+    (assocs->clojure (.entrySet m) keywordize))
 
   List
   (mongo->clojure [^List l keywordize]
-                  (vec (map #(mongo->clojure % keywordize) l)))
+    (vec (map #(mongo->clojure % keywordize) l)))
 
   Object
   (mongo->clojure [o keywordize] o)
@@ -110,17 +110,18 @@
 
   BasicDBList
   (mongo->clojure [^BasicDBList l keywordize]
-                  (vec (map #(mongo->clojure % keywordize) l)))
+    (vec (map #(mongo->clojure % keywordize) l)))
 
   DBObject
   (mongo->clojure [^DBObject f keywordize]
                   ;; DBObject provides .toMap, but the implementation in
                   ;; subclass GridFSFile unhelpfully throws
                   ;; UnsupportedOperationException
-                  (assocs->clojure (for [k (.keySet f)] [k (.get f k)]) keywordize)))
+    (assocs->clojure (for [k (.keySet f)] [k (.get f k)]) keywordize)))
 
 
 ;;; Converting data from Clojure into data objects suitable for Mongo
+
 
 (defprotocol ConvertibleToMongo
   (clojure->mongo [o]))
@@ -150,17 +151,16 @@
   nil
   (clojure->mongo [o] o))
 
-
 (def ^{:dynamic true
        :doc "Mapping of [from to] pairs to translation functions for coerce."}
-     *translations* {[:clojure :mongo  ] #'clojure->mongo
-                     [:clojure :json   ] #'write-str
-                     [:mongo   :clojure] #(mongo->clojure ^DBObject % ^boolean *keywordize*)
-                     [:mongo   :json   ] #'mongo->json
-                     [:json    :clojure] #(read-str % :key-fn (if *keywordize*
-                                                                keyword
-                                                                identity))
-                     [:json    :mongo  ] #'json->mongo})
+  *translations* {[:clojure :mongo] #'clojure->mongo
+                  [:clojure :json] #'write-str
+                  [:mongo   :clojure] #(mongo->clojure ^DBObject % ^boolean *keywordize*)
+                  [:mongo   :json] #'mongo->json
+                  [:json    :clojure] #(read-str % :key-fn (if *keywordize*
+                                                             keyword
+                                                             identity))
+                  [:json    :mongo] #'json->mongo})
 
 (defn coerce
   "takes an object, a vector of keywords:
@@ -181,7 +181,7 @@
                         (throw (RuntimeException. "unsupported keyword pair"))))))
 
 (defn ^DBObject dbobject
-   "Create a DBObject from a sequence of key/value pairs, in order."
+  "Create a DBObject from a sequence of key/value pairs, in order."
   [& args]
   (let [dbo (BasicDBObject.)]
     (doseq [[k v] (partition 2 args)]

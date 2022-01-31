@@ -19,30 +19,31 @@
 ; THE SOFTWARE.
 
 (ns
-  ^{:author "Andrew Boekhoff, Sean Corfield",
-    :doc "Various wrappers and utilities for the mongodb-java-driver"}
-  somnium.congomongo
+ ^{:author "Andrew Boekhoff, Sean Corfield",
+   :doc "Various wrappers and utilities for the mongodb-java-driver"}
+ somnium.congomongo
   (:require [clojure.string]
             [clojure.walk :refer (postwalk)]
             [somnium.congomongo.config :refer [*mongo-config* *default-query-options*]]
             [somnium.congomongo.coerce :refer [coerce coerce-fields coerce-index-fields]])
   (:import [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder
-                        MongoClientURI MongoCredential
-                        DB DBCollection DBObject DBRef DBCursor CursorType
-                        ServerAddress ReadPreference ReadConcern WriteConcern
-                        AggregationOptions
-                        MapReduceCommand MapReduceCommand$OutputType MapReduceOutput
-                        Tag TagSet
-                        InsertOptions DBEncoder]
+            MongoClientURI MongoCredential
+            DB DBCollection DBObject DBRef DBCursor CursorType
+            ServerAddress ReadPreference ReadConcern WriteConcern
+            AggregationOptions
+            MapReduceCommand MapReduceCommand$OutputType MapReduceOutput
+            Tag TagSet
+            InsertOptions DBEncoder]
            [com.mongodb.client.model DBCollectionUpdateOptions
-                                     DBCollectionCountOptions
-                                     DBCollectionFindOptions
-                                     DBCollectionRemoveOptions
-                                     DBCollectionDistinctOptions
-                                     DBCollectionFindAndModifyOptions
-                                     Collation]
+            DBCollectionCountOptions
+            DBCollectionFindOptions
+            DBCollectionRemoveOptions
+            DBCollectionDistinctOptions
+            DBCollectionFindAndModifyOptions
+            Collation]
            [com.mongodb.gridfs GridFS GridFSDBFile GridFSInputFile]
            [org.bson.types ObjectId]
+           [java.io Writer]
            [java.lang.reflect Method Modifier]
            [java.util List]
            [java.util.concurrent TimeUnit]
@@ -62,6 +63,7 @@
 
 
 ;; the `make-connection` and helpers
+
 
 (defn- field->kw
   "Convert camelCase identifier string to hyphen-separated keyword."
@@ -96,7 +98,7 @@
                        (if-let [f (k builder-map)]
                          (f b v)
                          (throw (IllegalArgumentException.
-                                  (str k " is not a valid MongoClientOptions$Builder argument")))))]
+                                 (str k " is not a valid MongoClientOptions$Builder argument")))))]
     (.build ^MongoClientOptions$Builder (reduce builder-call (MongoClientOptions$Builder.) option-map))))
 
 (defn- make-server-address
@@ -155,8 +157,8 @@
         mongo-client (if credential
                        (make-mongo-client addresses credential options)
                        (make-mongo-client addresses options))]
-      {:mongo mongo-client
-       :db    (when db-name (.getDB mongo-client db-name))}))
+    {:mongo mongo-client
+     :db    (when db-name (.getDB mongo-client db-name))}))
 
 (defn- make-connection-uri
   "Makes a connection to MongoDB with the passed URI, authenticating if `username` and `password` are specified."
@@ -198,7 +200,7 @@
 
       If `username` and `password` are specified in the URI, the connection will be authenticated."
   {:arglists '([db-name {:instance {:host host :port port} :instances instance+ :options mongo-options
-                     :username username :password password :auth-source {:mechanism mechanism :source source}}]
+                         :username username :password password :auth-source {:mechanism mechanism :source source}}]
                [mongo-client-uri])}
   [db-name-or-mongo-client-uri & {:as args}]
   ;; FIXME: The `named` doesn't always return a String. Drop the whole thing and use `clojure.core/name` here.
@@ -210,6 +212,7 @@
 
 
 ;; connection-related fns
+
 
 (defn connection?
   "Returns `true` if the argument is a map specifying an active connection.
@@ -250,6 +253,7 @@
 
 ;; database-related fns
 
+
 (defn databases
   "Lists database names on the MongoDB server."
   []
@@ -269,10 +273,11 @@
                       ^String (named db-name))]
     (alter-var-root #'*mongo-config* merge {:db db})
     (throw (RuntimeException.
-             (str "database with name " db-name " does not exist.")))))
+            (str "database with name " db-name " does not exist.")))))
 
 
 ;; handy scoping macros
+
 
 (defmacro with-mongo
   "Makes the passed `connection` an active one in the enclosing scope.
@@ -309,11 +314,12 @@
 
 ;; collections-related fns
 
+
 (definline ^DBCollection get-coll
   "Returns a DBCollection object"
   [collection]
   `(.getCollection (get-db *mongo-config*)
-     ^String (named ~collection)))
+                   ^String (named ~collection)))
 
 (defn collections
   "Returns the set of collections stored in the current database"
@@ -352,6 +358,7 @@
 
 ;; write concerns
 
+
 (def write-concern-map
   {:acknowledged         WriteConcern/ACKNOWLEDGED
    :fsynced              WriteConcern/JOURNALED
@@ -367,8 +374,7 @@
    :safe          WriteConcern/ACKNOWLEDGED
    ;; these are left for backward compatibility but are deprecated:
    :replica-safe WriteConcern/W2
-   :strict       WriteConcern/ACKNOWLEDGED
-   })
+   :strict       WriteConcern/ACKNOWLEDGED})
 
 (defn set-write-concern
   "Sets the write concern on the connection. Setting is a key in the
@@ -388,7 +394,7 @@
 (defn get-collection-write-concern
   "Gets the currently set write concern for a collection."
   [collection]
-    (.getWriteConcern (get-coll collection)))
+  (.getWriteConcern (get-coll collection)))
 
 (defn- illegal-write-concern
   [write-concern]
@@ -396,6 +402,7 @@
 
 
 ;; read concerns
+
 
 (def read-concern-map
   {:default      ReadConcern/DEFAULT
@@ -411,6 +418,7 @@
 
 
 ;; ObjectId-related conveniences
+
 
 (definline object-id ^ObjectId [^String s]
   `(ObjectId. ~s))
@@ -429,6 +437,7 @@
 
 
 ;; read preferences
+
 
 (def ^:private read-preference-map
   "Private map of factory functions of ReadPreferences to aliases."
@@ -479,6 +488,7 @@
 
 ;; DBRef-related & eager fetching conveniences
 
+
 (defn db-ref
   "Convenience `DBRef` constructor."
   [ns id]
@@ -510,6 +520,7 @@
 ;; collection operations
 
 ;; - fetches
+
 
 (defn- set-cursor-options!
   "Sets the options on the cursor"
@@ -572,9 +583,9 @@
          and might be removed in the next major 'congomongo' release."
   {:arglists
    '([collection {:one? false :count? false :as :clojure :from :clojure :where {} :only [] :sort nil :skip 0 :limit 0
-             :batch-size nil :max-time-ms nil :max-await-time-ms nil :cursor-type nil :no-cursor-timeout? nil
-             :oplog-replay? nil :partial? nil :read-preference nil :read-concern nil :collation nil :comment nil
-             :hint nil :max nil :min nil :return-key? nil :show-record-id? nil :explain? false :options []}])}
+                  :batch-size nil :max-time-ms nil :max-await-time-ms nil :cursor-type nil :no-cursor-timeout? nil
+                  :oplog-replay? nil :partial? nil :read-preference nil :read-concern nil :collation nil :comment nil
+                  :hint nil :max nil :min nil :return-key? nil :show-record-id? nil :explain? false :options []}])}
   [collection & {:as params}]
   (let [{:keys [one? count? as from where only sort skip limit
                 batch-size max-time-ms max-await-time-ms cursor-type no-cursor-timeout? oplog-replay? partial?
@@ -759,7 +770,7 @@ Please, use `fetch` with `:limit 1` instead.")))
    :read-concern    -> set the read concern (e.g. :local, see the `read-concern-map` for available options)
    :collation       -> set the collation"
   {:arglists '([collection field-name {:as :clojure :from :clojure :where nil
-                        :read-preference nil :read-concern nil :collation nil}])}
+                                       :read-preference nil :read-concern nil :collation nil}])}
   [collection field-name & {:keys [as from where read-preference read-concern collation]
                             :or {as :clojure from :clojure where nil}}]
   (let [;; TODO: Requires smth. like `set-collection-read-preference!` to be able to pass tags.
@@ -808,7 +819,7 @@ Please, use `fetch` with `:limit 1` instead.")))
 
    NOTE: To insert as a side-effect only, specify `:as` as `nil`."
   {:arglists '([collection obj {:many? false :as :clojure :from :clojure
-                 :write-concern nil :continue-on-error? nil :bypass-document-validation? nil :encoder nil}])}
+                                :write-concern nil :continue-on-error? nil :bypass-document-validation? nil :encoder nil}])}
   [collection obj & {:keys [many? as from
                             many to ;; TODO: For backward compatibility. Remove later.
                             write-concern continue-on-error? bypass-document-validation? encoder]
@@ -852,7 +863,7 @@ Please, use `fetch` with `:limit 1` instead.")))
 
    NOTE: To insert as a side-effect only, specify `:as` as `nil`."
   {:arglists '([collection objs {:as :clojure :from :clojure
-                  :write-concern nil :continue-on-error? nil :bypass-document-validation? nil :encoder nil}])}
+                                 :write-concern nil :continue-on-error? nil :bypass-document-validation? nil :encoder nil}])}
   [collection objs & {:keys [as from
                              to ;; TODO: For backward compatibility. Remove later.
                              write-concern continue-on-error? bypass-document-validation? encoder]
@@ -890,8 +901,8 @@ Please, use `fetch` with `:limit 1` instead.")))
    :collation     -> set the collation
    :array-filters -> set the array filters option"
   {:arglists '([collection old new {:upsert? true :multiple? false :as :clojure :from :clojure
-                     :write-concern nil :bypass-document-validation? nil :encoder nil :collation nil
-                     :array-filters nil}])}
+                                    :write-concern nil :bypass-document-validation? nil :encoder nil :collation nil
+                                    :array-filters nil}])}
   [collection query update & {:keys [upsert? multiple? as from write-concern bypass-document-validation?
                                      upsert multiple ;; TODO: For backward compatibility. Remove later.
                                      encoder collation array-filters]
@@ -946,8 +957,8 @@ Please, use `fetch` with `:limit 1` instead.")))
    NOTE: An `update` parameter cannot be `nil` unless is passed along with the `:remove? true`."
   {:arglists
    '([collection query update {:as :clojure :from :clojure :remove? false :return-new? false :upsert? false
-                          :only nil :sort nil :bypass-document-validation? nil :max-time-ms nil :write-concern nil
-                          :collation nil :array-filters nil}])}
+                               :only nil :sort nil :bypass-document-validation? nil :max-time-ms nil :write-concern nil
+                               :collation nil :array-filters nil}])}
   [collection query update & {:as params}]
   (let [{:keys [as from remove? return-new? upsert? only sort
                 bypass-document-validation? max-time-ms write-concern collation array-filters]}
@@ -1047,7 +1058,7 @@ Please, use `fetch` with `:limit 1` instead.")))
    :result          -> the result of the aggregation (if successful)
    :ok              -> 1.0 for success"
   {:arglists '([collection op & ops {:as :clojure :from :clojure :read-preference nil :batch-size nil
-                      :allow-disk-use? nil :max-time-ms nil :bypass-document-validation? nil :collation nil}])}
+                                     :allow-disk-use? nil :max-time-ms nil :bypass-document-validation? nil :collation nil}])}
   [collection op & ops-and-params]
   (let [[ops params-seq] (split-with (complement keyword?) ops-and-params)
         params (apply hash-map params-seq)
@@ -1085,6 +1096,7 @@ Please, use `fetch` with `:limit 1` instead.")))
 
 ;; database commands
 
+
 (defn command!
   "Executes a database command.
 
@@ -1118,6 +1130,7 @@ Please, use `fetch` with `:limit 1` instead.")))
 
 
 ;; collection indexes
+
 
 (defn get-indexes
   "Get indexes information on a collection."
@@ -1183,6 +1196,7 @@ Please, use `fetch` with `:limit 1` instead.")))
 
 ;; GridFS (contributed by Steve Purcell)
 
+
 (definline ^GridFS get-gridfs
   "Returns a GridFS object for the named bucket"
   [bucket]
@@ -1211,13 +1225,13 @@ Please, use `fetch` with `:limit 1` instead.")))
     (coerce f [:mongo :clojure])))
 
 (defn destroy-file!
-   "Removes file from gridfs. Takes a GridFS name and
+  "Removes file from gridfs. Takes a GridFS name and
     a query map"
-   {:arglists '([fs where {:from :clojure}])}
-   [fs q & {:keys [from]
-            :or {from :clojure}}]
-   (.remove (get-gridfs fs)
-            ^DBObject (coerce q [from :mongo])))
+  {:arglists '([fs where {:from :clojure}])}
+  [fs q & {:keys [from]
+           :or {from :clojure}}]
+  (.remove (get-gridfs fs)
+           ^DBObject (coerce q [from :mongo])))
 
 (defn fetch-files
   "Fetches objects from a GridFS
@@ -1260,6 +1274,7 @@ Please, use `fetch` with `:limit 1` instead.")))
 
 
 ;; Map-Reduce
+
 
 (defn- mapreduce-type
   [k]
@@ -1318,11 +1333,11 @@ Please, use `fetch` with `:limit 1` instead.")))
         ;; If out is a map then it should have a single entry, the key is the
         ;; output-type and the value is the output collection
         [out-collection mr-type] (letfn [(convert-map [[k v]]
-                                          [(named v) (mapreduce-type k)])]
-                                  (cond
-                                    (= out {:inline 1}) [nil (mapreduce-type :inline)]
-                                    (map? out)          (-> out first convert-map)
-                                    (named? out)        [(named out) (mapreduce-type :replace)]))
+                                           [(named v) (mapreduce-type k)])]
+                                   (cond
+                                     (= out {:inline 1}) [nil (mapreduce-type :inline)]
+                                     (map? out)          (-> out first convert-map)
+                                     (named? out)        [(named out) (mapreduce-type :replace)]))
         ;; Verbose is true by default
         ;; http://api.mongodb.org/java/3.0/com/mongodb/MapReduceCommand.html#setVerbose-java.lang.Boolean-
         mr-command (MapReduceCommand. (get-coll collection)
