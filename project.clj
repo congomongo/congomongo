@@ -18,4 +18,4 @@
   :profiles {:1.9 {:dependencies [[org.clojure/clojure "1.9.0"]]}
              :1.10 {:dependencies [[org.clojure/clojure "1.10.1"]]}}
   :aliases {"test-all" ["with-profile" "default,1.9:default,1.10" "test"]}
-  :plugins [[lein-cljfmt "0.6.7"]])
+  :plugins [[lein-cljfmt "0.8.0"]])

@@ -119,9 +119,7 @@
                   ;; UnsupportedOperationException
     (assocs->clojure (for [k (.keySet f)] [k (.get f k)]) keywordize)))
 
-
 ;;; Converting data from Clojure into data objects suitable for Mongo
-
 
 (defprotocol ConvertibleToMongo
   (clojure->mongo [o]))

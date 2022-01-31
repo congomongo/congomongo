@@ -658,10 +658,8 @@
       (is (or (= (read-str json) ["Pan", "Homo"])
               (= (read-str json) ["Homo", "Pan"]))))))
 
-
 ;; ;; mass insert chokes on excessively large inserts
 ;; ;; will need to implement some sort of chunking algorithm
-
 
 (deftest mass-insert
   (with-test-mongo
@@ -968,13 +966,13 @@
              #{{:_id "pineapples" :value {:count 6.0}}}))
       ;; check finalize
       (is (= (into #{} (map-reduce :mr mapfn reducefn target-collection
-                         :finalize "function(key, value){return 'There are ' + value.count + ' ' + key}"))
+                                   :finalize "function(key, value){return 'There are ' + value.count + ' ' + key}"))
              #{{:_id "bananas" :value "There are 3 bananas"}
                {:_id "pineapples" :value "There are 6 pineapples"}
                {:_id "plantains" :value "There are 5 plantains"}}))
       ;; check scope
       (is (= (into #{} (map-reduce :mr mapfn-with-scope reducefn target-collection
-                         :scope {:adj "tasty"}))
+                                   :scope {:adj "tasty"}))
              #{{:_id "tasty bananas" :value {:count 3.0}}
                {:_id "tasty pineapples" :value {:count 6.0}}
                {:_id "tasty plantains" :value {:count 5.0}}})))))

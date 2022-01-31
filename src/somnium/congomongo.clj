@@ -61,9 +61,7 @@
 (defn- named? [x]
   (instance? Named x))
 
-
 ;; the `make-connection` and helpers
-
 
 (defn- field->kw
   "Convert camelCase identifier string to hyphen-separated keyword."
@@ -210,9 +208,7 @@
       (make-connection-uri str)
       (make-connection-args str args))))
 
-
 ;; connection-related fns
-
 
 (defn connection?
   "Returns `true` if the argument is a map specifying an active connection.
@@ -250,9 +246,7 @@
                   (when (thread-bound? #'*mongo-config*)
                     (set! *mongo-config* connection))))
 
-
 ;; database-related fns
-
 
 (defn databases
   "Lists database names on the MongoDB server."
@@ -275,9 +269,7 @@
     (throw (RuntimeException.
             (str "database with name " db-name " does not exist.")))))
 
-
 ;; handy scoping macros
-
 
 (defmacro with-mongo
   "Makes the passed `connection` an active one in the enclosing scope.
@@ -311,9 +303,7 @@
   `(binding [*default-query-options* ~options]
      ~@body))
 
-
 ;; collections-related fns
-
 
 (definline ^DBCollection get-coll
   "Returns a DBCollection object"
@@ -355,9 +345,7 @@
                      ^String (named collection)
                      (coerce options [:clojure :mongo])))
 
-
 ;; write concerns
-
 
 (def write-concern-map
   {:acknowledged         WriteConcern/ACKNOWLEDGED
@@ -400,9 +388,7 @@
   [write-concern]
   (throw (IllegalArgumentException. (str write-concern " is not a valid WriteConcern alias"))))
 
-
 ;; read concerns
-
 
 (def read-concern-map
   {:default      ReadConcern/DEFAULT
@@ -416,9 +402,7 @@
   [read-concern]
   (throw (IllegalArgumentException. (str read-concern " is not a valid ReadConcern alias"))))
 
-
 ;; ObjectId-related conveniences
-
 
 (definline object-id ^ObjectId [^String s]
   `(ObjectId. ~s))
@@ -435,9 +419,7 @@
   (when-let [^ObjectId id (if (instance? ObjectId obj) obj (:_id obj))]
     (.getTime id)))
 
-
 ;; read preferences
-
 
 (def ^:private read-preference-map
   "Private map of factory functions of ReadPreferences to aliases."
@@ -485,9 +467,7 @@
   [collection]
   (.getReadPreference (get-coll collection)))
 
-
 ;; DBRef-related & eager fetching conveniences
-
 
 (defn db-ref
   "Convenience `DBRef` constructor."
@@ -516,11 +496,9 @@
                     x))
                 (apply fetcher args)))))
 
-
 ;; collection operations
 
 ;; - fetches
-
 
 (defn- set-cursor-options!
   "Sets the options on the cursor"
@@ -1093,9 +1071,7 @@ Please, use `fetch` with `:limit 1` instead.")))
                      :many true)
      :ok 1.0}))
 
-
 ;; database commands
-
 
 (defn command!
   "Executes a database command.
@@ -1128,9 +1104,7 @@ Please, use `fetch` with `:limit 1` instead.")))
             [:mongo (if (contains? params :to) to as)])))
 (def command command!)
 
-
 ;; collection indexes
-
 
 (defn get-indexes
   "Get indexes information on a collection."
@@ -1193,9 +1167,7 @@ Please, use `fetch` with `:limit 1` instead.")))
   [coll]
   (.dropIndexes (get-coll coll)))
 
-
 ;; GridFS (contributed by Steve Purcell)
-
 
 (definline ^GridFS get-gridfs
   "Returns a GridFS object for the named bucket"
@@ -1272,9 +1244,7 @@ Please, use `fetch` with `:limit 1` instead.")))
   (if-let [^GridFSDBFile f (.findOne ^GridFS (get-gridfs fs) ^DBObject (coerce file [:clojure :mongo]))]
     (.getInputStream f)))
 
-
 ;; Map-Reduce
-
 
 (defn- mapreduce-type
   [k]
