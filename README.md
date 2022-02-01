@@ -307,7 +307,7 @@ Developer information
 
 * [GitHub project](https://github.com/congomongo/congomongo)
 * [Google Group](https://groups.google.com/group/congomongo-dev)
-* [Continuous Integration](https://travis-ci.org/congomongo/congomongo)
+* [Continuous Integration](https://circleci.com/gh/congomongo/congomongo)
 
 Change Log
 ----------
