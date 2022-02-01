@@ -3,7 +3,7 @@ CongoMongo [![ClojarsVersionRelease](https://img.shields.io/clojars/v/congomongo
 
 What?
 ------
-A toolkit for using MongoDB with Clojure. This library is a pretty lightweight wrapper around the MongoDB Java driver, and can be paired with your favorite framworks or functions for validation such as (clojure.spec.alpha)[https://clojure.org/guides/spec].
+A toolkit for using MongoDB with Clojure. This library is a pretty lightweight wrapper around the MongoDB Java driver, and can be paired with your favorite framworks or functions for validation such as [clojure.spec.alpha](https://clojure.org/guides/spec).
 
 Releases and Dependency Information
 ----------------------------------------
