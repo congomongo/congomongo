@@ -886,7 +886,7 @@ Please, use `fetch` with `:limit 1` instead.")))
 ;; - updates
 
 (defn update!
-  "Alters/inserts a map in a collection. Overwrites existing objects.
+  "Alters/inserts document(s) in a collection. Overwrites existing objects.
    The shortcut forms need a map with valid `_id` and `_ns` fields or
    a collection and a map with a valid `_id` field.
 
@@ -894,6 +894,7 @@ Please, use `fetch` with `:limit 1` instead.")))
    collection     -> the database collection name (string, keyword, or symbol)
    query          -> the selection criteria for the update (a query map)
    update         -> the modifications to apply (a modifications map)
+                     or the Aggregation Pipeline (a sequential coll of stages maps, MongoDB 4.2+ only)
 
    Optional parameters include:
    :upsert?       -> do upsert, i.e. insert if document not present (default is `true`)
@@ -905,9 +906,9 @@ Please, use `fetch` with `:limit 1` instead.")))
    :encoder       -> set the encoder (of BSONObject to BSON)
    :collation     -> set the collation
    :array-filters -> set the array filters option"
-  {:arglists '([collection old new {:upsert? true :multiple? false :as :clojure :from :clojure
-                                    :write-concern nil :bypass-document-validation? nil :encoder nil :collation nil
-                                    :array-filters nil}])}
+  {:arglists '([collection query update {:upsert? true :multiple? false :as :clojure :from :clojure
+                                         :write-concern nil :bypass-document-validation? nil :encoder nil
+                                         :collation nil :array-filters nil}])}
   [collection query update & {:keys [upsert? multiple? as from write-concern bypass-document-validation?
                                      upsert multiple ;; TODO: For backward compatibility. Remove later.
                                      encoder collation array-filters]
@@ -967,6 +968,7 @@ Please, use `fetch` with `:limit 1` instead.")))
    collection          -> the database collection name (string, keyword, or symbol)
    query               -> the selection criteria for the modification (a query map)
    update              -> the modifications to apply to the selected document (a modifications map)
+                          or the Aggregation Pipeline (a sequential coll of stages maps, MongoDB 4.2+ only)
 
    Optional parameters include:
    :remove?            -> if `true`, removes the selected document
@@ -1054,7 +1056,7 @@ Please, use `fetch` with `:limit 1` instead.")))
 ;; - destroys
 
 (defn destroy!
-  "Removes map from a collection.
+  "Removes document(s) from a collection.
 
    Required parameters:
    collection     -> the database collection name (string, keyword, or symbol)
