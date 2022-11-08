@@ -34,6 +34,7 @@
             MapReduceCommand MapReduceCommand$OutputType MapReduceOutput
             Tag TagSet
             InsertOptions DBEncoder]
+           [com.mongodb.client MongoDatabase MongoCollection]
            [com.mongodb.client.model DBCollectionUpdateOptions
             DBCollectionCountOptions
             DBCollectionFindOptions
@@ -155,8 +156,9 @@
         mongo-client (if credential
                        (make-mongo-client addresses credential options)
                        (make-mongo-client addresses options))]
-    {:mongo mongo-client
-     :db    (when db-name (.getDB mongo-client db-name))}))
+    {:mongo    mongo-client
+     :db       (when db-name (.getDB mongo-client db-name))
+     :database (.getDatabase mongo-client db-name)}))
 
 (defn- make-connection-uri
   "Makes a connection to MongoDB with the passed URI, authenticating if `username` and `password` are specified."
@@ -164,8 +166,9 @@
   (let [^MongoClientURI mongo-client-uri (MongoClientURI. uri)
         ^MongoClient mongo-client (MongoClient. mongo-client-uri)
         ^String db-name (.getDatabase mongo-client-uri)]
-    {:mongo mongo-client
-     :db    (when db-name (.getDB mongo-client db-name))}))
+    {:mongo    mongo-client
+     :db       (when db-name (.getDB mongo-client db-name))
+     :database (.getDatabase mongo-client db-name)}))
 
 (defn make-connection
   "Connects to one or more MongoDB instances.
@@ -225,6 +228,13 @@
   (assert (connection? conn))
   (:db conn))
 
+(defn ^MongoDatabase get-database
+  "Returns a `MongoDatabase` object for the passed connection.
+   Throws exception if there isn't one."
+  [conn]
+  (assert (connection? conn))
+  (:database conn))
+
 (defn close-connection
   "Closes the `conn` and unsets it as the active connection if necessary."
   [conn]
@@ -263,11 +273,15 @@
 (defn set-database!
   "Atomically alters the current database."
   [db-name]
-  (if-let [db (.getDB ^MongoClient (:mongo *mongo-config*)
-                      ^String (named db-name))]
-    (alter-var-root #'*mongo-config* merge {:db db})
-    (throw (RuntimeException.
-            (str "database with name " db-name " does not exist.")))))
+  (let [mongo-client ^MongoClient (:mongo *mongo-config*)
+        db-name      ^String (named db-name)
+        db           (.getDB mongo-client db-name)
+        database     (.getDatabase mongo-client db-name)]
+    (if db
+      (alter-var-root #'*mongo-config* merge {:db db
+                                              :database database})
+      (throw (RuntimeException.
+               (str "database with name " db-name " does not exist."))))))
 
 ;; handy scoping macros
 
@@ -286,9 +300,12 @@
 
    NOTE: When `with-db` and `set-database!` interact, last one wins."
   [db-name & body]
-  `(let [^DB db# (.getDB ^MongoClient (:mongo *mongo-config*)
-                         (name ~db-name))]
-     (binding [*mongo-config* (assoc *mongo-config* :db db#)]
+  `(let [mongo-client# ^MongoClient (:mongo *mongo-config*)
+         db#           (.getDB mongo-client# (name ~db-name))
+         database#     (.getDatabase mongo-client# (name ~db-name))]
+     (binding [*mongo-config* (assoc *mongo-config*
+                                     :db db#
+                                     :database database#)]
        ~@body)))
 
 ;; TODO: Introduce these `*default-query-options*` overrides to other fns.
@@ -306,9 +323,15 @@
 ;; collections-related fns
 
 (definline ^DBCollection get-coll
-  "Returns a DBCollection object"
+  "Returns a `DBCollection` object"
   [collection]
   `(.getCollection (get-db *mongo-config*)
+                   ^String (named ~collection)))
+
+(definline ^MongoCollection get-mongo-coll
+  "Returns a `MongoCollection` object"
+  [collection]
+  `(.getCollection (get-database *mongo-config*)
                    ^String (named ~collection)))
 
 (defn collections
