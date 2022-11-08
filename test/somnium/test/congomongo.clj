@@ -335,6 +335,21 @@
       (with-default-query-options {:limit 1}
         (is (= {:foo 1} (fetch-and-modify :thingies {:foo 1} {:$inc {:foo 1}} :return-new? false :only {:_id false})))))))
 
+(deftest test-fetch-and-modify-with-aggregation-pipeline
+  (with-test-mongo
+    ;; Starting in MongoDB 4.2, we can use the aggregation pipeline for update operations
+    (when (nat-int? (-> test-db (version) (.compareTo "4.2")))
+      (insert! :test_col {:key "123"
+                          :value 1})
+      (fetch-and-modify :test_col {:key "123"} [{:$set {:value 3}}])
+      (is (= 3 (:value (fetch-one :test_col :where {:key "123"}))))
+      (let [res (fetch-and-modify :test_col {:key "123"}
+                                  [{:$set {:value 4}}
+                                   {:$project {:value 1}}]
+                                  :return-new? true)]
+        (is (not (contains? res :key)))
+        (is (= 4 (:value res)))))))
+
 (deftest can-insert-sets
   (with-test-mongo
     (insert! :test_col {:num-set #{1 2 3}
@@ -599,43 +614,110 @@
            "changed DB exists")
        (drop-database! test-db2))))
 
-(defn make-points!
+(defn insert-points!
   ([]
-   (make-points! 100))
+   (insert-points! 100))
   ([num-points]
-   (println "slow insert of " (* num-points num-points) " points:")
-   (time
-    (doseq [x (range num-points)
-            y (range num-points)]
-      (insert! :points {:x x :y y})))))
+   (let [total (* num-points num-points)]
+     (print (format "Inserting %s points: " total))
+     (time
+       (doseq [x (range num-points)
+               y (range num-points)]
+         (insert! :points {:x x :y y})))
+     total)))
 
 (deftest slow-insert-and-fetch
   (with-test-mongo
-    (make-points!)
+    (insert-points!)
     (is (= (* 100 100) (fetch-count :points)))
-    (is (= (fetch-count :points
-                        :where {:x 42}) 100))))
+    (is (= 100 (fetch-count :points :where {:x 42})))))
 
 (deftest destroy
   (with-test-mongo
-    (make-points!)
-    (let [point-id (:_id (fetch-one :points))]
-      (destroy! :points
-                {:_id point-id})
-      (is (= (fetch-count :points) (dec (* 100 100))))
-      (is (= nil (fetch-one :points
-                            :where {:_id point-id}))))))
+    (let [inserted (insert-points! 10)]
+      (let [point-id (:_id (fetch-one :points))]
+        (destroy! :points
+                  {:_id point-id})
+        (is (= (dec inserted) (fetch-count :points)))
+        (is (= nil (fetch-one :points :where {:_id point-id})))))))
 
 (deftest update-one
   (with-test-mongo
-    (make-points!)
-    (let [point-id (:_id (fetch-one :points))]
+    (let [inserted (insert-points! 10)]
+      (let [point-id (:_id (fetch-one :points))]
+        (update! :points
+                 {:_id point-id}
+                 {:x "suffusion of yellow"})
+        (is (= inserted (fetch-count :points)))
+        (is (= "suffusion of yellow"
+               (:x (fetch-one :points :where {:_id point-id}))))))))
+
+(deftest update-multiple
+  (with-test-mongo
+    (let [inserted (insert-points! 10)]
       (update! :points
-               {:_id point-id}
-               {:x "suffusion of yellow"})
-      (is (= (:x (fetch-one :points
-                            :where {:_id point-id}))
-             "suffusion of yellow")))))
+               {:y 0}
+               {:$set {:x "suffusion of yellow"}}
+               :multiple? true)
+      (is (= inserted (fetch-count :points)))
+      (is (= #{"suffusion of yellow"}
+             (set (map :x (fetch :points :where {:y 0}))))))))
+
+(deftest update-one-with-aggregation-pipeline
+  (with-test-mongo
+    ;; Starting in MongoDB 4.2, we can use the aggregation pipeline for update operations
+    (when (nat-int? (-> test-db (version) (.compareTo "4.2")))
+      (insert! :test_col {:key "123"
+                          :value 1})
+
+      ;; simple update of the `value` field
+      (let [upd-res (bean (update! :test_col {:key "123"}
+                                   [{:$set {:value 3}}]))]
+        (is (= 1 (:matchedCount upd-res)))
+        (is (= 1 (:modifiedCount upd-res))))
+      (let [upd-val (fetch-one :test_col :where {:key "123"})]
+        (is (= #{:_id :key :value} (set (keys upd-val))))
+        (is (= 3 (:value upd-val))))
+
+      ;; update of the `value` + unset of the `key`
+      (let [upd-res (bean (update! :test_col {:key "123"}
+                                   [{:$set {:value 4}}
+                                    {:$project {:value 1}}]))]
+        (is (= 1 (:matchedCount upd-res)))
+        (is (= 1 (:modifiedCount upd-res))))
+      (let [upd-val (fetch-one :test_col :where {:key "123"})]
+        (is (nil? upd-val)
+            "Must not be able to find a document with an unset key")))))
+
+(deftest update-multiple-with-aggregation-pipeline
+  (with-test-mongo
+    ;; Starting in MongoDB 4.2, we can use the aggregation pipeline for update operations
+    (when (nat-int? (-> test-db (version) (.compareTo "4.2")))
+      (insert! :test_col {:key "123"
+                          :value 1})
+      (insert! :test_col {:key "123"
+                          :value 2})
+
+      ;; simple update of the `value` field
+      (let [upd-res (bean (update! :test_col {:key "123"}
+                                   [{:$set {:value 3}}]
+                                   :multiple? true))]
+        (is (= 2 (:matchedCount upd-res)))
+        (is (= 2 (:modifiedCount upd-res))))
+      (let [upd-vals (fetch :test_col :where {:key "123"})]
+        (is (= 2 (count upd-vals)))
+        (is (= #{3} (set (map :value upd-vals)))))
+
+      ;; update of the `value` + unset of the `key`
+      (let [upd-res (bean (update! :test_col {:key "123"}
+                                   [{:$set {:value 4}}
+                                    {:$project {:value 1}}]
+                                   :multiple? true))]
+        (is (= 2 (:matchedCount upd-res)))
+        (is (= 2 (:modifiedCount upd-res))))
+      (let [upd-val (fetch-one :test_col :where {:key "123"})]
+        (is (nil? upd-val)
+            "Must not be able to find a document with an unset key")))))
 
 (deftest upsert-one
   (with-test-mongo
@@ -704,7 +786,7 @@
 
 (deftest basic-indexing
   (with-test-mongo
-    (make-points!)
+    (insert-points!)
     (add-index! :points [:x])
     (is (some #(= (into {} (% "key")) {"x" 1})
               (get-indexes :points)))))
