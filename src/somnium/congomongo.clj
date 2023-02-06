@@ -26,7 +26,8 @@
             [clojure.walk :refer (postwalk)]
             [somnium.congomongo.config :refer [*mongo-config* *default-query-options*]]
             [somnium.congomongo.coerce :refer [coerce coerce-fields coerce-index-fields]])
-  (:import [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder
+  (:import [clojure.lang Named Sequential]
+           [com.mongodb MongoClient MongoClientOptions MongoClientOptions$Builder
             MongoClientURI MongoCredential
             DB DBCollection DBObject DBRef DBCursor CursorType
             ServerAddress ReadPreference ReadConcern WriteConcern
@@ -34,20 +35,24 @@
             MapReduceCommand MapReduceCommand$OutputType MapReduceOutput
             Tag TagSet
             InsertOptions DBEncoder]
+           [com.mongodb.client MongoDatabase MongoCollection]
            [com.mongodb.client.model DBCollectionUpdateOptions
             DBCollectionCountOptions
             DBCollectionFindOptions
             DBCollectionRemoveOptions
             DBCollectionDistinctOptions
             DBCollectionFindAndModifyOptions
-            Collation]
+            Collation
+            UpdateOptions
+            FindOneAndUpdateOptions
+            ReturnDocument]
            [com.mongodb.gridfs GridFS GridFSDBFile GridFSInputFile]
-           [org.bson.types ObjectId]
            [java.io Writer]
            [java.lang.reflect Method Modifier]
            [java.util List]
            [java.util.concurrent TimeUnit]
-           [clojure.lang Named Sequential]))
+           [org.bson.conversions Bson]
+           [org.bson.types ObjectId]))
 
 ;; TODO: Remove as an unnecessary complexity. Just use `name`.
 (defprotocol StringNamed
@@ -155,8 +160,9 @@
         mongo-client (if credential
                        (make-mongo-client addresses credential options)
                        (make-mongo-client addresses options))]
-    {:mongo mongo-client
-     :db    (when db-name (.getDB mongo-client db-name))}))
+    {:mongo    mongo-client
+     :db       (when db-name (.getDB mongo-client db-name))
+     :database (.getDatabase mongo-client db-name)}))
 
 (defn- make-connection-uri
   "Makes a connection to MongoDB with the passed URI, authenticating if `username` and `password` are specified."
@@ -164,8 +170,9 @@
   (let [^MongoClientURI mongo-client-uri (MongoClientURI. uri)
         ^MongoClient mongo-client (MongoClient. mongo-client-uri)
         ^String db-name (.getDatabase mongo-client-uri)]
-    {:mongo mongo-client
-     :db    (when db-name (.getDB mongo-client db-name))}))
+    {:mongo    mongo-client
+     :db       (when db-name (.getDB mongo-client db-name))
+     :database (.getDatabase mongo-client db-name)}))
 
 (defn make-connection
   "Connects to one or more MongoDB instances.
@@ -225,6 +232,13 @@
   (assert (connection? conn))
   (:db conn))
 
+(defn ^MongoDatabase get-database
+  "Returns a `MongoDatabase` object for the passed connection.
+   Throws exception if there isn't one."
+  [conn]
+  (assert (connection? conn))
+  (:database conn))
+
 (defn close-connection
   "Closes the `conn` and unsets it as the active connection if necessary."
   [conn]
@@ -263,11 +277,15 @@
 (defn set-database!
   "Atomically alters the current database."
   [db-name]
-  (if-let [db (.getDB ^MongoClient (:mongo *mongo-config*)
-                      ^String (named db-name))]
-    (alter-var-root #'*mongo-config* merge {:db db})
-    (throw (RuntimeException.
-            (str "database with name " db-name " does not exist.")))))
+  (let [mongo-client ^MongoClient (:mongo *mongo-config*)
+        db-name      ^String (named db-name)
+        db           (.getDB mongo-client db-name)
+        database     (.getDatabase mongo-client db-name)]
+    (if db
+      (alter-var-root #'*mongo-config* merge {:db db
+                                              :database database})
+      (throw (RuntimeException.
+               (str "database with name " db-name " does not exist."))))))
 
 ;; handy scoping macros
 
@@ -286,9 +304,12 @@
 
    NOTE: When `with-db` and `set-database!` interact, last one wins."
   [db-name & body]
-  `(let [^DB db# (.getDB ^MongoClient (:mongo *mongo-config*)
-                         (name ~db-name))]
-     (binding [*mongo-config* (assoc *mongo-config* :db db#)]
+  `(let [mongo-client# ^MongoClient (:mongo *mongo-config*)
+         db#           (.getDB mongo-client# (name ~db-name))
+         database#     (.getDatabase mongo-client# (name ~db-name))]
+     (binding [*mongo-config* (assoc *mongo-config*
+                                     :db db#
+                                     :database database#)]
        ~@body)))
 
 ;; TODO: Introduce these `*default-query-options*` overrides to other fns.
@@ -306,9 +327,15 @@
 ;; collections-related fns
 
 (definline ^DBCollection get-coll
-  "Returns a DBCollection object"
+  "Returns a `DBCollection` object"
   [collection]
   `(.getCollection (get-db *mongo-config*)
+                   ^String (named ~collection)))
+
+(definline ^MongoCollection get-mongo-coll
+  "Returns a `MongoCollection` object"
+  [collection]
+  `(.getCollection (get-database *mongo-config*)
                    ^String (named ~collection)))
 
 (defn collections
@@ -859,7 +886,7 @@ Please, use `fetch` with `:limit 1` instead.")))
 ;; - updates
 
 (defn update!
-  "Alters/inserts a map in a collection. Overwrites existing objects.
+  "Alters/inserts document(s) in a collection. Overwrites existing objects.
    The shortcut forms need a map with valid `_id` and `_ns` fields or
    a collection and a map with a valid `_id` field.
 
@@ -867,6 +894,7 @@ Please, use `fetch` with `:limit 1` instead.")))
    collection     -> the database collection name (string, keyword, or symbol)
    query          -> the selection criteria for the update (a query map)
    update         -> the modifications to apply (a modifications map)
+                     or the Aggregation Pipeline (a sequential coll of stages maps, MongoDB 4.2+ only)
 
    Optional parameters include:
    :upsert?       -> do upsert, i.e. insert if document not present (default is `true`)
@@ -878,35 +906,58 @@ Please, use `fetch` with `:limit 1` instead.")))
    :encoder       -> set the encoder (of BSONObject to BSON)
    :collation     -> set the collation
    :array-filters -> set the array filters option"
-  {:arglists '([collection old new {:upsert? true :multiple? false :as :clojure :from :clojure
-                                    :write-concern nil :bypass-document-validation? nil :encoder nil :collation nil
-                                    :array-filters nil}])}
+  {:arglists '([collection query update {:upsert? true :multiple? false :as :clojure :from :clojure
+                                         :write-concern nil :bypass-document-validation? nil :encoder nil
+                                         :collation nil :array-filters nil}])}
   [collection query update & {:keys [upsert? multiple? as from write-concern bypass-document-validation?
                                      upsert multiple ;; TODO: For backward compatibility. Remove later.
                                      encoder collation array-filters]
                               :or {upsert? true multiple? false as :clojure from :clojure}}]
-  (coerce (.update ^DBCollection (get-coll collection)
-                   ^DBObject (coerce query [from :mongo])
-                   ^DBObject (coerce update [from :mongo])
-                   ^DBCollectionUpdateOptions
-                   (let [opts (DBCollectionUpdateOptions.)]
-                     (.upsert opts ^boolean (if (nil? upsert) upsert? upsert))
-                     (.multi opts ^boolean (or multiple multiple?))
-                     (when write-concern
-                       (if-let [wc (write-concern write-concern-map)]
-                         (.writeConcern opts ^WriteConcern wc)
-                         (illegal-write-concern write-concern)))
-                     (when (boolean? bypass-document-validation?)
-                       (.bypassDocumentValidation opts ^boolean bypass-document-validation?))
-                     (when (instance? DBEncoder encoder)
-                       (.encoder opts ^DBEncoder encoder))
-                     (when (instance? Collation collation)
-                       (.collation opts ^Collation collation))
-                     (when array-filters
-                       (let [coerced-af (coerce array-filters [:clojure :mongo] :many true)]
-                         (.arrayFilters opts ^List coerced-af)))
-                     opts))
-          [:mongo as]))
+  (let [upsert? (if (nil? upsert) upsert? upsert)
+        res (if (sequential? update)
+              ;; TODO: Pass `write-concern` another way around, via `MongoCollection#withWriteConcern`.
+              (let [opts ^UpdateOptions
+                         (let [opts (UpdateOptions.)]
+                           (.upsert opts ^boolean upsert?)
+                           (when (boolean? bypass-document-validation?)
+                             (.bypassDocumentValidation opts ^boolean bypass-document-validation?))
+                           (when (instance? Collation collation)
+                             (.collation opts ^Collation collation))
+                           (when array-filters
+                             (let [coerced-af (coerce array-filters [:clojure :mongo] :many true)]
+                               (.arrayFilters opts ^List coerced-af)))
+                           opts)]
+                (if-not multiple?
+                  (.updateOne ^MongoCollection (get-mongo-coll collection)
+                              ^Bson (coerce query [from :mongo])
+                              ^List (coerce update [from :mongo] :many true)
+                              opts)
+                  (.updateMany ^MongoCollection (get-mongo-coll collection)
+                               ^Bson (coerce query [from :mongo])
+                               ^List (coerce update [from :mongo] :many true)
+                               opts)))
+              (.update ^DBCollection (get-coll collection)
+                       ^DBObject (coerce query [from :mongo])
+                       ^DBObject (coerce update [from :mongo])
+                       ^DBCollectionUpdateOptions
+                       (let [opts (DBCollectionUpdateOptions.)]
+                         (.upsert opts ^boolean upsert?)
+                         (.multi opts ^boolean (or multiple multiple?))
+                         (when write-concern
+                           (if-let [wc (write-concern write-concern-map)]
+                             (.writeConcern opts ^WriteConcern wc)
+                             (illegal-write-concern write-concern)))
+                         (when (boolean? bypass-document-validation?)
+                           (.bypassDocumentValidation opts ^boolean bypass-document-validation?))
+                         (when (instance? DBEncoder encoder)
+                           (.encoder opts ^DBEncoder encoder))
+                         (when (instance? Collation collation)
+                           (.collation opts ^Collation collation))
+                         (when array-filters
+                           (let [coerced-af (coerce array-filters [:clojure :mongo] :many true)]
+                             (.arrayFilters opts ^List coerced-af)))
+                         opts)))]
+    (coerce res [:mongo as])))
 
 (defn fetch-and-modify!
   "Atomically modifies and returns a single document.
@@ -917,6 +968,7 @@ Please, use `fetch` with `:limit 1` instead.")))
    collection          -> the database collection name (string, keyword, or symbol)
    query               -> the selection criteria for the modification (a query map)
    update              -> the modifications to apply to the selected document (a modifications map)
+                          or the Aggregation Pipeline (a sequential coll of stages maps, MongoDB 4.2+ only)
 
    Optional parameters include:
    :remove?            -> if `true`, removes the selected document
@@ -944,43 +996,67 @@ Please, use `fetch` with `:limit 1` instead.")))
                 :only nil :sort nil :max-time-ms 0}
                *default-query-options*
                params)]
-    (coerce (.findAndModify ^DBCollection (get-coll collection)
-                            ^DBObject (coerce query [from :mongo])
-                            ^DBCollectionFindAndModifyOptions
-                            (let [opts (DBCollectionFindAndModifyOptions.)]
-                              (when update
-                                (.update opts ^DBObject (coerce update [from :mongo])))
-                              (when (boolean? remove?)
-                                (.remove opts ^boolean remove?))
-                              (when (boolean? return-new?)
-                                (.returnNew opts ^boolean return-new?))
-                              (when (boolean? upsert?)
-                                (.upsert opts ^boolean upsert?))
-                              (when only
-                                (.projection opts ^DBObject (coerce-fields only)))
-                              (when sort
-                                (.sort opts ^DBObject (coerce sort [from :mongo])))
-                              (when (boolean? bypass-document-validation?)
-                                (.bypassDocumentValidation opts ^boolean bypass-document-validation?))
-                              (when (int? max-time-ms)
-                                (.maxTime opts ^long max-time-ms TimeUnit/MILLISECONDS))
-                              (when write-concern
-                                (if-let [wc (write-concern write-concern-map)]
-                                  (.writeConcern opts ^WriteConcern wc)
-                                  (illegal-write-concern write-concern)))
-                              (when (instance? Collation collation)
-                                (.collation opts ^Collation collation))
-                              (when array-filters
-                                (let [coerced-af (coerce array-filters [:clojure :mongo] :many true)]
-                                  (.arrayFilters opts ^List coerced-af)))
-                              opts))
-            [:mongo as])))
+    (let [res (if (sequential? update)
+                (.findOneAndUpdate ^MongoCollection (get-mongo-coll collection)
+                                   ^Bson (coerce query [from :mongo])
+                                   ^List (coerce update [from :mongo] :many true)
+                                   ^FindOneAndUpdateOptions
+                                   (let [opts (FindOneAndUpdateOptions.)]
+                                     (when only
+                                       (.projection opts ^Bson (coerce-fields only)))
+                                     (when sort
+                                       (.sort opts ^Bson (coerce sort [from :mongo])))
+                                     (when (boolean? upsert?)
+                                       (.upsert opts ^boolean upsert?))
+                                     (when (boolean? return-new?)
+                                       (.returnDocument opts ReturnDocument/AFTER))
+                                     (when (int? max-time-ms)
+                                       (.maxTime opts ^long max-time-ms TimeUnit/MILLISECONDS))
+                                     (when (boolean? bypass-document-validation?)
+                                       (.bypassDocumentValidation opts ^boolean bypass-document-validation?))
+                                     (when (instance? Collation collation)
+                                       (.collation opts ^Collation collation))
+                                     (when array-filters
+                                       (let [coerced-af (coerce array-filters [:clojure :mongo] :many true)]
+                                         (.arrayFilters opts ^List coerced-af)))
+                                     opts))
+                (.findAndModify ^DBCollection (get-coll collection)
+                                ^DBObject (coerce query [from :mongo])
+                                ^DBCollectionFindAndModifyOptions
+                                (let [opts (DBCollectionFindAndModifyOptions.)]
+                                  (when update
+                                    (.update opts ^DBObject (coerce update [from :mongo])))
+                                  (when (boolean? remove?)
+                                    (.remove opts ^boolean remove?))
+                                  (when (boolean? return-new?)
+                                    (.returnNew opts ^boolean return-new?))
+                                  (when (boolean? upsert?)
+                                    (.upsert opts ^boolean upsert?))
+                                  (when only
+                                    (.projection opts ^DBObject (coerce-fields only)))
+                                  (when sort
+                                    (.sort opts ^DBObject (coerce sort [from :mongo])))
+                                  (when (boolean? bypass-document-validation?)
+                                    (.bypassDocumentValidation opts ^boolean bypass-document-validation?))
+                                  (when (int? max-time-ms)
+                                    (.maxTime opts ^long max-time-ms TimeUnit/MILLISECONDS))
+                                  (when write-concern
+                                    (if-let [wc (write-concern write-concern-map)]
+                                      (.writeConcern opts ^WriteConcern wc)
+                                      (illegal-write-concern write-concern)))
+                                  (when (instance? Collation collation)
+                                    (.collation opts ^Collation collation))
+                                  (when array-filters
+                                    (let [coerced-af (coerce array-filters [:clojure :mongo] :many true)]
+                                      (.arrayFilters opts ^List coerced-af)))
+                                  opts)))]
+      (coerce res [:mongo as]))))
 (def fetch-and-modify fetch-and-modify!) ;; TODO: Backward compatibility. Remove later on?
 
 ;; - destroys
 
 (defn destroy!
-  "Removes map from a collection.
+  "Removes document(s) from a collection.
 
    Required parameters:
    collection     -> the database collection name (string, keyword, or symbol)
