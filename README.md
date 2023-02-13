@@ -5,6 +5,15 @@ What?
 ------
 A toolkit for using MongoDB with Clojure. This library is a pretty lightweight wrapper around the MongoDB Java driver, and can be paired with your favorite framworks or functions for validation such as [clojure.spec.alpha](https://clojure.org/guides/spec).
 
+Supported MongoDB versions
+----------------------------------------
+
+The client was tested with the following MongoDB versions:
+- MongoDB 3.6
+- MongoDB 4.2
+
+Thus, while the library may work just fine with higher MongoDB versions, the full feature support is not guaranteed.
+
 Releases and Dependency Information
 ----------------------------------------
 

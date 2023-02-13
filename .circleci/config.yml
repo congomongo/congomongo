@@ -5,7 +5,7 @@
 version: 2.1
 
 jobs:
-  build:
+  build-3.6:
     docker:
       # specify the version you desire here
       - image: circleci/clojure:lein-2.9.5
@@ -38,7 +38,41 @@ jobs:
       # run tests!
       - run: lein test
 
+  build-4.2:
+    docker:
+      # specify the version you desire here
+      - image: circleci/clojure:lein-2.9.5
+      - image: mongo:4.2
+
+    working_directory: ~/repo
+
+    environment:
+      LEIN_ROOT: "true"
+      # Customize the JVM maximum heap limit
+      JVM_OPTS: -Xmx3200m
+
+    steps:
+      - checkout
+
+      # Download and cache dependencies
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "project.clj" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+
+      - run: lein deps
+
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-dependencies-{{ checksum "project.clj" }}
+
+      # run tests!
+      - run: lein test :all
+
 workflows:
   build:
     jobs:
-      - build
+      - build-3.6
+      - build-4.2

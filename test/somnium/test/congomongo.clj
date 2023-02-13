@@ -86,6 +86,11 @@
       (.command "buildInfo")
       (.getString "version")))
 
+(defn- assert-version!
+  [min-version]
+  (assert (nat-int? (-> test-db (version) (.compareTo min-version)))
+          (format "MongoDB %s+ is required for this test" min-version)))
+
 (defn- mongo-hash
   "Uses the same hashing algorithm as
   https://github.com/mongodb/mongo/blob/09917767b116f4ff1c0eadda1e8bc5db30828500/src/mongo/shell/db.js#L149"
@@ -335,20 +340,21 @@
       (with-default-query-options {:limit 1}
         (is (= {:foo 1} (fetch-and-modify :thingies {:foo 1} {:$inc {:foo 1}} :return-new? false :only {:_id false})))))))
 
-(deftest test-fetch-and-modify-with-aggregation-pipeline
+(deftest ^:mongo-4.2+ test-fetch-and-modify-with-aggregation-pipeline
+  ;; With MongoDB 4.2+ we can use the aggregation pipeline for update operations
   (with-test-mongo
-    ;; Starting in MongoDB 4.2, we can use the aggregation pipeline for update operations
-    (when (nat-int? (-> test-db (version) (.compareTo "4.2")))
-      (insert! :test_col {:key "123"
-                          :value 1})
-      (fetch-and-modify :test_col {:key "123"} [{:$set {:value 3}}])
-      (is (= 3 (:value (fetch-one :test_col :where {:key "123"}))))
-      (let [res (fetch-and-modify :test_col {:key "123"}
-                                  [{:$set {:value 4}}
-                                   {:$project {:value 1}}]
-                                  :return-new? true)]
-        (is (not (contains? res :key)))
-        (is (= 4 (:value res)))))))
+    (assert-version! "4.2")
+
+    (insert! :test_col {:key "123"
+                        :value 1})
+    (fetch-and-modify :test_col {:key "123"} [{:$set {:value 3}}])
+    (is (= 3 (:value (fetch-one :test_col :where {:key "123"}))))
+    (let [res (fetch-and-modify :test_col {:key "123"}
+                                [{:$set {:value 4}}
+                                 {:$project {:value 1}}]
+                                :return-new? true)]
+      (is (not (contains? res :key)))
+      (is (= 4 (:value res))))))
 
 (deftest can-insert-sets
   (with-test-mongo
@@ -663,61 +669,63 @@
       (is (= #{"suffusion of yellow"}
              (set (map :x (fetch :points :where {:y 0}))))))))
 
-(deftest update-one-with-aggregation-pipeline
+(deftest ^:mongo-4.2+ update-one-with-aggregation-pipeline
+  ;; With MongoDB 4.2+ we can use the aggregation pipeline for update operations
   (with-test-mongo
-    ;; Starting in MongoDB 4.2, we can use the aggregation pipeline for update operations
-    (when (nat-int? (-> test-db (version) (.compareTo "4.2")))
-      (insert! :test_col {:key "123"
-                          :value 1})
+    (assert-version! "4.2")
 
-      ;; simple update of the `value` field
-      (let [upd-res (bean (update! :test_col {:key "123"}
-                                   [{:$set {:value 3}}]))]
-        (is (= 1 (:matchedCount upd-res)))
-        (is (= 1 (:modifiedCount upd-res))))
-      (let [upd-val (fetch-one :test_col :where {:key "123"})]
-        (is (= #{:_id :key :value} (set (keys upd-val))))
-        (is (= 3 (:value upd-val))))
+    (insert! :test_col {:key "123"
+                        :value 1})
 
-      ;; update of the `value` + unset of the `key`
-      (let [upd-res (bean (update! :test_col {:key "123"}
-                                   [{:$set {:value 4}}
-                                    {:$project {:value 1}}]))]
-        (is (= 1 (:matchedCount upd-res)))
-        (is (= 1 (:modifiedCount upd-res))))
-      (let [upd-val (fetch-one :test_col :where {:key "123"})]
-        (is (nil? upd-val)
-            "Must not be able to find a document with an unset key")))))
+    ;; simple update of the `value` field
+    (let [upd-res (bean (update! :test_col {:key "123"}
+                                 [{:$set {:value 3}}]))]
+      (is (= 1 (:matchedCount upd-res)))
+      (is (= 1 (:modifiedCount upd-res))))
+    (let [upd-val (fetch-one :test_col :where {:key "123"})]
+      (is (= #{:_id :key :value} (set (keys upd-val))))
+      (is (= 3 (:value upd-val))))
 
-(deftest update-multiple-with-aggregation-pipeline
+    ;; update of the `value` + unset of the `key`
+    (let [upd-res (bean (update! :test_col {:key "123"}
+                                 [{:$set {:value 4}}
+                                  {:$project {:value 1}}]))]
+      (is (= 1 (:matchedCount upd-res)))
+      (is (= 1 (:modifiedCount upd-res))))
+    (let [upd-val (fetch-one :test_col :where {:key "123"})]
+      (is (nil? upd-val)
+          "Must not be able to find a document with an unset key"))))
+
+(deftest ^:mongo-4.2+ update-multiple-with-aggregation-pipeline
+  ;; With MongoDB 4.2+ we can use the aggregation pipeline for update operations
   (with-test-mongo
-    ;; Starting in MongoDB 4.2, we can use the aggregation pipeline for update operations
-    (when (nat-int? (-> test-db (version) (.compareTo "4.2")))
-      (insert! :test_col {:key "123"
-                          :value 1})
-      (insert! :test_col {:key "123"
-                          :value 2})
+    (assert-version! "4.2")
 
-      ;; simple update of the `value` field
-      (let [upd-res (bean (update! :test_col {:key "123"}
-                                   [{:$set {:value 3}}]
-                                   :multiple? true))]
-        (is (= 2 (:matchedCount upd-res)))
-        (is (= 2 (:modifiedCount upd-res))))
-      (let [upd-vals (fetch :test_col :where {:key "123"})]
-        (is (= 2 (count upd-vals)))
-        (is (= #{3} (set (map :value upd-vals)))))
+    (insert! :test_col {:key "123"
+                        :value 1})
+    (insert! :test_col {:key "123"
+                        :value 2})
 
-      ;; update of the `value` + unset of the `key`
-      (let [upd-res (bean (update! :test_col {:key "123"}
-                                   [{:$set {:value 4}}
-                                    {:$project {:value 1}}]
-                                   :multiple? true))]
-        (is (= 2 (:matchedCount upd-res)))
-        (is (= 2 (:modifiedCount upd-res))))
-      (let [upd-val (fetch-one :test_col :where {:key "123"})]
-        (is (nil? upd-val)
-            "Must not be able to find a document with an unset key")))))
+    ;; simple update of the `value` field
+    (let [upd-res (bean (update! :test_col {:key "123"}
+                                 [{:$set {:value 3}}]
+                                 :multiple? true))]
+      (is (= 2 (:matchedCount upd-res)))
+      (is (= 2 (:modifiedCount upd-res))))
+    (let [upd-vals (fetch :test_col :where {:key "123"})]
+      (is (= 2 (count upd-vals)))
+      (is (= #{3} (set (map :value upd-vals)))))
+
+    ;; update of the `value` + unset of the `key`
+    (let [upd-res (bean (update! :test_col {:key "123"}
+                                 [{:$set {:value 4}}
+                                  {:$project {:value 1}}]
+                                 :multiple? true))]
+      (is (= 2 (:matchedCount upd-res)))
+      (is (= 2 (:modifiedCount upd-res))))
+    (let [upd-val (fetch-one :test_col :where {:key "123"})]
+      (is (nil? upd-val)
+          "Must not be able to find a document with an unset key"))))
 
 (deftest upsert-one
   (with-test-mongo
