@@ -1,3 +1,8 @@
+# Version 2.6.0 - Feb 16, 2023
+* Support for aggregation pipeline
+* Updated CI scripts
+* Stratified test cases depending on MongoDB version used
+
 # Version 2.5.1 - Jan 31, 2022
 
 * Re-implement `aggregate` w/ `AggregationOptions`.
