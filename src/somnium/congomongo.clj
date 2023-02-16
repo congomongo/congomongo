@@ -285,7 +285,7 @@
       (alter-var-root #'*mongo-config* merge {:db db
                                               :database database})
       (throw (RuntimeException.
-               (str "database with name " db-name " does not exist."))))))
+              (str "database with name " db-name " does not exist."))))))
 
 ;; handy scoping macros
 
@@ -917,16 +917,16 @@ Please, use `fetch` with `:limit 1` instead.")))
         res (if (sequential? update)
               ;; TODO: Pass `write-concern` another way around, via `MongoCollection#withWriteConcern`.
               (let [opts ^UpdateOptions
-                         (let [opts (UpdateOptions.)]
-                           (.upsert opts ^boolean upsert?)
-                           (when (boolean? bypass-document-validation?)
-                             (.bypassDocumentValidation opts ^boolean bypass-document-validation?))
-                           (when (instance? Collation collation)
-                             (.collation opts ^Collation collation))
-                           (when array-filters
-                             (let [coerced-af (coerce array-filters [:clojure :mongo] :many true)]
-                               (.arrayFilters opts ^List coerced-af)))
-                           opts)]
+                    (let [opts (UpdateOptions.)]
+                      (.upsert opts ^boolean upsert?)
+                      (when (boolean? bypass-document-validation?)
+                        (.bypassDocumentValidation opts ^boolean bypass-document-validation?))
+                      (when (instance? Collation collation)
+                        (.collation opts ^Collation collation))
+                      (when array-filters
+                        (let [coerced-af (coerce array-filters [:clojure :mongo] :many true)]
+                          (.arrayFilters opts ^List coerced-af)))
+                      opts)]
                 (if-not multiple?
                   (.updateOne ^MongoCollection (get-mongo-coll collection)
                               ^Bson (coerce query [from :mongo])

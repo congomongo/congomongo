@@ -627,9 +627,9 @@
    (let [total (* num-points num-points)]
      (print (format "Inserting %s points: " total))
      (time
-       (doseq [x (range num-points)
-               y (range num-points)]
-         (insert! :points {:x x :y y})))
+      (doseq [x (range num-points)
+              y (range num-points)]
+        (insert! :points {:x x :y y})))
      total)))
 
 (deftest slow-insert-and-fetch

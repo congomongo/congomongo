@@ -17,27 +17,27 @@ Thus, while the library may work just fine with higher MongoDB versions, the ful
 Releases and Dependency Information
 ----------------------------------------
 
-Latest stable release is **2.5.1**.
+Latest stable release is **2.6.0**.
 
 [Leiningen] dependency information:
 
-    [congomongo "2.5.1"]
+    [congomongo "2.6.0"]
 
 [Clojure CLI]:
 
-    congomongo {:mvn/version "2.5.1"}
+    congomongo {:mvn/version "2.6.0"}
 
 [Maven] dependency information:
 
     <dependency>
       <groupId>congomongo</groupId>
       <artifactId>congomongo</artifactId>
-      <version>2.5.1</version>
+      <version>2.6.0</version>
     </dependency>
 
 [Gradle] dependency information:
 
-    compile 'congomongo:congomongo:2.5.1'
+    compile 'congomongo:congomongo:2.6.0'
 
 [Leiningen]: https://leiningen.org/
 [Clojure CLI]: https://clojure.org/guides/deps_and_cli
