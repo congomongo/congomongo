@@ -5,7 +5,7 @@
 version: 2.1
 
 jobs:
-  build-3.6:
+  build-3-6:
     docker:
       # specify the version you desire here
       - image: circleci/clojure:lein-2.9.5
@@ -38,7 +38,7 @@ jobs:
       # run tests!
       - run: lein test
 
-  build-4.2:
+  build-4-2:
     docker:
       # specify the version you desire here
       - image: circleci/clojure:lein-2.9.5
@@ -74,5 +74,5 @@ jobs:
 workflows:
   build:
     jobs:
-      - build-3.6
-      - build-4.2
+      - build-3-6
+      - build-4-2
